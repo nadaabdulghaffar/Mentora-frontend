@@ -4,7 +4,7 @@ import logoImage from "../../assets/images/logo.png"
 import illustrationImage from "../../assets/images/rafiki.png"
 import { InputField, PasswordInput, SocialLoginButton, FormDivider, AuthLink } from "../../components/Form"
 import { Alert } from "../../components/Alert"
-import { authAPI } from "../../services/auth"
+import authAPI from "../../services/authService"
 import { 
   validateSignupForm, 
   validatePassword, 
@@ -97,17 +97,23 @@ function Signup() {
 
     setLoading(true)
 
-    const response = await authAPI.registerInitial(firstName, lastName, email, password)
+    try {
+      const response = await authAPI.registerInitial(firstName, lastName, email, password)
 
-    if (response.success) {
-      const userId = response.data?.userId
-      localStorage.setItem('pendingUserEmail', email)
-      if (userId) {
-        localStorage.setItem('pendingUserId', userId)
+      if (response.success) {
+        const userId = response.data?.user?.userId
+        localStorage.setItem('pendingUserEmail', email)
+        if (userId) {
+          localStorage.setItem('pendingUserId', userId)
+        }
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`)
+      } else {
+        setError(response.message || response.errors?.[0] || 'Failed to create account')
       }
-      navigate(`/verify-email?email=${encodeURIComponent(email)}`)
-    } else {
-      setError(response.message || response.errors?.[0] || 'Failed to create account')
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Request failed'
+      setError(message)
+    } finally {
       setLoading(false)
     }
   }

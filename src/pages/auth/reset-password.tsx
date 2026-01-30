@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { authAPI } from "../../services/auth"
+import authAPI from "../../services/authService"
 import bgImage from "../../assets/images/bg.png"
 import { PasswordInput } from "../../components/Form"
 import { Alert } from "../../components/Alert"

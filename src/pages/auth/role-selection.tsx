@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import menteeIcon from "../../assets/images/menteeIcon.png"
 import mentorIcon from "../../assets/images/mentorIcon.png"
-import { authAPI } from "../../services/auth"
+import authAPI from "../../services/authService"
 
 function RoleSelection() {
   const navigate = useNavigate()
@@ -14,26 +14,33 @@ function RoleSelection() {
   const handleContinue = async () => {
     if (!selectedRole) return
 
-    const pendingUserId = localStorage.getItem('pendingUserId')
-    if (!pendingUserId) {
-      setError('Missing registration data. Please sign up again.')
+    setLoading(true)
+    setError("")
+
+    const registrationToken = localStorage.getItem('registrationToken')
+    if (!registrationToken) {
+      setError('Missing registration token. Please sign up again.')
+      setLoading(false)
       navigate('/signup')
       return
     }
 
-    setLoading(true)
-    setError("")
+    try {
+      const response = await authAPI.selectRole(selectedRole, registrationToken)
 
-    const response = await authAPI.completeRegistration(pendingUserId, selectedRole)
-
-    if (response.success) {
-      if (selectedRole === 'mentee') {
-        navigate('/signup/mentee-form')
+      if (response.success) {
+        if (selectedRole === 'mentee') {
+          navigate('/signup/mentee-form')
+        } else {
+          navigate('/signup/mentor-form')
+        }
       } else {
-        navigate('/signup/mentor-form')
+        setError(response.message || response.errors?.[0] || 'Failed to save role')
       }
-    } else {
-      setError(response.message || response.errors?.[0] || 'Failed to save role')
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Request failed'
+      setError(message)
+    } finally {
       setLoading(false)
     }
   }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import {
@@ -16,6 +16,7 @@ import {
   FormNavigation,
   type Option,
 } from "../../components/MultiStepForm"
+import lookupAPI from "../../services/lookupService"
 
 interface MenteeFormData {
   educationLevel: string
@@ -45,20 +46,18 @@ function MenteeForm() {
     bio: '',
   })
 
+  // البيانات من الـ API
+  const [domains, setDomains] = useState<Option[]>([])
+  const [subDomains, setSubDomains] = useState<string[]>([])
+  const [careerGoals, setCareerGoals] = useState<string[]>([])
+  const [learningStyles, setLearningStyles] = useState<string[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+
   const totalSteps = 4
 
   const educationOptions: Option[] = [
     { label: "Student", value: "student" },
     { label: "Graduate", value: "graduate" },
-   
-  ]
-   const industryOptions: Option[] = [
-    { label: "Design", value: "design" },
-    { label: "Software", value: "software" },
-    { label: "Marketing", value: "marketing" },
-    { label: "Finance", value: "finance" },
-    { label: "Healthcare", value: "healthcare" },
-    { label: "Other", value: "other" },
   ]
 
   const experienceOptions : Option[] = [
@@ -68,29 +67,68 @@ function MenteeForm() {
     { label: "5+ years", value: "5plus" },
   ]
 
-  const relevantExpertiseOptions = [
-    'Graphic Design',
-    'Product Management',
-    'User Experience',
-    'Full Stack Development',
-    'Frontend Development',
-    'Backend Development',
-    'Mobile Development',
-    'Data Analysis',
-  ]
+  // جلب البيانات من الـ API
+  useEffect(() => {
+    const loadLookupData = async () => {
+      setLoadingData(true)
+      try {
+        // جلب المجالات
+        const domainsResponse = await lookupAPI.getDomains()
+        if (domainsResponse.success && domainsResponse.data) {
+          setDomains(domainsResponse.data.map(d => ({ 
+            label: d.name, 
+            value: d.id 
+          })))
+        }
 
-  const toolsOptions = [
-    'Figma',
-    'React',
-    'Node.js',
-    'Python',
-    'JavaScript',
-    'TypeScript',
-    'SQL',
-    'Git',
-    'AWS',
-    'Docker',
-  ]
+        // جلب المجالات الفرعية
+        const subDomainsResponse = await lookupAPI.getSubDomains()
+        if (subDomainsResponse.success && subDomainsResponse.data) {
+          setSubDomains(subDomainsResponse.data.map(sd => sd.name))
+        }
+
+        // جلب الأهداف المهنية
+        const goalsResponse = await lookupAPI.getCareerGoals()
+        if (goalsResponse.success && goalsResponse.data) {
+          setCareerGoals(goalsResponse.data.map(g => g.name))
+        }
+
+        // جلب أساليب التعلم
+        const stylesResponse = await lookupAPI.getLearningStyles()
+        if (stylesResponse.success && stylesResponse.data) {
+          setLearningStyles(stylesResponse.data.map(s => s.name))
+        }
+      } catch (error) {
+        console.error('خطأ في تحميل البيانات:', error)
+        // في حالة الفشل، استخدم بيانات افتراضية
+        setDomains([
+          { label: "Design", value: "design" },
+          { label: "Software", value: "software" },
+          { label: "Marketing", value: "marketing" },
+        ])
+        setSubDomains([
+          'Graphic Design',
+          'Full Stack Development',
+          'Frontend Development',
+          'Backend Development',
+        ])
+        setCareerGoals([
+          'Grow and advance in my current field',
+          'Explore a new career path',
+          'Start my own business or project',
+        ])
+        setLearningStyles([
+          'Visual (learn best through images, charts, videos)',
+          'Auditory (learn best through listening and speaking)',
+          'Kinesthetic (learn best through hands-on activities)',
+        ])
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadLookupData()
+  }, [])
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
@@ -146,8 +184,16 @@ function MenteeForm() {
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       <FormCard>
-        <div className="space-y-8">
-          <StepProgress current={currentStep} total={totalSteps} />
+        {loadingData ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-gray-600">Loading form data...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">.
+            <StepProgress current={currentStep} total={totalSteps} />
 
           {currentStep === 1 && (
             <div className="space-y-4">
@@ -164,13 +210,10 @@ function MenteeForm() {
 
               <InputGroup label="What is your career goal?" htmlFor="goals"></InputGroup>
               <CheckboxList
-                items={[
+                items={careerGoals.length > 0 ? careerGoals : [
                   'Grow and advance in my current field',
                   'Explore a new career path',
                   'Start my own business or project',
-                  'get guidance on my career journey',
-                  'Prepare for leadership or management roles',
-                  'Other',
                 ]}
                 selected={formData.goals}
                 onToggle={handleGoalToggle}
@@ -185,7 +228,11 @@ function MenteeForm() {
               <InputGroup label=" What’s your preferred learning style" htmlFor="learningStyle"></InputGroup>
               <RadioList
                 name="learningStyle"
-                items={["Visual (learn best through images, charts, videos)","Auditory (learn best through listening and speaking)","Kinesthetic (learn best through hands-on activities)","Reading/Writing (learn best through reading and writing)","Mixed (a combination of the above)"]}
+                items={learningStyles.length > 0 ? learningStyles : [
+                  "Visual (learn best through images, charts, videos)",
+                  "Auditory (learn best through listening and speaking)",
+                  "Kinesthetic (learn best through hands-on activities)",
+                ]}
                 value={formData.learningStyle}
                 onChange={(v) => setFormData({ ...formData, learningStyle: v })}
               />
@@ -201,7 +248,7 @@ function MenteeForm() {
                   id="industry"
                   value={formData.industry}
                   onChange={(v) => setFormData({ ...formData, industry: v })}
-                  options={industryOptions}
+                  options={domains}
                 />
               </InputGroup>
 
@@ -217,7 +264,7 @@ function MenteeForm() {
               <InputGroup label="What Relevant expertise to your career" htmlFor="expertise">
                 <SelectWithTags
                   id="expertise"
-                  options={relevantExpertiseOptions}
+                  options={subDomains}
                   selected={formData.relevantExpertise}
                   onAdd={(item) => handleExpertiseToggle(item)}
                   onRemove={(item) => handleExpertiseToggle(item)}
@@ -228,7 +275,7 @@ function MenteeForm() {
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
                 <SelectWithTags
                   id="tools"
-                  options={toolsOptions}
+                  options={subDomains}
                   selected={formData.tools}
                   onAdd={(item) => handleToolsToggle(item)}
                   onRemove={(item) => handleToolsToggle(item)}
@@ -266,6 +313,7 @@ function MenteeForm() {
             submitting={loading}
           />
         </div>
+        )}
       </FormCard>
     </div>
   )

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import logoImage from "../../assets/images/logo.png"
 import illustrationImage from "../../assets/images/rafiki.png"
 import { InputField, PasswordInput, SocialLoginButton, FormDivider, AuthLink } from "../../components/Form"
-import { authAPI } from "../../services/auth"
+import authAPI from "../../services/authService"
 import { Modal } from "../../components/Modal"
 
 function Login() {
@@ -23,16 +23,29 @@ function Login() {
     setLoading(true)
     setError("")
 
-    const response = await authAPI.login(email, password)
+    try {
+      const response = await authAPI.login(email, password)
 
-    if (response.success && response.data) {
-      if (rememberMe) {
-        localStorage.setItem('email', email)
+      if (response.success && response.data) {
+        if (rememberMe) {
+          localStorage.setItem('email', email)
+        }
+
+        const role = response.data.user?.role?.toLowerCase()
+        if (role === 'mentee') {
+          navigate('/signup/mentee-form')
+        } else if (role === 'mentor') {
+          navigate('/signup/mentor-form')
+        } else {
+          navigate('/role-selection')
+        }
+      } else {
+        setError(response.message || response.errors?.[0] || 'Sign in failed')
       }
-      // Navigate to role selection page instead of dashboard
-      navigate('/role-selection')
-    } else {
-      setError(response.message || response.errors?.[0] || 'Sign in failed')
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Request failed'
+      setError(message)
+    } finally {
       setLoading(false)
     }
   }

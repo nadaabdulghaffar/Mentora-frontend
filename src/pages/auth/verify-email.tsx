@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { authAPI } from "../../services/auth"
+import authAPI from "../../services/authService"
 import bgImage from "../../assets/images/bg.png"
 import emailImage from "../../assets/images/email.png"
 
@@ -21,13 +21,14 @@ function VerifyEmail() {
     const tokenParam = searchParams.get('token')
     const emailParam = searchParams.get('email')
     const storedEmail = localStorage.getItem('pendingUserEmail')
-    
+    const resolvedEmail = emailParam || storedEmail
+
     // Set email from URL or localStorage
-    if (emailParam) {
-      setEmail(emailParam)
-      localStorage.setItem('pendingUserEmail', emailParam)
-    } else if (storedEmail) {
-      setEmail(storedEmail)
+    if (resolvedEmail) {
+      setEmail(resolvedEmail)
+      if (emailParam) {
+        localStorage.setItem('pendingUserEmail', emailParam)
+      }
     } else {
       navigate('/signup')
       return
@@ -37,17 +38,21 @@ function VerifyEmail() {
     if (tokenParam && !verifyAttempted) {
       setHasToken(true)
       setVerifyAttempted(true)
-      verifyWithToken(tokenParam)
+      verifyWithToken(tokenParam, resolvedEmail)
     }
   }, [searchParams, navigate, verifyAttempted])
 
-  const verifyWithToken = async (token: string) => {
+  const verifyWithToken = async (token: string, userEmail: string) => {
     setLoading(true)
     setError("")
-    
-    const response = await authAPI.verifyEmail(token)
+
+    const response = await authAPI.verifyEmail(token, userEmail)
 
     if (response.success) {
+      const registrationToken = response.data?.registrationToken
+      if (registrationToken) {
+        localStorage.setItem('registrationToken', registrationToken)
+      }
       setSuccess(true)
       localStorage.removeItem('pendingUserEmail')
       setTimeout(() => navigate('/role-selection'), 2000)
@@ -77,9 +82,13 @@ function VerifyEmail() {
       return
     }
 
-    const response = await authAPI.verifyEmail(code)
+    const response = await authAPI.verifyEmail(code, email)
 
     if (response.success) {
+      const registrationToken = response.data?.registrationToken
+      if (registrationToken) {
+        localStorage.setItem('registrationToken', registrationToken)
+      }
       setSuccess(true)
       localStorage.removeItem('pendingUserEmail')
       setTimeout(() => navigate('/role-selection'), 2000)
@@ -93,7 +102,7 @@ function VerifyEmail() {
     setResendLoading(true)
     setError("")
 
-    const response = await authAPI.resendVerification(email)
+    const response = await authAPI.resendVerificationCode(email)
 
     if (response.success) {
       setResendCooldown(60)

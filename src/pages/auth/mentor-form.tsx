@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import {
@@ -20,6 +20,7 @@ import {
   validateCVFile,
   validateMentorProfileForm 
 } from "../../utils/validation"
+import lookupAPI from "../../services/lookupService"
 
 interface MentorFormData {
   expertise: string[]
@@ -56,16 +57,12 @@ function MentorForm() {
   const [generalError, setGeneralError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
-  const totalSteps = 4
+  // البيانات من الـ API
+  const [domains, setDomains] = useState<Option[]>([])
+  const [subDomains, setSubDomains] = useState<string[]>([])
+  const [loadingData, setLoadingData] = useState(true)
 
-  const industryOptions: Option[] = [
-    { label: 'Technology', value: 'tech' },
-    { label: 'Finance', value: 'finance' },
-    { label: 'Healthcare', value: 'healthcare' },
-    { label: 'E-commerce', value: 'ecommerce' },
-    { label: 'Consulting', value: 'consulting' },
-    { label: 'Other', value: 'other' },
-  ]
+  const totalSteps = 4
 
   const experienceOptions: Option[] = [
     { label: '2-5 years', value: '2-5' },
@@ -74,29 +71,46 @@ function MentorForm() {
     { label: '15+ years', value: '15plus' },
   ]
 
-   const relevantExpertiseOptions = [
-    'Graphic Design',
-    'Product Management',
-    'User Experience',
-    'Full Stack Development',
-    'Frontend Development',
-    'Backend Development',
-    'Mobile Development',
-    'Data Analysis',
-  ]
+  // جلب البيانات من الـ API
+  useEffect(() => {
+    const loadLookupData = async () => {
+      setLoadingData(true)
+      try {
+        // جلب المجالات
+        const domainsResponse = await lookupAPI.getDomains()
+        if (domainsResponse.success && domainsResponse.data) {
+          setDomains(domainsResponse.data.map(d => ({ 
+            label: d.name, 
+            value: d.id 
+          })))
+        }
 
-  const toolsOptions = [
-    'Figma',
-    'React',
-    'Node.js',
-    'Python',
-    'JavaScript',
-    'TypeScript',
-    'SQL',
-    'Git',
-    'AWS',
-    'Docker',
-  ]
+        // جلب المجالات الفرعية
+        const subDomainsResponse = await lookupAPI.getSubDomains()
+        if (subDomainsResponse.success && subDomainsResponse.data) {
+          setSubDomains(subDomainsResponse.data.map(sd => sd.name))
+        }
+      } catch (error) {
+        console.error('خطأ في تحميل البيانات:', error)
+        // في حالة الفشل، استخدم بيانات افتراضية
+        setDomains([
+          { label: 'Technology', value: 'tech' },
+          { label: 'Finance', value: 'finance' },
+          { label: 'Healthcare', value: 'healthcare' },
+        ])
+        setSubDomains([
+          'Full Stack Development',
+          'Frontend Development',
+          'Backend Development',
+          'Mobile Development',
+        ])
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadLookupData()
+  }, [])
 
 const handleToolsToggle = (tool: string) => {
   setFormData((prev) => ({
@@ -260,8 +274,16 @@ const handleLinkedInChange = (value: string) => {
       style={{ backgroundImage: `url(${bgImage})` }}
     >
       <FormCard>
-        <div className="space-y-8">
-          <StepProgress current={currentStep} total={totalSteps} />
+        {loadingData ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="text-center">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <p className="text-gray-600">Loading form data...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <StepProgress current={currentStep} total={totalSteps} />
 
           {generalError && (
             <Alert 
@@ -333,7 +355,7 @@ const handleLinkedInChange = (value: string) => {
                       setFieldErrors(prev => ({ ...prev, industry: '' }))
                     }
                   }}
-                  options={industryOptions}
+                  options={domains}
                 />
                 {fieldErrors.industry && (
                   <p className="mt-1 text-xs text-red-600">{fieldErrors.industry}</p>
@@ -342,7 +364,7 @@ const handleLinkedInChange = (value: string) => {
                 <InputGroup label="What Relevant expertise to your career" htmlFor="expertise">
                 <SelectWithTags
                   id="expertise"
-                  options={relevantExpertiseOptions}
+                  options={subDomains}
                   selected={formData.relevantExpertise}
                   onAdd={(item) => {
                     handleExpertiseToggle(item)
@@ -361,7 +383,7 @@ const handleLinkedInChange = (value: string) => {
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
                 <SelectWithTags
                   id="tools"
-                  options={toolsOptions}
+                  options={subDomains}
                   selected={formData.tools}
                   onAdd={(item) => handleToolsToggle(item)}
                   onRemove={(item) => handleToolsToggle(item)}
@@ -529,6 +551,7 @@ const handleLinkedInChange = (value: string) => {
             submitting={loading}
           />
         </div>
+        )}
       </FormCard>
     </div>
   )
