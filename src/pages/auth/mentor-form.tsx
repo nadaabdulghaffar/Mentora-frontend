@@ -2,19 +2,24 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import {
-  FormContainer,
   FormCard,
   StepProgress,
   StepTitle,
   StepSubtitle,
   InputGroup,
   SelectField,
-  CheckboxList,
   TextAreaField,
   FormNavigation,
   type Option,
   SelectWithTags,
 } from "../../components/MultiStepForm"
+import { Alert } from "../../components/Alert"
+import { 
+  validateLinkedInUrl, 
+  validateBio, 
+  validateCVFile,
+  validateMentorProfileForm 
+} from "../../utils/validation"
 
 interface MentorFormData {
   expertise: string[]
@@ -48,6 +53,8 @@ function MentorForm() {
 
   const [linkedinError, setLinkedinError] = useState('')
   const [cvError, setCvError] = useState('')
+  const [generalError, setGeneralError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
   const totalSteps = 4
 
@@ -101,29 +108,57 @@ const handleToolsToggle = (tool: string) => {
 }
 
 
-const validateLinkedInUrl = (url: string): boolean => {
-    if (!url) return true // Empty is allowed
-    
-    // LinkedIn URL patterns
-    const linkedinPattern = /^(https?:\/\/)?(www\.)?linkedin\.com\/(in|pub|company|school)\/[a-zA-Z0-9_-]+\/?$/
-    return linkedinPattern.test(url)
-  }
-
-  const handleLinkedInChange = (value: string) => {
+const handleLinkedInChange = (value: string) => {
     setFormData({ ...formData, linkedinUrl: value })
     
-    if (value && !validateLinkedInUrl(value)) {
-      setLinkedinError('Please enter a valid LinkedIn URL (e.g., https://linkedin.com/in/username)')
+    if (value) {
+      const validation = validateLinkedInUrl(value)
+      if (!validation.valid) {
+        setLinkedinError(validation.message || 'Invalid LinkedIn URL format')
+      } else {
+        setLinkedinError('')
+      }
     } else {
       setLinkedinError('')
     }
   }
 
   const handleNext = () => {
-    // Validate LinkedIn URL before moving to next step
-    if (currentStep === 1 && formData.linkedinUrl && !validateLinkedInUrl(formData.linkedinUrl)) {
-      setLinkedinError('Please enter a valid LinkedIn URL before continuing')
-      return
+    setGeneralError('')
+    setFieldErrors({})
+
+    // Validate based on current step
+    if (currentStep === 1) {
+      if (!formData.experience) {
+        setGeneralError('Please select years of experience')
+        return
+      }
+      if (formData.linkedinUrl) {
+        const validation = validateLinkedInUrl(formData.linkedinUrl)
+        if (!validation.valid) {
+          setLinkedinError(validation.message || 'Invalid LinkedIn URL format')
+          return
+        }
+      }
+    } else if (currentStep === 2) {
+      if (!formData.industry) {
+        setGeneralError('Please select an industry')
+        return
+      }
+      if (!formData.relevantExpertise || formData.relevantExpertise.length === 0) {
+        setGeneralError('Please select at least one expertise')
+        return
+      }
+    } else if (currentStep === 3) {
+      if (formData.cvFiles.length === 0) {
+        setCvError('Please upload at least one CV file')
+        return
+      }
+      const bioValidation = validateBio(formData.bio)
+      if (!bioValidation.valid) {
+        setGeneralError(bioValidation.message || 'Invalid bio')
+        return
+      }
     }
     
     if (currentStep < totalSteps) {
@@ -132,6 +167,8 @@ const validateLinkedInUrl = (url: string): boolean => {
   }
 
   const handlePrev = () => {
+    setGeneralError('')
+    setFieldErrors({})
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
     }
@@ -144,32 +181,23 @@ const validateLinkedInUrl = (url: string): boolean => {
       return
     }
 
-    // Validate file type
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    const allowedExtensions = ['.pdf', '.doc', '.docx']
+    // Validate using utility function
+    const newFiles = [...formData.cvFiles, file]
+    const validation = validateCVFile(newFiles)
     
-    const hasValidType = allowedTypes.includes(file.type) || 
-                         allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
-    
-    if (!hasValidType) {
-      setCvError('Please upload a valid CV/Resume file (PDF or Word document)')
+    if (!validation.valid) {
+      setCvError(validation.message || 'Error uploading file')
       return
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setCvError('File size must be less than 5MB')
-      return
-    }
-
-    // Check if file already exists in the list
+    // Check if file already exists
     if (formData.cvFiles.some(f => f.name === file.name && f.size === file.size)) {
-      setCvError('This file is already uploaded')
+      setCvError('This file has already been uploaded')
       return
     }
 
     setCvError('')
-    setFormData({ ...formData, cvFiles: [...formData.cvFiles, file] })
+    setFormData({ ...formData, cvFiles: newFiles })
     
     // Reset input
     event.target.value = ''
@@ -193,6 +221,31 @@ const validateLinkedInUrl = (url: string): boolean => {
   }
 
   const handleSubmit = async () => {
+    setGeneralError('')
+    setFieldErrors({})
+
+    // Validate entire form before submission
+    const validation = validateMentorProfileForm(
+      formData.expertise,
+      formData.industry,
+      formData.experience,
+      formData.availability,
+      formData.mentees,
+      formData.bio,
+      formData.linkedinUrl,
+      formData.cvFiles
+    )
+
+    if (!validation.valid) {
+      setGeneralError(validation.errors[0]?.message || 'Please check all form data')
+      const errors: Record<string, string> = {}
+      validation.errors.forEach(err => {
+        errors[err.field] = err.message
+      })
+      setFieldErrors(errors)
+      return
+    }
+
     setLoading(true)
     // TODO: Send data to backend
     console.log('Mentor Form Data:', formData)
@@ -210,6 +263,14 @@ const validateLinkedInUrl = (url: string): boolean => {
         <div className="space-y-8">
           <StepProgress current={currentStep} total={totalSteps} />
 
+          {generalError && (
+            <Alert 
+              type="error" 
+              message={generalError}
+              dismissible
+            />
+          )}
+
           {currentStep === 1 && (
             <div className="space-y-4">
               <StepTitle>Getting to know you</StepTitle>
@@ -218,9 +279,17 @@ const validateLinkedInUrl = (url: string): boolean => {
                 <SelectField
                   id="experience"
                   value={formData.experience}
-                  onChange={(v) => setFormData({ ...formData, experience: v })}
+                  onChange={(v) => {
+                    setFormData({ ...formData, experience: v })
+                    if (fieldErrors.experience) {
+                      setFieldErrors(prev => ({ ...prev, experience: '' }))
+                    }
+                  }}
                   options={experienceOptions}
                 />
+                {fieldErrors.experience && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.experience}</p>
+                )}
               </InputGroup>
 
               <InputGroup label="LinkedIn Profile URL" htmlFor="linkedinUrl">
@@ -228,7 +297,12 @@ const validateLinkedInUrl = (url: string): boolean => {
                   type="url"
                   id="linkedinUrl"
                   value={formData.linkedinUrl}
-                  onChange={(e) => handleLinkedInChange(e.target.value)}
+                  onChange={(e) => {
+                    handleLinkedInChange(e.target.value)
+                    if (fieldErrors.linkedinUrl) {
+                      setFieldErrors(prev => ({ ...prev, linkedinUrl: '' }))
+                    }
+                  }}
                   placeholder="https://linkedin.com/in/yourprofile"
                   className={`w-full rounded-xl border ${
                     linkedinError ? 'border-red-500' : 'border-gray-200'
@@ -236,6 +310,9 @@ const validateLinkedInUrl = (url: string): boolean => {
                 />
                 {linkedinError && (
                   <p className="mt-1 text-sm text-red-500">{linkedinError}</p>
+                )}
+                {fieldErrors.linkedinUrl && !linkedinError && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.linkedinUrl}</p>
                 )}
               </InputGroup>
 
@@ -250,19 +327,35 @@ const validateLinkedInUrl = (url: string): boolean => {
                 <SelectField
                   id="industry"
                   value={formData.industry}
-                  onChange={(v) => setFormData({ ...formData, industry: v })}
+                  onChange={(v) => {
+                    setFormData({ ...formData, industry: v })
+                    if (fieldErrors.industry) {
+                      setFieldErrors(prev => ({ ...prev, industry: '' }))
+                    }
+                  }}
                   options={industryOptions}
                 />
+                {fieldErrors.industry && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.industry}</p>
+                )}
               </InputGroup>
                 <InputGroup label="What Relevant expertise to your career" htmlFor="expertise">
                 <SelectWithTags
                   id="expertise"
                   options={relevantExpertiseOptions}
                   selected={formData.relevantExpertise}
-                  onAdd={(item) => handleExpertiseToggle(item)}
+                  onAdd={(item) => {
+                    handleExpertiseToggle(item)
+                    if (fieldErrors.expertise) {
+                      setFieldErrors(prev => ({ ...prev, expertise: '' }))
+                    }
+                  }}
                   onRemove={(item) => handleExpertiseToggle(item)}
                   placeholder="Select expertise..."
                 />
+                {fieldErrors.expertise && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.expertise}</p>
+                )}
               </InputGroup>
 
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
@@ -348,17 +441,28 @@ const validateLinkedInUrl = (url: string): boolean => {
                 {cvError && (
                   <p className="mt-2 text-sm text-red-500">{cvError}</p>
                 )}
+                {fieldErrors.cvFiles && !cvError && (
+                  <p className="mt-2 text-sm text-red-500">{fieldErrors.cvFiles}</p>
+                )}
               </InputGroup>
 
               <InputGroup label="Professional Bio" htmlFor="bio">
                 <TextAreaField
                   id="bio"
                   value={formData.bio}
-                  onChange={(v) => setFormData({ ...formData, bio: v })}
+                  onChange={(v) => {
+                    setFormData({ ...formData, bio: v })
+                    if (fieldErrors.bio) {
+                      setFieldErrors(prev => ({ ...prev, bio: '' }))
+                    }
+                  }}
                   placeholder="Share your professional journey, achievements, and what you're passionate about..."
                   rows={5}
                 />
                 <p className="mt-1 text-right text-xs text-gray-500">{formData.bio.length}/500</p>
+                {fieldErrors.bio && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.bio}</p>
+                )}
               </InputGroup>
             </div>
           )}
@@ -372,7 +476,12 @@ const validateLinkedInUrl = (url: string): boolean => {
                   <SelectField
                     id="availability"
                     value={formData.availability}
-                    onChange={(v) => setFormData({ ...formData, availability: v })}
+                    onChange={(v) => {
+                      setFormData({ ...formData, availability: v })
+                      if (fieldErrors.availability) {
+                        setFieldErrors(prev => ({ ...prev, availability: '' }))
+                      }
+                    }}
                     options={[
                       { label: '1-2 hours per week', value: '1-2hours' },
                       { label: '3-5 hours per week', value: '3-5hours' },
@@ -380,13 +489,21 @@ const validateLinkedInUrl = (url: string): boolean => {
                       { label: '10+ hours per week', value: '10plus' },
                     ]}
                   />
+                  {fieldErrors.availability && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.availability}</p>
+                  )}
                 </InputGroup>
 
                 <InputGroup label="How many mentees would you like?" htmlFor="mentees">
                   <SelectField
                     id="mentees"
                     value={formData.mentees}
-                    onChange={(v) => setFormData({ ...formData, mentees: v })}
+                    onChange={(v) => {
+                      setFormData({ ...formData, mentees: v })
+                      if (fieldErrors.mentees) {
+                        setFieldErrors(prev => ({ ...prev, mentees: '' }))
+                      }
+                    }}
                     options={[
                       { label: '1 mentee', value: '1' },
                       { label: '2-3 mentees', value: '2-3' },
@@ -395,6 +512,9 @@ const validateLinkedInUrl = (url: string): boolean => {
                       { label: 'Unlimited', value: 'unlimited' },
                     ]}
                   />
+                  {fieldErrors.mentees && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.mentees}</p>
+                  )}
                 </InputGroup>
               </div>
             </div>

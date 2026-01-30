@@ -3,24 +3,39 @@ import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import menteeIcon from "../../assets/images/menteeIcon.png"
 import mentorIcon from "../../assets/images/mentorIcon.png"
+import { authAPI } from "../../services/auth"
 
 function RoleSelection() {
   const navigate = useNavigate()
   const [selectedRole, setSelectedRole] = useState<'mentee' | 'mentor' | null>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!selectedRole) return
 
+    const pendingUserId = localStorage.getItem('pendingUserId')
+    if (!pendingUserId) {
+      setError('Missing registration data. Please sign up again.')
+      navigate('/signup')
+      return
+    }
+
     setLoading(true)
-    // Navigate to multi-step form based on selected role
-    setTimeout(() => {
+    setError("")
+
+    const response = await authAPI.completeRegistration(pendingUserId, selectedRole)
+
+    if (response.success) {
       if (selectedRole === 'mentee') {
         navigate('/signup/mentee-form')
       } else {
         navigate('/signup/mentor-form')
       }
-    }, 300)
+    } else {
+      setError(response.message || response.errors?.[0] || 'Failed to save role')
+      setLoading(false)
+    }
   }
 
   return (
@@ -71,6 +86,12 @@ function RoleSelection() {
             <p className="text-sm text-gray-600">Share your experience and guide others</p>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-600">
+            {error}
+          </div>
+        )}
 
         <button
           className="w-full rounded-xl bg-[#332D54] py-3 text-base font-semibold text-white shadow-md transition hover:bg-[#2b2648] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#332D54]"

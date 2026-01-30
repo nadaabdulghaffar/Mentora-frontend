@@ -3,7 +3,15 @@ import { useNavigate } from "react-router-dom"
 import logoImage from "../../assets/images/logo.png"
 import illustrationImage from "../../assets/images/rafiki.png"
 import { InputField, PasswordInput, SocialLoginButton, FormDivider, AuthLink } from "../../components/Form"
-//import { authAPI } from "../../services/auth"
+import { Alert } from "../../components/Alert"
+import { authAPI } from "../../services/auth"
+import { 
+  validateSignupForm, 
+  validatePassword, 
+  validateFirstName, 
+  validateLastName, 
+  validateEmail 
+} from "../../utils/validation"
 
 
 function Signup() {
@@ -14,30 +22,94 @@ function Signup() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | ''>('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value
+    setPassword(newPassword)
+    
+    // Check password strength in real-time
+    if (newPassword) {
+      const validation = validatePassword(newPassword)
+      setPasswordStrength(validation.strength || '')
+      
+      // Update error if field was touched
+      if (touched.password) {
+        setFieldErrors(prev => ({
+          ...prev,
+          password: validation.valid ? '' : (validation.message || '')
+        }))
+      }
+    } else {
+      setPasswordStrength('')
+      if (touched.password) {
+        setFieldErrors(prev => ({ ...prev, password: 'Password is required' }))
+      }
+    }
+  }
+
+  const handleBlur = (field: string, value: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }))
+    
+    let validation
+    switch (field) {
+      case 'firstName':
+        validation = validateFirstName(value)
+        break
+      case 'lastName':
+        validation = validateLastName(value)
+        break
+      case 'email':
+        validation = validateEmail(value)
+        break
+      case 'password':
+        validation = validatePassword(value)
+        break
+      default:
+        return
+    }
+    
+    setFieldErrors(prev => ({
+      ...prev,
+      [field]: validation.valid ? '' : (validation.message || '')
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setLoading(true)
     setError("")
+    setFieldErrors({})
 
-    // TODO: Remove this mock and uncomment API call when backend is ready
-    // For now, simulating successful signup
-    setTimeout(() => {
-      // Save email for verification page
-      localStorage.setItem('pendingEmail', email)
-      // Redirect to verify email page
+    // Validate form before submission
+    const validation = validateSignupForm(firstName, lastName, email, password)
+    
+    if (!validation.valid) {
+      const errors: Record<string, string> = {}
+      validation.errors.forEach(err => {
+        errors[err.field] = err.message
+      })
+      setFieldErrors(errors)
+      setError(validation.errors[0]?.message || 'Please check the entered data')
+      return
+    }
+
+    setLoading(true)
+
+    const response = await authAPI.registerInitial(firstName, lastName, email, password)
+
+    if (response.success) {
+      const userId = response.data?.userId
+      localStorage.setItem('pendingUserEmail', email)
+      if (userId) {
+        localStorage.setItem('pendingUserId', userId)
+      }
       navigate(`/verify-email?email=${encodeURIComponent(email)}`)
-    }, 500)
-
-    // Uncomment this when backend is ready:
-    // const response = await authAPI.signup(email, password, fullName)
-    // if (response.success) {
-    //   localStorage.setItem('pendingEmail', email)
-    //   navigate(`/verify-email?email=${encodeURIComponent(email)}`)
-    // } else {
-    //   setError(response.error || 'Failed to create account')
-    //   setLoading(false)
-    // }
+    } else {
+      setError(response.message || response.errors?.[0] || 'Failed to create account')
+      setLoading(false)
+    }
   }
 
   return (
@@ -74,51 +146,122 @@ function Signup() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-600">
-                {error}
-              </div>
+              <Alert 
+                type="error" 
+                message={error}
+                dismissible
+              />
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <InputField
-                id="firstName"
-                label="First name"
-                type="text"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-              <InputField
-                id="lastName"
-                label="Last name"
-                type="text"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
+              <div>
+                <InputField
+                  id="firstName"
+                  label="First name"
+                  type="text"
+                  placeholder="First name"
+                  value={firstName}
+                  onChange={(e) => {
+                    setFirstName(e.target.value)
+                    if (touched.firstName && fieldErrors.firstName) {
+                      const validation = validateFirstName(e.target.value)
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        firstName: validation.valid ? '' : (validation.message || '')
+                      }))
+                    }
+                  }}
+                  onBlur={() => handleBlur('firstName', firstName)}
+                  required
+                />
+                {fieldErrors.firstName && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.firstName}</p>
+                )}
+              </div>
+              <div>
+                <InputField
+                  id="lastName"
+                  label="Last name"
+                  type="text"
+                  placeholder="Last name"
+                  value={lastName}
+                  onChange={(e) => {
+                    setLastName(e.target.value)
+                    if (touched.lastName && fieldErrors.lastName) {
+                      const validation = validateLastName(e.target.value)
+                      setFieldErrors(prev => ({
+                        ...prev,
+                        lastName: validation.valid ? '' : (validation.message || '')
+                      }))
+                    }
+                  }}
+                  onBlur={() => handleBlur('lastName', lastName)}
+                  required
+                />
+                {fieldErrors.lastName && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.lastName}</p>
+                )}
+              </div>
             </div>
 
-            <InputField
-              id="email"
-              label="Email Address"
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div>
+              <InputField
+                id="email"
+                label="Email Address"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (touched.email && fieldErrors.email) {
+                    const validation = validateEmail(e.target.value)
+                    setFieldErrors(prev => ({
+                      ...prev,
+                      email: validation.valid ? '' : (validation.message || '')
+                    }))
+                  }
+                }}
+                onBlur={() => handleBlur('email', email)}
+                required
+              />
+              {fieldErrors.email && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+              )}
+            </div>
 
-            <PasswordInput
-              id="password"
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              requirementText="It must be a combination of minimum 8 letters, numbers, and symbols."
-            />
+            <div>
+              <PasswordInput
+                id="password"
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={handlePasswordChange}
+                onBlur={() => handleBlur('password', password)}
+                required
+                requirementText="Must contain: uppercase, lowercase, numbers and special characters (min 8 characters)"
+              />
+              {fieldErrors.password && (
+                <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+              )}
+              {password && passwordStrength && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    <div className={`h-1 flex-1 rounded ${passwordStrength === 'weak' ? 'bg-red-500' : 'bg-red-300'}`}></div>
+                    <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' ? 'bg-yellow-500' : 'bg-gray-200'}`}></div>
+                    <div className={`h-1 flex-1 rounded ${passwordStrength === 'strong' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                  </div>
+                  <p className={`text-xs font-medium ${
+                    passwordStrength === 'weak' ? 'text-red-600' : 
+                    passwordStrength === 'medium' ? 'text-yellow-600' : 
+                    'text-green-600'
+                  }`}>
+                    {passwordStrength === 'weak' ? 'Weak password' : 
+                     passwordStrength === 'medium' ? 'Medium password' : 
+                     'Strong password'}
+                  </p>
+                </div>
+              )}
+            </div>
 
             <button
               type="submit"
@@ -132,7 +275,7 @@ function Signup() {
 
             <div className="grid grid-cols-2 gap-3">
               <SocialLoginButton provider="Google" />
-              <SocialLoginButton provider="Apple" />
+              <SocialLoginButton provider="Github" />
             </div>
 
             <AuthLink 

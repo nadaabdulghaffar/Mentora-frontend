@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-//import { apiCall } from "../../services/auth"
+import { authAPI } from "../../services/auth"
 import bgImage from "../../assets/images/bg.png"
 import emailImage from "../../assets/images/email.png"
 
@@ -13,22 +13,49 @@ function VerifyEmail() {
   const [email, setEmail] = useState("")
   const [resendLoading, setResendLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [hasToken, setHasToken] = useState(false)
+  const [verifyAttempted, setVerifyAttempted] = useState(false)
 
   useEffect(() => {
-    // Get email from query params or localStorage
+    // Check if token is in URL (from email link)
+    const tokenParam = searchParams.get('token')
     const emailParam = searchParams.get('email')
-    const storedEmail = localStorage.getItem('pendingEmail')
+    const storedEmail = localStorage.getItem('pendingUserEmail')
     
+    // Set email from URL or localStorage
     if (emailParam) {
       setEmail(emailParam)
-      localStorage.setItem('pendingEmail', emailParam)
+      localStorage.setItem('pendingUserEmail', emailParam)
     } else if (storedEmail) {
       setEmail(storedEmail)
     } else {
-      // If no email found, redirect to signup
       navigate('/signup')
+      return
     }
-  }, [searchParams, navigate])
+
+    // If token is in URL, auto-verify immediately
+    if (tokenParam && !verifyAttempted) {
+      setHasToken(true)
+      setVerifyAttempted(true)
+      verifyWithToken(tokenParam)
+    }
+  }, [searchParams, navigate, verifyAttempted])
+
+  const verifyWithToken = async (token: string) => {
+    setLoading(true)
+    setError("")
+    
+    const response = await authAPI.verifyEmail(token)
+
+    if (response.success) {
+      setSuccess(true)
+      localStorage.removeItem('pendingUserEmail')
+      setTimeout(() => navigate('/role-selection'), 2000)
+    } else {
+      setError(response.message || response.errors?.[0] || 'Email verification failed')
+      setLoading(false)
+    }
+  }
 
   // Resend cooldown timer
   useEffect(() => {
@@ -44,63 +71,45 @@ function VerifyEmail() {
 
     const code = (document.getElementById('verification-code') as HTMLInputElement)?.value
 
-    if (!code || code.length < 6) {
-      setError('Please enter the complete verification code')
+    if (!code) {
+      setError('Please enter the verification code')
       setLoading(false)
       return
     }
 
-    // TODO: Remove this mock and uncomment API call when backend is ready
-    // For now, simulating successful verification
-    setTimeout(() => {
-      setSuccess(true)
-      localStorage.removeItem('pendingEmail')
-      // Redirect to role-selection after 2 seconds
-      setTimeout(() => navigate('/role-selection'), 2000)
-    }, 500)
+    const response = await authAPI.verifyEmail(code)
 
-    // Uncomment this when backend is ready:
-    // const response = await apiCall('/auth/verify-email', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ email, code }),
-    // })
-    // if (response.success) {
-    //   setSuccess(true)
-    //   localStorage.removeItem('pendingEmail')
-    //   setTimeout(() => navigate('/role-selection'), 2000)
-    // } else {
-    //   setError(response.error || 'Email verification failed')
-    //   setLoading(false)
-    // }
+    if (response.success) {
+      setSuccess(true)
+      localStorage.removeItem('pendingUserEmail')
+      setTimeout(() => navigate('/role-selection'), 2000)
+    } else {
+      setError(response.message || response.errors?.[0] || 'Email verification failed')
+      setLoading(false)
+    }
   }
 
   const handleResendCode = async () => {
     setResendLoading(true)
     setError("")
 
-    // TODO: Remove this mock and uncomment API call when backend is ready
-    setTimeout(() => {
-      setResendCooldown(60)
-    }, 300)
+    const response = await authAPI.resendVerification(email)
 
-    // Uncomment this when backend is ready:
-    // const response = await apiCall('/auth/resend-verification-code', {
-    //   method: 'POST',
-    //   body: JSON.stringify({ email }),
-    // })
-    // if (response.success) {
-    //   setResendCooldown(60)
-    // } else {
-    //   setError(response.error || 'Failed to resend the code')
-    // }
-    // setResendLoading(false)
+    if (response.success) {
+      setResendCooldown(60)
+    } else {
+      setError(response.message || response.errors?.[0] || 'Failed to resend the code')
+    }
+
+    setResendLoading(false)
   }
 
   const handleChangeEmail = () => {
-    localStorage.removeItem('pendingEmail')
+    localStorage.removeItem('pendingUserEmail')
     navigate('/signup')
   }
 
+  // Success screen
   if (success) {
     return (
       <div
@@ -110,12 +119,31 @@ function VerifyEmail() {
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/90 p-8 text-center shadow-2xl backdrop-blur-sm">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-2xl text-primary">✓</div>
           <h1 className="text-2xl font-bold text-slateInk">Email Verified!</h1>
-          <p className="text-sm text-gray-600">Your email has been verified. Redirecting to sign in...</p>
+          <p className="text-sm text-gray-600">Your email has been verified. Redirecting to role selection...</p>
         </div>
       </div>
     )
   }
 
+  // Loading screen when verifying from email link
+  if (loading && hasToken) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat px-4 py-10 font-sans"
+        style={{ backgroundImage: `url(${bgImage})` }}
+      >
+        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 rounded-2xl bg-white/90 p-8 text-center shadow-2xl backdrop-blur-sm">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+          </div>
+          <h1 className="text-2xl font-bold text-slateInk">Verifying Email...</h1>
+          <p className="text-sm text-gray-600">Please wait while we verify your email address.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Main verification form
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat px-4 py-10 font-sans"
@@ -126,10 +154,10 @@ function VerifyEmail() {
           <img src={emailImage} alt="Email" className="h-20 w-20 object-contain" />
         </div>
 
-        <h1 className="text-2xl font-bold text-slateInk">Verify your email</h1>
+        <h1 className="text-2xl font-bold text-slateInk">Check your email</h1>
 
-        <p className="mt-3 text-sm leading-relaxed text-gray-600">
-          We've sent a verification code to <strong className="font-semibold text-slateInk">{email}</strong> for verification to keep a trusted and safe community, and you'll only do this once.
+        <p className="mt-4 text-base leading-relaxed text-gray-700">
+          We've sent a verification link to <strong className="font-semibold text-slateInk">{email}</strong>
         </p>
 
         {error && (
@@ -138,44 +166,21 @@ function VerifyEmail() {
           </div>
         )}
 
-        <div className="mt-6 space-y-3">
-          <input
-            type="text"
-            id="verification-code"
-            placeholder="Enter verification code"
-            maxLength={6}
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-[14px] font-regular tracking-[0.1rem] text-slateInk placeholder:text-[16px] placeholder:text-gray-300 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') handleVerify()
-            }}
-          />
-
-          <button
-            type="button"
-            onClick={handleVerify}
-            disabled={loading}
-            className="w-full rounded-xl bg-[#332D54] py-3 text-base font-semibold text-white shadow-md transition transform hover:-translate-y-0.5 hover:bg-[#2b2648] hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#332D54]"
-          >
-            {loading ? 'Verifying...' : 'Verify'}
-          </button>
-        </div>
-
-        <div className="mt-8 space-y-3  px-4 py-3 text-sm text-gray-600">
-           <p>
-            Didn't receive the code?{' '}
+        <div className="mt-8 space-y-3 px-4 py-3 text-sm text-gray-600">
+          <p>
+            Didn't receive the email?{' '}
             <button
               type="button"
               onClick={handleResendCode}
               disabled={resendLoading || resendCooldown > 0}
               className="font-semibold text-primary transition hover:text-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {resendCooldown > 0 ? `Try again in ${resendCooldown}s` : 'Resend'}
+              {resendCooldown > 0 ? `Try again in ${resendCooldown}s` : 'Resend Email'}
             </button>
           </p>
-          
-          
+
           <p>
-            Not the correct email?{' '}
+            Wrong email?{' '}
             <button
               type="button"
               onClick={handleChangeEmail}
@@ -184,22 +189,7 @@ function VerifyEmail() {
               change email address
             </button>
           </p>
-
-         
         </div>
-
-        {/* 
-        <p className="mt-4 text-sm text-gray-600">
-          Already have an account?{' '}
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="font-semibold text-primary transition hover:text-primary-dark"
-          >
-            Sign in
-          </button>
-        </p>
-        */}
       </div>
     </div>
   )

@@ -1,9 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import logoImage from "../../assets/images/logo.png"
 import illustrationImage from "../../assets/images/rafiki.png"
 import { InputField, PasswordInput, SocialLoginButton, FormDivider, AuthLink } from "../../components/Form"
-//import { authAPI } from "../../services/auth"
+import { authAPI } from "../../services/auth"
+import { Modal } from "../../components/Modal"
 
 function Login() {
   const navigate = useNavigate()
@@ -12,35 +13,59 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false)
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
-    // TODO: Remove this mock and uncomment API call when backend is ready
-    // For now, simulating successful login
-    setTimeout(() => {
-      localStorage.setItem('token', 'mock-token-' + Date.now())
+    const response = await authAPI.login(email, password)
+
+    if (response.success && response.data) {
       if (rememberMe) {
         localStorage.setItem('email', email)
       }
-      navigate('/dashboard')
-    }, 500)
-
-    // Uncomment this when backend is ready:
-    // const response = await authAPI.login(email, password)
-    // if (response.success && response.data) {
-    //   localStorage.setItem('token', response.data.token)
-    //   if (rememberMe) {
-    //     localStorage.setItem('email', email)
-    //   }
-    //   navigate('/dashboard')
-    // } else {
-    //   setError(response.error || 'Sign in failed')
-    //   setLoading(false)
-    // }
+      // Navigate to role selection page instead of dashboard
+      navigate('/role-selection')
+    } else {
+      setError(response.message || response.errors?.[0] || 'Sign in failed')
+      setLoading(false)
+    }
   }
+
+  const handleForgotPassword = async () => {
+    const emailToSend = forgotPasswordEmail || email
+    if (!emailToSend) {
+      return
+    }
+
+    setSendingEmail(true)
+    await authAPI.forgotPassword(emailToSend)
+    setSendingEmail(false)
+    setForgotPasswordEmail(emailToSend)
+    setResendCooldown(60)
+  }
+
+  const handleResendResetEmail = async () => {
+    if (resendCooldown > 0) return
+    
+    setSendingEmail(true)
+    await authAPI.forgotPassword(forgotPasswordEmail)
+    setSendingEmail(false)
+    setResendCooldown(60)
+  }
+
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [resendCooldown])
 
   return (
     <div className="min-h-screen bg-white font-sans lg:grid lg:grid-cols-2">
@@ -113,7 +138,16 @@ function Login() {
                 />
                 <span>Remember me</span>
               </label>
-              <a href="#" className="font-semibold text-primary transition hover:text-primary-dark">Forgot Password?</a>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPasswordModal(true)
+                  handleForgotPassword()
+                }}
+                className="font-semibold text-primary transition hover:text-primary-dark"
+              >
+                Forgot Password?
+              </button>
             </div>
 
             <button
@@ -128,7 +162,7 @@ function Login() {
 
             <div className="grid grid-cols-2 gap-3">
               <SocialLoginButton provider="Google" />
-              <SocialLoginButton provider="Apple" />
+              <SocialLoginButton provider="Github" />
             </div>
 
             <div className="h-px bg-gray-200" />
@@ -166,6 +200,34 @@ function Login() {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      <Modal isOpen={showForgotPasswordModal} onClose={() => setShowForgotPasswordModal(false)}>
+        <div className="text-center space-y-4">
+          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-primary/10 text-3xl">
+            📧
+          </div>
+          <h2 className="text-2xl font-bold text-slateInk">Check Your Email</h2>
+          <p className="text-gray-600">
+            An email has been sent to{' '}
+            <strong className="text-slateInk">{forgotPasswordEmail}</strong>{' '}
+            to reset your password.
+          </p>
+          <div className="mt-6 space-y-3">
+            <p className="text-sm text-gray-600">
+              Didn't receive the email?{' '}
+              <button
+                type="button"
+                onClick={handleResendResetEmail}
+                disabled={sendingEmail || resendCooldown > 0}
+                className="font-semibold text-primary transition hover:text-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Email'}
+              </button>
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
