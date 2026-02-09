@@ -55,6 +55,9 @@ function MenteeForm() {
   const [experienceLevels, setExperienceLevels] = useState<Option[]>([])
   const [countries, setCountries] = useState<Option[]>([])
   const [loadingData, setLoadingData] = useState(true)
+  const [technologyLevels, setTechnologyLevels] = useState<Record<string, string>>({})
+  const [technologyLevelError, setTechnologyLevelError] = useState('')
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   const totalSteps = 4
 
@@ -171,6 +174,7 @@ function MenteeForm() {
         setSubDomainOptions([])
         setTechnologyOptions([])
         setFormData((prev) => ({ ...prev, relevantExpertise: [], tools: [] }))
+        setTechnologyLevels({})
         return
       }
 
@@ -199,6 +203,7 @@ function MenteeForm() {
       if (selectedSubDomainIds.length === 0) {
         setTechnologyOptions([])
         setFormData((prev) => ({ ...prev, tools: [] }))
+        setTechnologyLevels({})
         return
       }
 
@@ -216,15 +221,30 @@ function MenteeForm() {
             uniqueByName.set(tech.name, tech)
           }
         })
-        setTechnologyOptions(Array.from(uniqueByName.values()))
+        const dedupedTechnologies = Array.from(uniqueByName.values())
+        setTechnologyOptions(dedupedTechnologies)
+        setTechnologyLevels((prev) => {
+          const selectedNames = new Set(formData.tools)
+          const next: Record<string, string> = {}
+          dedupedTechnologies.forEach((tech) => {
+            if (selectedNames.has(tech.name) && prev[tech.id]) {
+              next[tech.id] = prev[tech.id]
+            }
+          })
+          return next
+        })
       } catch (error) {
         console.error('خطأ في تحميل التقنيات:', error)
         setTechnologyOptions([])
+        setTechnologyLevels({})
       }
     }
 
     loadTechnologies()
   }, [formData.relevantExpertise, subDomainOptions])
+
+  const selectedTechnologies = technologyOptions
+    .filter((tech) => formData.tools.includes(tech.name))
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
@@ -254,6 +274,25 @@ function MenteeForm() {
         ? prev.tools.filter((t) => t !== tool)
         : [...prev.tools, tool],
     }))
+    setTechnologyLevels((prev) => {
+      const tech = technologyOptions.find((t) => t.name === tool)
+      if (!tech) {
+        return prev
+      }
+
+      if (formData.tools.includes(tool)) {
+        const next = { ...prev }
+        delete next[tech.id]
+        return next
+      }
+
+      if (prev[tech.id]) {
+        return prev
+      }
+
+      return { ...prev, [tech.id]: '' }
+    })
+    setTechnologyLevelError('')
   }
 
   const handleSubmit = async () => {
@@ -269,9 +308,20 @@ function MenteeForm() {
       .filter((sd) => formData.relevantExpertise.includes(sd.name))
       .map((sd) => sd.id)
 
-    const selectedTechnologyIds = technologyOptions
-      .filter((tech) => formData.tools.includes(tech.name))
-      .map((tech) => tech.id)
+    const missingTechnologyLevels = selectedTechnologies
+      .filter((tech) => !technologyLevels[tech.id])
+
+    if (missingTechnologyLevels.length > 0) {
+      setTechnologyLevelError('Please select a level for each selected tool')
+      setLoading(false)
+      setCurrentStep(3)
+      return
+    }
+
+    const technologyInterests = selectedTechnologies.map((tech) => ({
+      technologyId: tech.id,
+      experienceLevel: technologyLevels[tech.id],
+    }))
 
     try {
       const response = await authAPI.completeMenteeProfile({
@@ -281,9 +331,9 @@ function MenteeForm() {
         careerGoalId: formData.careerGoalId,
         learningStyleId: formData.learningStyleId,
         domainId: formData.domainId,
-        experienceLevel: formData.experienceLevel,
+        currentLevel: formData.experienceLevel,
         subDomainIds: selectedSubDomainIds,
-        technologyIds: selectedTechnologyIds,
+        technologyInterests,
         bio: formData.bio,
       })
 
@@ -394,14 +444,86 @@ function MenteeForm() {
               </InputGroup>
 
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
-                <SelectWithTags
-                  id="tools"
-                  options={technologyOptions.map((tech) => tech.name)}
-                  selected={formData.tools}
-                  onAdd={(item) => handleToolsToggle(item)}
-                  onRemove={(item) => handleToolsToggle(item)}
-                  placeholder="Select tools..."
-                />
+                <div className="space-y-2">
+                  <div
+                    onClick={() => setToolsOpen(!toolsOpen)}
+                    className="w-full min-h-[48px] rounded-xl border border-gray-200 bg-white px-4 py-2 text-base text-slateInk outline-none transition focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 flex items-center gap-2 flex-wrap cursor-pointer"
+                  >
+                    {selectedTechnologies.length > 0 ? (
+                      selectedTechnologies.map((tech) => (
+                        <div
+                          key={tech.id}
+                          className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
+                        >
+                          <span>#{tech.name}</span>
+                          <select
+                            value={technologyLevels[tech.id] || ''}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => {
+                              const value = event.target.value
+                              setTechnologyLevels((prev) => ({ ...prev, [tech.id]: value }))
+                              if (value) {
+                                setTechnologyLevelError('')
+                              }
+                            }}
+                            className="rounded-full border border-primary/30 bg-white px-2 py-0.5 text-xs text-primary outline-none focus:border-primary"
+                          >
+                            <option value="">Level</option>
+                            {experienceLevels.map((level) => (
+                              <option key={level.value} value={level.value}>
+                                {level.label}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleToolsToggle(tech.name)
+                            }}
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-primary hover:bg-primary/20 transition"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-gray-400">Select tools...</span>
+                    )}
+                    <svg
+                      className={`ml-auto h-4 w-4 text-slateInk transition flex-shrink-0 ${toolsOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+
+                  {toolsOpen && technologyOptions.length > 0 && (
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+                      {technologyOptions
+                        .filter((tech) => !formData.tools.includes(tech.name))
+                        .map((tech) => (
+                          <button
+                            key={tech.id}
+                            type="button"
+                            onClick={() => {
+                              handleToolsToggle(tech.name)
+                              if (technologyOptions.length === 1) setToolsOpen(false)
+                            }}
+                            className="block w-full px-4 py-3 text-left text-sm text-slateInk hover:bg-indigo-50 first:rounded-t-xl last:rounded-b-xl transition"
+                          >
+                            {tech.name}
+                          </button>
+                        ))}
+                    </div>
+                  )}
+
+                  {technologyLevelError && (
+                    <p className="text-sm text-red-600">{technologyLevelError}</p>
+                  )}
+                </div>
               </InputGroup>
             </div>
           )}

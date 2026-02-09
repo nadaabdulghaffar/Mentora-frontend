@@ -66,8 +66,15 @@ export interface MenteeProfile {
   domainId?: string;
   subDomainIds?: string[];
   experienceLevel?: string;
+  currentLevel?: string;
   technologyIds?: string[];
+  technologyInterests?: TechnologyInterest[];
   bio?: string;
+}
+
+export interface TechnologyInterest {
+  technologyId: string;
+  experienceLevel: string;
 }
 
 export interface MentorProfileRequest extends MentorProfile {
