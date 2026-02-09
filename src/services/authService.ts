@@ -6,6 +6,9 @@ import type {
   RegistrationFlowResponse,
   MentorProfile,
   MenteeProfile,
+  CompleteRegistrationRequest,
+  MentorProfileRequest,
+  MenteeProfileRequest,
 } from '../types/api';
 
 // Re-export for backward compatibility
@@ -68,21 +71,52 @@ export const authAPI = {
     role: 'mentee' | 'mentor',
     registrationToken: string
   ): Promise<ApiResponse<RegistrationFlowResponse>> => {
-    const response = await apiClient.post('/auth/select-role', {
-      role,
-      registrationToken,
-    });
+    const payload: CompleteRegistrationRequest = { role, registrationToken };
+    const response = await apiClient.post('/auth/select-role', payload);
     return response.data;
   },
 
   // إكمال بروفايل الـ Mentor
-  completeMentorProfile: async (profile: MentorProfile): Promise<ApiResponse<null>> => {
+  completeMentorProfile: async (
+    profile: MentorProfileRequest & { cvFiles?: File[] }
+  ): Promise<ApiResponse<null>> => {
+    const hasFiles = !!profile.cvFiles && profile.cvFiles.length > 0;
+
+    if (hasFiles) {
+      const formData = new FormData();
+      formData.append('registrationToken', profile.registrationToken);
+      if (profile.yearsOfExperience !== undefined) {
+        formData.append('yearsOfExperience', String(profile.yearsOfExperience));
+      }
+      if (profile.linkedinUrl) {
+        formData.append('linkedinUrl', profile.linkedinUrl);
+      }
+      if (profile.domainId) {
+        formData.append('domainId', profile.domainId);
+      }
+      if (profile.bio) {
+        formData.append('bio', profile.bio);
+      }
+      if (profile.subDomainIds) {
+        profile.subDomainIds.forEach((id) => formData.append('subDomainIds', id));
+      }
+      if (profile.technologyIds) {
+        profile.technologyIds.forEach((id) => formData.append('technologyIds', id));
+      }
+      profile.cvFiles?.forEach((file) => formData.append('cvFiles', file));
+
+      const response = await apiClient.post('/auth/complete-mentor-profile', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    }
+
     const response = await apiClient.post('/auth/complete-mentor-profile', profile);
     return response.data;
   },
 
   // إكمال بروفايل الـ Mentee
-  completeMenteeProfile: async (profile: MenteeProfile): Promise<ApiResponse<null>> => {
+  completeMenteeProfile: async (profile: MenteeProfileRequest): Promise<ApiResponse<null>> => {
     const response = await apiClient.post('/auth/complete-mentee-profile', profile);
     return response.data;
   },
@@ -147,6 +181,12 @@ export const authAPI = {
       return JSON.parse(userStr);
     }
     return null;
+  },
+
+  // جلب بيانات المستخدم الحالي من السيرفر
+  getMe: async (): Promise<ApiResponse<AuthUser>> => {
+    const response = await apiClient.get('/auth/me');
+    return response.data;
   },
 
   // التحقق من تسجيل الدخول

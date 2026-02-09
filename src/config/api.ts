@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // إعدادات الـ API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7018/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:7018/api';
 
 // إنشاء instance من Axios
 const apiClient = axios.create({
@@ -38,7 +38,7 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
           refreshToken,
         });
 

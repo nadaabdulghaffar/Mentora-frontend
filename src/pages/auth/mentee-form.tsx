@@ -2,7 +2,6 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import bgImage from "../../assets/images/bg.png"
 import {
-  FormContainer,
   FormCard,
   StepProgress,
   StepTitle,
@@ -10,21 +9,21 @@ import {
   InputGroup,
   SelectField,
   TextAreaField,
-  CheckboxList,
-  RadioList,
   SelectWithTags,
   FormNavigation,
   type Option,
 } from "../../components/MultiStepForm"
 import lookupAPI from "../../services/lookupService"
+import authAPI from "../../services/authService"
+import type { SubDomain, Technology } from "../../types/api"
 
 interface MenteeFormData {
-  educationLevel: string
-  expertise: string
-  learningStyle: string
-  goals: string[]
-  industry: string
-  experience: string
+  educationStatus: string
+  countryCode: string
+  careerGoalId: string
+  learningStyleId: string
+  domainId: string
+  experienceLevel: string
   relevantExpertise: string[]
   tools: string[]
   bio: string
@@ -35,12 +34,12 @@ function MenteeForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<MenteeFormData>({
-    educationLevel: '',
-    expertise: '',
-    learningStyle: '',
-    goals: [],
-    industry: '',
-    experience: '',
+    educationStatus: '',
+    countryCode: '',
+    careerGoalId: '',
+    learningStyleId: '',
+    domainId: '',
+    experienceLevel: '',
     relevantExpertise: [],
     tools: [],
     bio: '',
@@ -48,24 +47,16 @@ function MenteeForm() {
 
   // البيانات من الـ API
   const [domains, setDomains] = useState<Option[]>([])
-  const [subDomains, setSubDomains] = useState<string[]>([])
-  const [careerGoals, setCareerGoals] = useState<string[]>([])
-  const [learningStyles, setLearningStyles] = useState<string[]>([])
+  const [subDomainOptions, setSubDomainOptions] = useState<SubDomain[]>([])
+  const [technologyOptions, setTechnologyOptions] = useState<Technology[]>([])
+  const [careerGoals, setCareerGoals] = useState<Option[]>([])
+  const [learningStyles, setLearningStyles] = useState<Option[]>([])
+  const [educationStatuses, setEducationStatuses] = useState<Option[]>([])
+  const [experienceLevels, setExperienceLevels] = useState<Option[]>([])
+  const [countries, setCountries] = useState<Option[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   const totalSteps = 4
-
-  const educationOptions: Option[] = [
-    { label: "Student", value: "student" },
-    { label: "Graduate", value: "graduate" },
-  ]
-
-  const experienceOptions : Option[] = [
-    { label: "0-1 years", value: "0-1" },
-    { label: "1-3 years", value: "1-3" },
-    { label: "3-5 years", value: "3-5" },
-    { label: "5+ years", value: "5plus" },
-  ]
 
   // جلب البيانات من الـ API
   useEffect(() => {
@@ -75,28 +66,64 @@ function MenteeForm() {
         // جلب المجالات
         const domainsResponse = await lookupAPI.getDomains()
         if (domainsResponse.success && domainsResponse.data) {
-          setDomains(domainsResponse.data.map(d => ({ 
+          const domainOptions = domainsResponse.data.map(d => ({ 
             label: d.name, 
             value: d.id 
-          })))
-        }
-
-        // جلب المجالات الفرعية
-        const subDomainsResponse = await lookupAPI.getSubDomains()
-        if (subDomainsResponse.success && subDomainsResponse.data) {
-          setSubDomains(subDomainsResponse.data.map(sd => sd.name))
+          }))
+          setDomains(domainOptions)
+          if (domainOptions.length > 0) {
+            setFormData((prev) =>
+              prev.domainId ? prev : { ...prev, domainId: domainOptions[0].value }
+            )
+          }
         }
 
         // جلب الأهداف المهنية
         const goalsResponse = await lookupAPI.getCareerGoals()
         if (goalsResponse.success && goalsResponse.data) {
-          setCareerGoals(goalsResponse.data.map(g => g.name))
+          setCareerGoals(goalsResponse.data.map((g: any) => ({
+            label: g.name,
+            value: String(g.careerGoalId || g.id),
+          })))
         }
 
         // جلب أساليب التعلم
         const stylesResponse = await lookupAPI.getLearningStyles()
         if (stylesResponse.success && stylesResponse.data) {
-          setLearningStyles(stylesResponse.data.map(s => s.name))
+          setLearningStyles(stylesResponse.data.map((s: any) => ({
+            label: s.name,
+            value: String(s.learningStyleId || s.id),
+          })))
+        }
+
+        const educationResponse = await lookupAPI.getEducationStatuses()
+        if (educationResponse.success && educationResponse.data) {
+          setEducationStatuses(educationResponse.data.map((status: any) => ({
+            label: status.name,
+            value: status.value,
+          })))
+        }
+
+        const countriesResponse = await lookupAPI.getCountries()
+        if (countriesResponse.success && countriesResponse.data) {
+          const countryOptions = countriesResponse.data.map((country) => ({
+            label: country.name,
+            value: country.code,
+          }))
+          setCountries(countryOptions)
+          if (countryOptions.length > 0) {
+            setFormData((prev) =>
+              prev.countryCode ? prev : { ...prev, countryCode: countryOptions[0].value }
+            )
+          }
+        }
+
+        const experienceResponse = await lookupAPI.getExperienceLevels()
+        if (experienceResponse.success && experienceResponse.data) {
+          setExperienceLevels(experienceResponse.data.map((level: any) => ({
+            label: level.name,
+            value: level.value,
+          })))
         }
       } catch (error) {
         console.error('خطأ في تحميل البيانات:', error)
@@ -106,21 +133,29 @@ function MenteeForm() {
           { label: "Software", value: "software" },
           { label: "Marketing", value: "marketing" },
         ])
-        setSubDomains([
-          'Graphic Design',
-          'Full Stack Development',
-          'Frontend Development',
-          'Backend Development',
-        ])
         setCareerGoals([
-          'Grow and advance in my current field',
-          'Explore a new career path',
-          'Start my own business or project',
+          { label: 'Grow and advance in my current field', value: 'goal-1' },
+          { label: 'Explore a new career path', value: 'goal-2' },
+          { label: 'Start my own business or project', value: 'goal-3' },
         ])
         setLearningStyles([
-          'Visual (learn best through images, charts, videos)',
-          'Auditory (learn best through listening and speaking)',
-          'Kinesthetic (learn best through hands-on activities)',
+          { label: 'Visual (learn best through images, charts, videos)', value: 'style-1' },
+          { label: 'Auditory (learn best through listening and speaking)', value: 'style-2' },
+          { label: 'Kinesthetic (learn best through hands-on activities)', value: 'style-3' },
+        ])
+        setEducationStatuses([
+          { label: 'Student', value: 'student' },
+          { label: 'Graduate', value: 'graduate' },
+        ])
+        setExperienceLevels([
+          { label: 'Beginner', value: 'beginner' },
+          { label: 'Intermediate', value: 'intermediate' },
+          { label: 'Expert', value: 'expert' },
+        ])
+        setCountries([
+          { label: 'Egypt', value: 'EG' },
+          { label: 'Saudi Arabia', value: 'SA' },
+          { label: 'United Arab Emirates', value: 'AE' },
         ])
       } finally {
         setLoadingData(false)
@@ -129,6 +164,67 @@ function MenteeForm() {
 
     loadLookupData()
   }, [])
+
+  useEffect(() => {
+    const loadSubDomains = async () => {
+      if (!formData.domainId) {
+        setSubDomainOptions([])
+        setTechnologyOptions([])
+        setFormData((prev) => ({ ...prev, relevantExpertise: [], tools: [] }))
+        return
+      }
+
+      try {
+        const subDomainsResponse = await lookupAPI.getSubDomains(formData.domainId)
+        if (subDomainsResponse.success && subDomainsResponse.data) {
+          setSubDomainOptions(subDomainsResponse.data)
+        } else {
+          setSubDomainOptions([])
+        }
+      } catch (error) {
+        console.error('خطأ في تحميل المجالات الفرعية:', error)
+        setSubDomainOptions([])
+      }
+    }
+
+    loadSubDomains()
+  }, [formData.domainId])
+
+  useEffect(() => {
+    const loadTechnologies = async () => {
+      const selectedSubDomainIds = subDomainOptions
+        .filter((sd) => formData.relevantExpertise.includes(sd.name))
+        .map((sd) => sd.id)
+
+      if (selectedSubDomainIds.length === 0) {
+        setTechnologyOptions([])
+        setFormData((prev) => ({ ...prev, tools: [] }))
+        return
+      }
+
+      try {
+        const responses = await Promise.all(
+          selectedSubDomainIds.map((id) => lookupAPI.getTechnologies(id))
+        )
+        const allTechnologies = responses
+          .filter((res) => res.success && res.data)
+          .flatMap((res) => res.data || [])
+
+        const uniqueByName = new Map<string, Technology>()
+        allTechnologies.forEach((tech) => {
+          if (!uniqueByName.has(tech.name)) {
+            uniqueByName.set(tech.name, tech)
+          }
+        })
+        setTechnologyOptions(Array.from(uniqueByName.values()))
+      } catch (error) {
+        console.error('خطأ في تحميل التقنيات:', error)
+        setTechnologyOptions([])
+      }
+    }
+
+    loadTechnologies()
+  }, [formData.relevantExpertise, subDomainOptions])
 
   const handleNext = () => {
     if (currentStep < totalSteps) {
@@ -140,15 +236,6 @@ function MenteeForm() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
     }
-  }
-
-  const handleGoalToggle = (goal: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      goals: prev.goals.includes(goal)
-        ? prev.goals.filter((g) => g !== goal)
-        : [...prev.goals, goal],
-    }))
   }
 
   const handleExpertiseToggle = (expertise: string) => {
@@ -171,11 +258,41 @@ function MenteeForm() {
 
   const handleSubmit = async () => {
     setLoading(true)
-    // TODO: Send data to backend
-    console.log('Mentee Form Data:', formData)
-    setTimeout(() => {
-      navigate('/dashboard')
-    }, 1000)
+    const registrationToken = localStorage.getItem('registrationToken')
+    if (!registrationToken) {
+      setLoading(false)
+      navigate('/signup')
+      return
+    }
+
+    const selectedSubDomainIds = subDomainOptions
+      .filter((sd) => formData.relevantExpertise.includes(sd.name))
+      .map((sd) => sd.id)
+
+    const selectedTechnologyIds = technologyOptions
+      .filter((tech) => formData.tools.includes(tech.name))
+      .map((tech) => tech.id)
+
+    try {
+      const response = await authAPI.completeMenteeProfile({
+        registrationToken,
+        educationStatus: formData.educationStatus,
+        countryCode: formData.countryCode,
+        careerGoalId: formData.careerGoalId,
+        learningStyleId: formData.learningStyleId,
+        domainId: formData.domainId,
+        experienceLevel: formData.experienceLevel,
+        subDomainIds: selectedSubDomainIds,
+        technologyIds: selectedTechnologyIds,
+        bio: formData.bio,
+      })
+
+      if (response.success) {
+        navigate('/dashboard')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -192,7 +309,7 @@ function MenteeForm() {
             </div>
           </div>
         ) : (
-          <div className="space-y-8">.
+          <div className="space-y-8">
             <StepProgress current={currentStep} total={totalSteps} />
 
           {currentStep === 1 && (
@@ -202,22 +319,29 @@ function MenteeForm() {
               <InputGroup label="What is your education level?" htmlFor="educationLevel">
                 <SelectField
                   id="educationLevel"
-                  value={formData.educationLevel}
-                  onChange={(v) => setFormData({ ...formData, educationLevel: v })}
-                  options={educationOptions}
+                  value={formData.educationStatus}
+                  onChange={(v) => setFormData({ ...formData, educationStatus: v })}
+                  options={educationStatuses}
                 />
               </InputGroup >
 
-              <InputGroup label="What is your career goal?" htmlFor="goals"></InputGroup>
-              <CheckboxList
-                items={careerGoals.length > 0 ? careerGoals : [
-                  'Grow and advance in my current field',
-                  'Explore a new career path',
-                  'Start my own business or project',
-                ]}
-                selected={formData.goals}
-                onToggle={handleGoalToggle}
-              />
+              <InputGroup label="Your country" htmlFor="country">
+                <SelectField
+                  id="country"
+                  value={formData.countryCode}
+                  onChange={(v) => setFormData({ ...formData, countryCode: v })}
+                  options={countries}
+                />
+              </InputGroup>
+
+              <InputGroup label="What is your career goal?" htmlFor="goals">
+                <SelectField
+                  id="goals"
+                  value={formData.careerGoalId}
+                  onChange={(v) => setFormData({ ...formData, careerGoalId: v })}
+                  options={careerGoals}
+                />
+              </InputGroup>
             </div>
           )}
 
@@ -225,17 +349,14 @@ function MenteeForm() {
               <div className="space-y-4">
               <StepTitle>Getting to know you</StepTitle>
               <StepSubtitle>This will help us offer you the most appropriate guidance.</StepSubtitle>
-              <InputGroup label=" What’s your preferred learning style" htmlFor="learningStyle"></InputGroup>
-              <RadioList
-                name="learningStyle"
-                items={learningStyles.length > 0 ? learningStyles : [
-                  "Visual (learn best through images, charts, videos)",
-                  "Auditory (learn best through listening and speaking)",
-                  "Kinesthetic (learn best through hands-on activities)",
-                ]}
-                value={formData.learningStyle}
-                onChange={(v) => setFormData({ ...formData, learningStyle: v })}
-              />
+              <InputGroup label=" What’s your preferred learning style" htmlFor="learningStyle">
+                <SelectField
+                  id="learningStyle"
+                  value={formData.learningStyleId}
+                  onChange={(v) => setFormData({ ...formData, learningStyleId: v })}
+                  options={learningStyles}
+                />
+              </InputGroup>
             </div>
           )}
 
@@ -246,8 +367,8 @@ function MenteeForm() {
             <InputGroup label="Select your career field" htmlFor="industry">
                 <SelectField
                   id="industry"
-                  value={formData.industry}
-                  onChange={(v) => setFormData({ ...formData, industry: v })}
+                  value={formData.domainId}
+                  onChange={(v) => setFormData({ ...formData, domainId: v })}
                   options={domains}
                 />
               </InputGroup>
@@ -255,16 +376,16 @@ function MenteeForm() {
               <InputGroup label="Years of Experience" htmlFor="experience">
                 <SelectField
                   id="experience"
-                  value={formData.experience}
-                  onChange={(v) => setFormData({ ...formData, experience: v })}
-                  options={experienceOptions}
+                  value={formData.experienceLevel}
+                  onChange={(v) => setFormData({ ...formData, experienceLevel: v })}
+                  options={experienceLevels}
                 />
               </InputGroup>
 
               <InputGroup label="What Relevant expertise to your career" htmlFor="expertise">
                 <SelectWithTags
                   id="expertise"
-                  options={subDomains}
+                  options={subDomainOptions.map((sd) => sd.name)}
                   selected={formData.relevantExpertise}
                   onAdd={(item) => handleExpertiseToggle(item)}
                   onRemove={(item) => handleExpertiseToggle(item)}
@@ -275,7 +396,7 @@ function MenteeForm() {
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
                 <SelectWithTags
                   id="tools"
-                  options={subDomains}
+                  options={technologyOptions.map((tech) => tech.name)}
                   selected={formData.tools}
                   onAdd={(item) => handleToolsToggle(item)}
                   onRemove={(item) => handleToolsToggle(item)}

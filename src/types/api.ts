@@ -1,10 +1,18 @@
-// أنواع البيانات المشتركة
-
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
   data?: T;
   errors?: string[];
+}
+
+export interface CompleteRegistrationRequest {
+  registrationToken: string;
+  role: 'mentee' | 'mentor';
+}
+
+export interface VerifyEmailRequest {
+  token: string;
+  email: string;
 }
 
 export interface AuthUser {
@@ -41,19 +49,33 @@ export interface RegistrationFlowResponse {
 }
 
 export interface MentorProfile {
-  yearsOfExperience: number;
-  currentTitle: string;
-  companyName: string;
-  expertiseAreas: string[];
+  yearsOfExperience: number | string;
+  linkedinUrl?: string;
+  countryCode?: string;
+  domainId?: string;
+  subDomainIds?: string[];
+  technologyIds?: string[];
   bio?: string;
 }
 
 export interface MenteeProfile {
-  currentCareerGoalId?: string;
-  currentSkillLevel?: string;
-  preferredLearningStyleId?: string;
-  interests?: string[];
-  subDomains?: string[];
+  educationStatus?: string;
+  countryCode?: string;
+  careerGoalId?: string;
+  learningStyleId?: string;
+  domainId?: string;
+  subDomainIds?: string[];
+  experienceLevel?: string;
+  technologyIds?: string[];
+  bio?: string;
+}
+
+export interface MentorProfileRequest extends MentorProfile {
+  registrationToken: string;
+}
+
+export interface MenteeProfileRequest extends MenteeProfile {
+  registrationToken: string;
 }
 
 export interface Country {
@@ -62,24 +84,26 @@ export interface Country {
   code: string;
 }
 
-export interface Domain {
+export interface LookupItem {
   id: string;
   name: string;
 }
 
-export interface SubDomain {
-  id: string;
+export interface Domain extends LookupItem {}
+
+export interface SubDomain extends LookupItem {
   domainId: string;
-  name: string;
 }
 
-export interface CareerGoal {
-  id: string;
-  name: string;
-}
+export interface CareerGoal extends LookupItem {}
 
-export interface LearningStyle {
-  id: string;
-  name: string;
+export interface LearningStyle extends LookupItem {
   description?: string;
 }
+
+export interface Technology extends LookupItem {
+  subDomainId?: string;
+}
+
+export type EducationStatus = string;
+export type ExperienceLevel = string;

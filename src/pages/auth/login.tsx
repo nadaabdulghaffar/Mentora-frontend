@@ -17,6 +17,15 @@ function Login() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
   const [resendCooldown, setResendCooldown] = useState(0)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7018/api'
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${oauthBaseUrl}/auth/login-google?rememberMe=${rememberMe}`
+  }
+
+  const handleGithubLogin = () => {
+    window.location.href = `${oauthBaseUrl}/auth/login-github?rememberMe=${rememberMe}`
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -174,8 +183,8 @@ function Login() {
             <FormDivider text="Or log in with:" />
 
             <div className="grid grid-cols-2 gap-3">
-              <SocialLoginButton provider="Google" />
-              <SocialLoginButton provider="Github" />
+              <SocialLoginButton provider="Google" onClick={handleGoogleLogin} />
+              <SocialLoginButton provider="Github" onClick={handleGithubLogin} />
             </div>
 
             <div className="h-px bg-gray-200" />

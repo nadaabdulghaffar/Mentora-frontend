@@ -25,6 +25,15 @@ function Signup() {
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | ''>('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7018/api'
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${oauthBaseUrl}/auth/login-google?rememberMe=false`
+  }
+
+  const handleGithubLogin = () => {
+    window.location.href = `${oauthBaseUrl}/auth/login-github?rememberMe=false`
+  }
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPassword = e.target.value
@@ -280,8 +289,8 @@ function Signup() {
             <FormDivider text="Or sign up with:" />
 
             <div className="grid grid-cols-2 gap-3">
-              <SocialLoginButton provider="Google" />
-              <SocialLoginButton provider="Github" />
+              <SocialLoginButton provider="Google" onClick={handleGoogleLogin} />
+              <SocialLoginButton provider="Github" onClick={handleGithubLogin} />
             </div>
 
             <AuthLink 

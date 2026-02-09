@@ -21,10 +21,12 @@ import {
   validateMentorProfileForm 
 } from "../../utils/validation"
 import lookupAPI from "../../services/lookupService"
+import authAPI from "../../services/authService"
+import type { SubDomain, Technology } from "../../types/api"
 
 interface MentorFormData {
-  expertise: string[]
-  industry: string
+  domainId: string
+  countryCode: string
   experience: string
   availability: string
   mentees: string
@@ -40,8 +42,8 @@ function MentorForm() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<MentorFormData>({
-    expertise: [],
-    industry: '',
+    domainId: '',
+    countryCode: '',
     experience: '',
     bio: '',
     availability: '',
@@ -59,7 +61,9 @@ function MentorForm() {
 
   // البيانات من الـ API
   const [domains, setDomains] = useState<Option[]>([])
-  const [subDomains, setSubDomains] = useState<string[]>([])
+  const [subDomainOptions, setSubDomainOptions] = useState<SubDomain[]>([])
+  const [technologyOptions, setTechnologyOptions] = useState<Technology[]>([])
+  const [countries, setCountries] = useState<Option[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   const totalSteps = 4
@@ -79,17 +83,32 @@ function MentorForm() {
         // جلب المجالات
         const domainsResponse = await lookupAPI.getDomains()
         if (domainsResponse.success && domainsResponse.data) {
-          setDomains(domainsResponse.data.map(d => ({ 
+          const domainOptions = domainsResponse.data.map(d => ({ 
             label: d.name, 
             value: d.id 
-          })))
+          }))
+          setDomains(domainOptions)
+          if (domainOptions.length > 0) {
+            setFormData((prev) =>
+              prev.domainId ? prev : { ...prev, domainId: domainOptions[0].value }
+            )
+          }
         }
 
-        // جلب المجالات الفرعية
-        const subDomainsResponse = await lookupAPI.getSubDomains()
-        if (subDomainsResponse.success && subDomainsResponse.data) {
-          setSubDomains(subDomainsResponse.data.map(sd => sd.name))
+        const countriesResponse = await lookupAPI.getCountries()
+        if (countriesResponse.success && countriesResponse.data) {
+          const countryOptions = countriesResponse.data.map((country) => ({
+            label: country.name,
+            value: country.code,
+          }))
+          setCountries(countryOptions)
+          if (countryOptions.length > 0) {
+            setFormData((prev) =>
+              prev.countryCode ? prev : { ...prev, countryCode: countryOptions[0].value }
+            )
+          }
         }
+
       } catch (error) {
         console.error('خطأ في تحميل البيانات:', error)
         // في حالة الفشل، استخدم بيانات افتراضية
@@ -98,11 +117,10 @@ function MentorForm() {
           { label: 'Finance', value: 'finance' },
           { label: 'Healthcare', value: 'healthcare' },
         ])
-        setSubDomains([
-          'Full Stack Development',
-          'Frontend Development',
-          'Backend Development',
-          'Mobile Development',
+        setCountries([
+          { label: 'Egypt', value: 'EG' },
+          { label: 'Saudi Arabia', value: 'SA' },
+          { label: 'United Arab Emirates', value: 'AE' },
         ])
       } finally {
         setLoadingData(false)
@@ -111,6 +129,67 @@ function MentorForm() {
 
     loadLookupData()
   }, [])
+
+  useEffect(() => {
+    const loadSubDomains = async () => {
+      if (!formData.domainId) {
+        setSubDomainOptions([])
+        setTechnologyOptions([])
+        setFormData((prev) => ({ ...prev, relevantExpertise: [], tools: [] }))
+        return
+      }
+
+      try {
+        const subDomainsResponse = await lookupAPI.getSubDomains(formData.domainId)
+        if (subDomainsResponse.success && subDomainsResponse.data) {
+          setSubDomainOptions(subDomainsResponse.data)
+        } else {
+          setSubDomainOptions([])
+        }
+      } catch (error) {
+        console.error('خطأ في تحميل المجالات الفرعية:', error)
+        setSubDomainOptions([])
+      }
+    }
+
+    loadSubDomains()
+  }, [formData.domainId])
+
+  useEffect(() => {
+    const loadTechnologies = async () => {
+      const selectedSubDomainIds = subDomainOptions
+        .filter((sd) => formData.relevantExpertise.includes(sd.name))
+        .map((sd) => sd.id)
+
+      if (selectedSubDomainIds.length === 0) {
+        setTechnologyOptions([])
+        setFormData((prev) => ({ ...prev, tools: [] }))
+        return
+      }
+
+      try {
+        const responses = await Promise.all(
+          selectedSubDomainIds.map((id) => lookupAPI.getTechnologies(id))
+        )
+        const allTechnologies = responses
+          .filter((res) => res.success && res.data)
+          .flatMap((res) => res.data || [])
+
+        const uniqueByName = new Map<string, Technology>()
+        allTechnologies.forEach((tech) => {
+          if (!uniqueByName.has(tech.name)) {
+            uniqueByName.set(tech.name, tech)
+          }
+        })
+        setTechnologyOptions(Array.from(uniqueByName.values()))
+      } catch (error) {
+        console.error('خطأ في تحميل التقنيات:', error)
+        setTechnologyOptions([])
+      }
+    }
+
+    loadTechnologies()
+  }, [formData.relevantExpertise, subDomainOptions])
 
 const handleToolsToggle = (tool: string) => {
   setFormData((prev) => ({
@@ -155,7 +234,7 @@ const handleLinkedInChange = (value: string) => {
         }
       }
     } else if (currentStep === 2) {
-      if (!formData.industry) {
+      if (!formData.domainId) {
         setGeneralError('Please select an industry')
         return
       }
@@ -240,8 +319,8 @@ const handleLinkedInChange = (value: string) => {
 
     // Validate entire form before submission
     const validation = validateMentorProfileForm(
-      formData.expertise,
-      formData.industry,
+      formData.relevantExpertise,
+      formData.domainId,
       formData.experience,
       formData.availability,
       formData.mentees,
@@ -261,11 +340,41 @@ const handleLinkedInChange = (value: string) => {
     }
 
     setLoading(true)
-    // TODO: Send data to backend
-    console.log('Mentor Form Data:', formData)
-    setTimeout(() => {
-      navigate('/dashboard')
-    }, 1000)
+
+    const registrationToken = localStorage.getItem('registrationToken')
+    if (!registrationToken) {
+      setLoading(false)
+      navigate('/signup')
+      return
+    }
+
+    const selectedSubDomainIds = subDomainOptions
+      .filter((sd) => formData.relevantExpertise.includes(sd.name))
+      .map((sd) => sd.id)
+
+    const selectedTechnologyIds = technologyOptions
+      .filter((tech) => formData.tools.includes(tech.name))
+      .map((tech) => tech.id)
+
+    try {
+      const response = await authAPI.completeMentorProfile({
+        registrationToken,
+        yearsOfExperience: formData.experience,
+        linkedinUrl: formData.linkedinUrl,
+        countryCode: formData.countryCode,
+        domainId: formData.domainId,
+        subDomainIds: selectedSubDomainIds,
+        technologyIds: selectedTechnologyIds,
+        bio: formData.bio,
+        cvFiles: formData.cvFiles,
+      })
+
+      if (response.success) {
+        navigate('/dashboard')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -297,6 +406,19 @@ const handleLinkedInChange = (value: string) => {
             <div className="space-y-4">
               <StepTitle>Getting to know you</StepTitle>
               <StepSubtitle>This will help us to understand you better.</StepSubtitle>
+              <InputGroup label="Your country" htmlFor="country">
+                <SelectField
+                  id="country"
+                  value={formData.countryCode}
+                  onChange={(v) => {
+                    setFormData({ ...formData, countryCode: v })
+                    if (fieldErrors.countryCode) {
+                      setFieldErrors(prev => ({ ...prev, countryCode: '' }))
+                    }
+                  }}
+                  options={countries}
+                />
+              </InputGroup>
                 <InputGroup label="Years of Experience" htmlFor="experience">
                 <SelectField
                   id="experience"
@@ -348,9 +470,9 @@ const handleLinkedInChange = (value: string) => {
           <InputGroup label="Select your career field" htmlFor="industry">
                 <SelectField
                   id="industry"
-                  value={formData.industry}
+                  value={formData.domainId}
                   onChange={(v) => {
-                    setFormData({ ...formData, industry: v })
+                    setFormData({ ...formData, domainId: v })
                     if (fieldErrors.industry) {
                       setFieldErrors(prev => ({ ...prev, industry: '' }))
                     }
@@ -364,7 +486,7 @@ const handleLinkedInChange = (value: string) => {
                 <InputGroup label="What Relevant expertise to your career" htmlFor="expertise">
                 <SelectWithTags
                   id="expertise"
-                  options={subDomains}
+                  options={subDomainOptions.map((sd) => sd.name)}
                   selected={formData.relevantExpertise}
                   onAdd={(item) => {
                     handleExpertiseToggle(item)
@@ -383,7 +505,7 @@ const handleLinkedInChange = (value: string) => {
               <InputGroup label="Which tools you have experience in" htmlFor="tools">
                 <SelectWithTags
                   id="tools"
-                  options={subDomains}
+                  options={technologyOptions.map((tech) => tech.name)}
                   selected={formData.tools}
                   onAdd={(item) => handleToolsToggle(item)}
                   onRemove={(item) => handleToolsToggle(item)}
