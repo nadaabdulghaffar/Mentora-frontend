@@ -7,6 +7,8 @@ import MenteeForm from "./pages/auth/mentee-form"
 import MentorForm from "./pages/auth/mentor-form"
 import ResetPassword from "./pages/auth/reset-password"
 import AuthSuccess from "./pages/auth/auth-success"
+import DashboardPage from "./features/dashboard/DashboardPage";
+
 
 function App() { 
   return (
@@ -20,8 +22,11 @@ function App() {
       <Route path="/role-selection" element={<RoleSelection />} />
       <Route path="/signup/mentee-form" element={<MenteeForm />} />
       <Route path="/signup/mentor-form" element={<MentorForm />} />
+      <Route path="/dashboard" element={<DashboardPage />} />
+
     </Routes>
   )
 }
 
 export default App
+
