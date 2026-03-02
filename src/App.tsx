@@ -7,7 +7,7 @@ import MenteeForm from "./pages/auth/mentee-form"
 import MentorForm from "./pages/auth/mentor-form"
 import ResetPassword from "./pages/auth/reset-password"
 import AuthSuccess from "./pages/auth/auth-success"
-import DashboardPage from "./features/dashboard/DashboardPage";
+import DashboardPage from "./pages/DashboardPage";
 
 
 function App() { 

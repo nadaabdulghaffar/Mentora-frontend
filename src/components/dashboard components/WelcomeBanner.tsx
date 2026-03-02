@@ -1,5 +1,5 @@
-import leftIllustration from "../../../assets/images/welcome-banner-left.png";
-import rightIllustration from "../../../assets/images/welcome-banner-right.png";
+import leftIllustration from "../../assets/images/welcome-banner-left.png";
+import rightIllustration from "../../assets/images/welcome-banner-right.png";
 
 interface Props {
     name: string;
