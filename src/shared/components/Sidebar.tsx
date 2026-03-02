@@ -72,47 +72,53 @@ const Sidebar = () => {
                 </nav>
             </div>
 
-            {/* Profile Section */}
-            <div className="relative border-t pt-4" ref={dropdownRef}>
-                <div
-                    onClick={() => setOpen(!open)}
-                    className="flex items-center gap-3 cursor-pointer p-2 rounded-xl hover:bg-gray-100 transition"
-                >
-                    <img
-                        src={"https://randomuser.me/api/portraits/lego/1.jpg"}
-                        alt="profile"
-                        className="w-10 h-10 rounded-full object-cover"
-                    />
+{/* Profile Section */}
+<div className="relative border-t border-gray-200 pt-4 mt-6" ref={dropdownRef}>
+  <div
+    onClick={() => setOpen(!open)}
+    className="flex items-center gap-3 cursor-pointer group"
+  >
+    {/* Avatar */}
+    <img
+      src="https://randomuser.me/api/portraits/lego/1.jpg"
+      alt="profile"
+      className="w-9 h-9 rounded-full object-cover"
+    />
 
-                    <div className="flex-1">
-                        <p className="text-sm font-semibold text-slateInk">
-                            {user ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : 'Guest'}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                            {user?.email ?? '—'}
-                        </p>
-                    </div>
+    {/* Name + Email */}
+    <div className="flex-1 leading-tight">
+      <p className="text-sm font-semibold text-[#2E2A47]">
+        {user
+          ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
+          : "Guest"}
+      </p>
 
-                    <ChevronDown
-                        size={60}
-                        strokeWidth={7}
-                        className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""
-                            }`}
-                    />
-                </div>
+      <p className="text-xs text-gray-400">
+        {user?.email ?? "—"}
+      </p>
+    </div>
 
-                {/* Dropdown Menu */}
-                {open && (
-                    <div className="absolute bottom-14 left-0 w-full bg-white shadow-lg rounded-xl py-2 border">
-                        <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
-                            Edit Profile
-                        </button>
-                        <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100">
-                            Logout
-                        </button>
-                    </div>
-                )}
-            </div>
+    {/* Chevron */}
+    <ChevronDown
+      size={18}
+      className={`text-gray-400 transition-transform duration-200 ${
+        open ? "rotate-180" : ""
+      }`}
+    />
+  </div>
+
+  {/* Dropdown */}
+  {open && (
+    <div className="absolute bottom-12 left-0 w-full bg-white shadow-lg rounded-xl py-2 border border-gray-100">
+      <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
+        Edit Profile
+      </button>
+      <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100">
+        Logout
+      </button>
+    </div>
+  )}
+</div>
 
         </div>
     );

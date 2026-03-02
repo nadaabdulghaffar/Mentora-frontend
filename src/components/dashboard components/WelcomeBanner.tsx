@@ -1,42 +1,49 @@
-import leftIllustration from "../../assets/images/welcome-banner-left.png";
-import rightIllustration from "../../assets/images/welcome-banner-right.png";
+import graphicsIllustration from "../../assets/images/welcome-banner/Graphics.png";
+import leftIllustration from "../../assets/images/welcome-banner/welcome-banner-left.png";
+import plantIllustration from "../../assets/images/welcome-banner/welcome-banner-plant.png";
 
 interface Props {
-    name: string;
+  name: string;
 }
 
 const WelcomeBanner = ({ name }: Props) => {
-    return (
-        <div className="relative bg-primary text-white rounded-3xl px-6 sm:px-10 lg:px-12 py-6 lg:py-8 min-h-[160px] lg:min-h-[200px] overflow-hidden flex items-center">
+  return (
+<div className="relative bg-primary text-white rounded-3xl px-12 py-3 min-h-[85px] overflow-hidden flex items-center">
 
-            {/* Left Image */}
-            <img
-                src={leftIllustration}
-                alt="welcome left"
-                className="hidden lg:block absolute left-6 bottom-0 w-[180px] object-contain pointer-events-none"
-            />
+  {/* Graphics */}
+  <img
+    src={graphicsIllustration}
+    alt="graphics"
+    className="absolute right-36 top-6 w-[250px] opacity-90 pointer-events-none"
+  />
 
-            {/* Right Image */}
-            <img
-                src={rightIllustration}
-                alt="welcome right"
-                className="hidden lg:block absolute right-6 top-4 w-[130px] object-contain pointer-events-none select-none"
-            />
+  {/* Left Illustration */}
+  <img
+    src={leftIllustration}
+    alt="welcome illustration"
+    className="w-[180px] object-contain mr-6"
+  />
 
-            {/* Text */}
-            <div className="relative z-10 max-w-xl lg:ml-[200px]">
-                <h2 className="text-xl sm:text-2xl font-bold tracking-wide">
-                    Hello, {name}
-                </h2>
+  {/* Text */}
+  <div className="relative z-10 max-w-xl">
+    <h2 className="text-3xl font-bold leading-tight">
+      Hello , {name}
+    </h2>
 
-                <p className="mt-2 sm:mt-3 text-sm sm:text-base text-purple-100">
-                    Continue your growth journey with expert mentorship
-                </p>
-            </div>
+    <p className="mt-0.5 text-lg text-purple-100 font-medium">
+      Continue your growth journey with expert mentorship
+    </p>
+  </div>
 
-        </div>
+  {/* Plant */}
+  <img
+    src={plantIllustration}
+    alt="plant"
+    className="absolute right-8 bottom-2 w-[45px] object-contain pointer-events-none"
+  />
 
-    );
+</div>
+  );
 };
 
 export default WelcomeBanner;
