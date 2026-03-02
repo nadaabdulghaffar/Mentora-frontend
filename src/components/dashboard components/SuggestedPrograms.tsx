@@ -2,21 +2,21 @@ import ProgramCard from "./ProgramCard";
 
 const SuggestedPrograms = () => {
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
 
             {/* Header */}
             <div className="flex justify-between items-start mb-6">
 
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
+                    <h3 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800">
                         Programs Suggested for you
                     </h3>
-                    <p className="text-sm text-gray-400 mt-1">
+                    <p className="text-xs md:text-sm lg:text-base text-gray-400 mt-1">
                         AI-matched based on your goals
                     </p>
                 </div>
 
-                <button className="text-sm text-gray-500 hover:text-primary
+                <button className="text-xs md:text-sm lg:text-base text-gray-500 hover:text-primary
  transition">
                     View all
                 </button>
@@ -24,9 +24,9 @@ const SuggestedPrograms = () => {
 
             {/* Cards Wrapper */}
             <div className="overflow-x-auto no-scrollbar">
-                <div className="flex gap-6 min-w-max">
+                <div className="flex gap-3 md:gap-6 lg:gap-8 min-w-max">
 
-                    <div className="w-[380px] flex-shrink-0">
+                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
                         <ProgramCard
                             title="Career Acceleration Program"
                             mentorName="Sarah Chen"
@@ -36,7 +36,7 @@ const SuggestedPrograms = () => {
                         />
                     </div>
 
-                    <div className="w-[380px] flex-shrink-0">
+                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
                         <ProgramCard
                             title="Career Acceleration Program"
                             mentorName="Sarah Chen"
@@ -46,7 +46,7 @@ const SuggestedPrograms = () => {
                         />
                     </div>
 
-                    <div className="w-[380px] flex-shrink-0">
+                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
                         <ProgramCard
                             title="Career Acceleration Program"
                             mentorName="Sarah Chen"

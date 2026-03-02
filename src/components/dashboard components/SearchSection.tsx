@@ -5,12 +5,12 @@ const SearchSection = () => {
         <div className="bg-white rounded-2xl p-6 shadow-sm">
 
             {/* Title */}
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+            <h3 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800 mb-4">
                 Share your Thoughts , find your mentor
             </h3>
 
             {/* Search Row */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4 lg:gap-6">
 
                 {/* Input Wrapper */}
                 <div className="relative flex-1">
@@ -27,7 +27,7 @@ const SearchSection = () => {
                 </div>
 
                 {/* Button */}
-                <button className="px-6 py-3 rounded-xl bg-gray-200 hover:bg-gray-300 transition font-medium text-gray-700">
+                <button className="px-4 md:px-6 lg:px-8 py-3 rounded-xl bg-gray-200 hover:bg-gray-300 transition font-medium text-gray-700 text-sm md:text-base flex-shrink-0">
                     Search
                 </button>
 

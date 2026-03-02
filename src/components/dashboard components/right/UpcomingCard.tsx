@@ -2,11 +2,11 @@ import { CalendarDays } from "lucide-react";
 
 const UpcomingCard = () => {
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slateInk">
+                <h3 className="text-base md:text-lg lg:text-xl font-semibold text-slateInk">
                     Upcoming
                 </h3>
 
@@ -38,7 +38,7 @@ const UpcomingCard = () => {
             </div>
 
             {/* Button */}
-            <button className="mt-3 w-full py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 transition font-medium text-slateInk">
+            <button className="mt-3 w-full py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 transition font-medium text-sm md:text-base lg:text-lg text-slateInk">
                 Full calendar
             </button>
 
@@ -70,7 +70,7 @@ const EventItem = ({
 
             {/* Date Box */}
             <div
-                className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center text-xs font-semibold ${color}`}
+                className={`w-12 md:w-14 lg:w-16 h-12 md:h-14 lg:h-16 rounded-xl flex flex-col items-center justify-center text-xs font-semibold ${color}`}
             >
                 <span>{date}</span>
                 <span className="text-sm">{day}</span>
@@ -78,7 +78,7 @@ const EventItem = ({
 
             {/* Info */}
             <div className="flex-1">
-                <p className="font-semibold text-sm text-slateInk">
+                <p className="font-semibold text-xs md:text-sm lg:text-base text-slateInk">
                     {title}
                 </p>
 

@@ -35,16 +35,16 @@ const DashboardPage = () => {
 
     return (
         <Layout>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:gap-12">
 
-                <div className="lg:col-span-9 space-y-6">
+                <div className="lg:col-span-9 space-y-4 md:space-y-6 lg:space-y-8">
                     <WelcomeBanner name={displayName} />
                     <SearchSection />
                     <SuggestedPrograms />
 
                 </div>
 
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-3 space-y-4 md:space-y-6 lg:space-y-8">
                     <RightSidebar />
                 </div>
 

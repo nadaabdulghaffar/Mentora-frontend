@@ -2,11 +2,11 @@ import { BookOpen } from "lucide-react";
 
 const LearningHubCard = () => {
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
 
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slateInk">
+                <h3 className="text-base md:text-lg lg:text-xl font-semibold text-slateInk">
                     Learning Hub
                 </h3>
 
@@ -50,7 +50,7 @@ const LearningItem = ({ title, date }: LearningItemProps) => {
     return (
         <div className="bg-[#F3F2F7] rounded-xl px-4 py-2.5 hover:bg-[#EAE8F5] transition cursor-pointer">
 
-            <p className="text-sm font-semibold text-slateInk">
+            <p className="text-xs md:text-sm lg:text-base font-semibold text-slateInk">
                 {title}
             </p>
 
