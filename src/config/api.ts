@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 // إعدادات الـ API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:7018/api';
+// القيمة تُقرأ من متغير بيئة VITE_API_URL الذي يمكن تعيينه عبر ملف
+// `.env` أو مباشرة عند تشغيل vite (`VITE_API_URL=http://localhost:5069/api npm run dev`).
+// إذا لم يُحدد المتغير، نضع بورت التطوير الافتراضي الذي يستخدمه
+// المشروع الخلفي (يتوافق مع `launchSettings.json`).
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5069/api';
 
 // إنشاء instance من Axios
 const apiClient = axios.create({
@@ -38,26 +42,70 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refreshToken');
+        
+        if (!refreshToken) {
+          console.warn('No refresh token available, redirecting to login');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          
+          if (!window.location.href.includes('/login')) {
+            window.location.href = '/login';
+          }
+          throw new Error('No refresh token available');
+        }
+
+        console.log('Attempting to refresh token...');
+        
         const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-          refreshToken,
+          RefreshToken: refreshToken,
         });
 
-        const { accessToken } = response.data.data;
-        localStorage.setItem('accessToken', accessToken);
+        if (response.data?.success && response.data?.data?.accessToken) {
+          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+          
+          console.log('Token refreshed successfully');
+          
+          localStorage.setItem('accessToken', accessToken);
+          
+          if (newRefreshToken) {
+            localStorage.setItem('refreshToken', newRefreshToken);
+          }
 
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        return apiClient(originalRequest);
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return apiClient(originalRequest);
+        } else {
+          console.error('Token refresh response invalid:', response.data);
+          throw new Error('Token refresh failed');
+        }
       } catch (refreshError) {
+        console.error('Token refresh error:', refreshError);
+        
         // إزالة الـ tokens وإعادة التوجيه للـ login
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
+        localStorage.removeItem('user');
+        
+        // تجنب infinite redirects
+        if (!window.location.href.includes('/login')) {
+          console.log('Redirecting to login');
+          window.location.href = '/login';
+        }
+        
         return Promise.reject(refreshError);
       }
     }
 
+    // For other errors, just reject
+    console.error('API Error:', {
+      status: error.response?.status,
+      message: error.message,
+      url: error.config?.url,
+    });
+
     return Promise.reject(error);
   }
 );
+
 
 export default apiClient;

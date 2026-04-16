@@ -9,10 +9,12 @@ import {
     ChevronDown,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
 
 const Sidebar = () => {
+    const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -48,6 +50,16 @@ const Sidebar = () => {
             }
         })();
     }, []);
+
+    const handleLogout = async () => {
+        try {
+            await authAPI.logout();
+        } catch (err) {
+            console.error('Sidebar: logout failed', err);
+        } finally {
+            navigate('/login');
+        }
+    };
 
     return (
         <div className="fixed left-0 top-0 w-64 h-screen bg-white shadow-sm p-6 flex flex-col">
@@ -113,7 +125,11 @@ const Sidebar = () => {
       <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
         Edit Profile
       </button>
-      <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100">
+      <button
+        className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100"
+        onClick={handleLogout}
+        type="button"
+      >
         Logout
       </button>
     </div>

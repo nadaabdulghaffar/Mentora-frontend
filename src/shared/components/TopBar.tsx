@@ -1,5 +1,8 @@
 import { Bell, Menu, X, Home, Mail, Users, FileText, BookOpen, Calendar } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import authAPI from "../../services/authService";
+import type { AuthUser } from "../../types/api";
 
 interface Notification {
   id: number;
@@ -9,10 +12,13 @@ interface Notification {
 }
 
 const TopBar = () => {
+  const navigate = useNavigate();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const notifications: Notification[] = [
     {
@@ -45,6 +51,21 @@ const TopBar = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () =>
       document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // load current user to determine role
+  useEffect(() => {
+    const local = authAPI.getCurrentUser();
+    if (local) setUser(local);
+
+    (async () => {
+      try {
+        const res = await authAPI.getMe();
+        if (res.success && res.data) setUser(res.data);
+      } catch (err) {
+        // ignore
+      }
+    })();
   }, []);
 
   // Close menu when clicking outside
@@ -148,9 +169,18 @@ const TopBar = () => {
           )}
         </div>
 
-        {/* Find Mentorship Button */}
-        <button className="bg-primary hover:bg-primary-dark text-white px-3 md:px-5 lg:px-7 py-2 md:py-2.5 rounded-xl font-medium text-sm md:text-base lg:text-lg transition">
-          Find Mentorship
+        {/* Find/Create Mentorship Button */}
+        <button
+          onClick={() => {
+            if (user?.role?.toLowerCase() === 'mentor') {
+              navigate('/mentor/create-mentorship');
+            } else {
+              navigate('/search-mentorship');
+            }
+          }}
+          className="bg-primary hover:bg-primary-dark text-white px-3 md:px-5 lg:px-7 py-2 md:py-2.5 rounded-xl font-medium text-sm md:text-base lg:text-lg transition"
+        >
+          {user?.role?.toLowerCase() === 'mentor' ? 'Create Mentorship' : 'Find Mentorship'}
         </button>
       </div>
     </div>

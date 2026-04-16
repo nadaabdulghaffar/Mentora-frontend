@@ -7,7 +7,12 @@ import MenteeForm from "./pages/auth/mentee-form"
 import MentorForm from "./pages/auth/mentor-form"
 import ResetPassword from "./pages/auth/reset-password"
 import AuthSuccess from "./pages/auth/auth-success"
-import DashboardPage from "./pages/DashboardPage";
+import DashboardPage from "./pages/DashboardPage"
+import MentorDashboardPage from "./pages/MentorDashboardPage"
+import SearchMentorshipPage from "./pages/SearchMentorshipPage";
+import CreateMentorshipPage from "./pages/CreateMentorshipPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+import OnboardingRoute from "./components/OnboardingRoute"; 
 
 
 function App() { 
@@ -20,9 +25,55 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth-success" element={<AuthSuccess />} />
       <Route path="/role-selection" element={<RoleSelection />} />
-      <Route path="/signup/mentee-form" element={<MenteeForm />} />
-      <Route path="/signup/mentor-form" element={<MentorForm />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
+      <Route 
+  path="/signup/mentee-form" 
+  element={
+    <OnboardingRoute>
+      <MenteeForm />
+    </OnboardingRoute>
+  } 
+/>
+
+<Route 
+  path="/signup/mentor-form" 
+  element={
+    <OnboardingRoute>
+      <MentorForm />
+    </OnboardingRoute>
+  } 
+/>
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute roles={[ 'mentee' ]}>
+            <DashboardPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route
+        path="/mentor/dashboard"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <MentorDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/search-mentorship"
+        element={
+          <ProtectedRoute>
+            <SearchMentorshipPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mentor/create-mentorship"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <CreateMentorshipPage />
+          </ProtectedRoute>
+        }
+      />
 
     </Routes>
   )

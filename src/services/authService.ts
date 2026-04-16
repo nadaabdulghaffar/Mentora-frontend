@@ -4,18 +4,46 @@ import type {
   AuthUser,
   AuthTokens,
   RegistrationFlowResponse,
+  RegistrationCompleteResponse,
   MentorProfile,
   MenteeProfile,
   CompleteRegistrationRequest,
   MentorProfileRequest,
   MenteeProfileRequest,
+  FileUploadResponse,
 } from '../types/api';
 
 // Re-export for backward compatibility
 export type { ApiResponse, AuthUser, AuthTokens, RegistrationFlowResponse, MentorProfile, MenteeProfile };
 
+const persistAuthData = (accessToken: string, refreshToken: string, user: AuthUser) => {
+  localStorage.setItem('accessToken', accessToken);
+  localStorage.setItem('refreshToken', refreshToken);
+  localStorage.setItem('user', JSON.stringify(user));
+};
+
 // خدمات الـ Authentication
 export const authAPI = {
+  // تحميل ملف (CV أو صورة)
+  uploadFile: async (
+    file: File,
+    type: 'cv' | 'profile-picture',
+    registrationToken?: string
+  ): Promise<ApiResponse<FileUploadResponse>> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (registrationToken) {
+      formData.append('registrationToken', registrationToken);
+    }
+
+    const response = await apiClient.post(`/file/upload-${type}`, formData, {
+      headers: {
+        'Content-Type': undefined, // Allow browser to set proper multipart boundary
+      },
+    });
+    return response.data;
+  },
+
   // التسجيل الأولي
   registerInitial: async (
     firstName: string,
@@ -39,11 +67,19 @@ export const authAPI = {
       password,
     });
     
+    console.log('Login response:', response.data);
+    
     // حفظ الـ tokens
     if (response.data.success && response.data.data) {
-      localStorage.setItem('accessToken', response.data.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.data.refreshToken);
-      localStorage.setItem('user', JSON.stringify(response.data.data.user));
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      if (accessToken && refreshToken && user) {
+        persistAuthData(accessToken, refreshToken, user);
+      } else {
+        console.error('Login response missing tokens or user:', response.data);
+      }
+    } else {
+      console.error('Login failed:', response.data);
     }
     
     return response.data;
@@ -79,9 +115,10 @@ export const authAPI = {
   // إكمال بروفايل الـ Mentor
   completeMentorProfile: async (
     profile: MentorProfileRequest & { cvFiles?: File[] }
-  ): Promise<ApiResponse<null>> => {
+  ): Promise<ApiResponse<RegistrationCompleteResponse>> => {
     const hasFiles = !!profile.cvFiles && profile.cvFiles.length > 0;
 
+    let response: any
     if (hasFiles) {
       const formData = new FormData();
       formData.append('registrationToken', profile.registrationToken);
@@ -97,27 +134,62 @@ export const authAPI = {
       if (profile.bio) {
         formData.append('bio', profile.bio);
       }
+      if (profile.cvUrl) {
+        formData.append('cvUrl', profile.cvUrl);
+      }
+      if (profile.countryCode) {
+        formData.append('countryCode', profile.countryCode);
+      }
       if (profile.subDomainIds) {
-        profile.subDomainIds.forEach((id) => formData.append('subDomainIds', id));
+        profile.subDomainIds.forEach((id) => formData.append('subDomainIds', String(id)));
       }
       if (profile.technologyIds) {
-        profile.technologyIds.forEach((id) => formData.append('technologyIds', id));
+        profile.technologyIds.forEach((id) => formData.append('technologyIds', String(id)));
       }
-      profile.cvFiles?.forEach((file) => formData.append('cvFiles', file));
 
-      const response = await apiClient.post('/auth/complete-mentor-profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data;
+      // let axios/browser set the Content-Type including boundary automatically
+      response = await apiClient.post('/auth/complete-mentor-profile', formData);
+    } else {
+      response = await apiClient.post('/auth/complete-mentor-profile', profile);
     }
 
-    const response = await apiClient.post('/auth/complete-mentor-profile', profile);
+    if (response.data.success && response.data.data) {
+      const { accessToken, refreshToken, userId, email, firstName, lastName, role } = response.data.data;
+      if (accessToken && refreshToken) {
+        persistAuthData(accessToken, refreshToken, {
+          userId,
+          email,
+          firstName,
+          lastName,
+          role,
+        });
+      } else {
+        console.error('completeMentorProfile response missing tokens:', response.data);
+      }
+    }
+
     return response.data;
   },
 
   // إكمال بروفايل الـ Mentee
-  completeMenteeProfile: async (profile: MenteeProfileRequest): Promise<ApiResponse<null>> => {
+  completeMenteeProfile: async (profile: MenteeProfileRequest): Promise<ApiResponse<RegistrationCompleteResponse>> => {
     const response = await apiClient.post('/auth/complete-mentee-profile', profile);
+
+    if (response.data.success && response.data.data) {
+      const { accessToken, refreshToken, userId, email, firstName, lastName, role } = response.data.data;
+      if (accessToken && refreshToken) {
+        persistAuthData(accessToken, refreshToken, {
+          userId,
+          email,
+          firstName,
+          lastName,
+          role,
+        });
+      } else {
+        console.error('completeMenteeProfile response missing tokens:', response.data);
+      }
+    }
+
     return response.data;
   },
 
@@ -149,12 +221,14 @@ export const authAPI = {
   // تحديث الـ Token
   refreshToken: async (refreshToken: string): Promise<ApiResponse<AuthTokens>> => {
     const response = await apiClient.post('/auth/refresh-token', {
-      refreshToken,
+      RefreshToken: refreshToken,
     });
     
     if (response.data.success && response.data.data) {
-      localStorage.setItem('accessToken', response.data.data.accessToken);
-      localStorage.setItem('refreshToken', response.data.data.refreshToken);
+      const { accessToken, refreshToken: newRefreshToken, user } = response.data.data;
+      if (accessToken && newRefreshToken && user) {
+        persistAuthData(accessToken, newRefreshToken, user);
+      }
     }
     
     return response.data;
@@ -165,7 +239,7 @@ export const authAPI = {
     try {
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
-        await apiClient.post('/auth/logout', { refreshToken });
+        await apiClient.post('/auth/logout', { RefreshToken: refreshToken });
       }
     } finally {
       localStorage.removeItem('accessToken');

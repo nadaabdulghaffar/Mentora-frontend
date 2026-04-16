@@ -11,7 +11,7 @@ function AuthSuccess() {
     const refreshToken = searchParams.get("refreshToken")
 
     if (!token || !refreshToken) {
-      navigate("/login")
+      navigate("/login", { replace: true })
       return
     }
 
@@ -25,17 +25,17 @@ function AuthSuccess() {
           localStorage.setItem("user", JSON.stringify(response.data))
           const role = response.data.role?.toLowerCase()
           if (role === "mentee") {
-            navigate("/signup/mentee-form")
+            navigate("/signup/mentee-form", { replace: true })
             return
           }
           if (role === "mentor") {
-            navigate("/signup/mentor-form")
+            navigate("/signup/mentor-form", { replace: true })
             return
           }
         }
-        navigate("/role-selection")
+        navigate("/role-selection", { replace: true })
       } catch {
-        navigate("/role-selection")
+        navigate("/role-selection", { replace: true })
       }
     }
 

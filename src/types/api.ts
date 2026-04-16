@@ -48,14 +48,26 @@ export interface RegistrationFlowResponse {
   user: UserBasicInfo;
 }
 
+export interface RegistrationCompleteResponse {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+}
+
 export interface MentorProfile {
   yearsOfExperience: number | string;
   linkedinUrl?: string;
   countryCode?: string;
-  domainId?: string;
-  subDomainIds?: string[];
-  technologyIds?: string[];
+  domainId?: string | number;
+  subDomainIds?: Array<string | number>;
+  technologyIds?: Array<string | number>;
   bio?: string;
+  cvUrl?: string;
 }
 
 export interface MenteeProfile {
@@ -114,3 +126,10 @@ export interface Technology extends LookupItem {
 
 export type EducationStatus = string;
 export type ExperienceLevel = string;
+
+export interface FileUploadResponse {
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+}

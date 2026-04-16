@@ -68,6 +68,19 @@ function MentorForm() {
 
   const totalSteps = 4
 
+  useEffect(() => {
+    if (authAPI.isAuthenticated()) {
+      const currentUser = authAPI.getCurrentUser()
+      if (currentUser) {
+        if (currentUser.role?.toLowerCase() === 'mentor') {
+          navigate('/mentor/dashboard', { replace: true })
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
+      }
+    }
+  }, [navigate])
+
   const experienceOptions: Option[] = [
     { label: '2-5 years', value: '2-5' },
     { label: '5-10 years', value: '5-10' },
@@ -350,27 +363,50 @@ const handleLinkedInChange = (value: string) => {
 
     const selectedSubDomainIds = subDomainOptions
       .filter((sd) => formData.relevantExpertise.includes(sd.name))
-      .map((sd) => sd.id)
+      .map((sd) => parseInt(sd.id, 10))
 
     const selectedTechnologyIds = technologyOptions
       .filter((tech) => formData.tools.includes(tech.name))
-      .map((tech) => tech.id)
+      .map((tech) => parseInt(tech.id, 10))
 
     try {
+      let cvUrl: string | undefined;
+      if (formData.cvFiles.length > 0) {
+        // upload first CV file and capture URL
+        const uploadRes = await authAPI.uploadFile(
+          formData.cvFiles[0],
+          'cv',
+          registrationToken
+        );
+        if (uploadRes.success && uploadRes.data) {
+          cvUrl = uploadRes.data.fileUrl;
+        } else {
+          setGeneralError(
+            uploadRes.message || 'Failed to upload CV, please try again.'
+          );
+          return;
+        }
+      }
+
       const response = await authAPI.completeMentorProfile({
         registrationToken,
-        yearsOfExperience: formData.experience,
+        yearsOfExperience: parseInt(formData.experience.split('-')[0], 10) || 0,
         linkedinUrl: formData.linkedinUrl,
         countryCode: formData.countryCode,
-        domainId: formData.domainId,
+        domainId: parseInt(formData.domainId, 10),
         subDomainIds: selectedSubDomainIds,
         technologyIds: selectedTechnologyIds,
         bio: formData.bio,
-        cvFiles: formData.cvFiles,
-      })
+        cvUrl,
+      });
 
-      if (response.success) {
-        navigate('/dashboard')
+  if (response.success && response.data) {
+        const role = response.data.role?.toLowerCase()
+        if (role === 'mentor') {
+          navigate('/mentor/dashboard', { replace: true })
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
       }
     } finally {
       setLoading(false)

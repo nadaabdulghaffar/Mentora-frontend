@@ -61,6 +61,19 @@ function MenteeForm() {
 
   const totalSteps = 4
 
+  useEffect(() => {
+    if (authAPI.isAuthenticated()) {
+      const currentUser = authAPI.getCurrentUser()
+      if (currentUser) {
+        if (currentUser.role?.toLowerCase() === 'mentor') {
+          navigate('/mentor/dashboard', { replace: true })
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
+      }
+    }
+  }, [navigate])
+
   // جلب البيانات من الـ API
   useEffect(() => {
     const loadLookupData = async () => {
@@ -337,8 +350,13 @@ function MenteeForm() {
         bio: formData.bio,
       })
 
-      if (response.success) {
-        navigate('/dashboard')
+      if (response.success && response.data) {
+        const role = response.data.role?.toLowerCase()
+        if (role === 'mentee') {
+          navigate('/dashboard', { replace: true })
+        } else {
+          navigate('/mentor/dashboard', { replace: true })
+        }
       }
     } finally {
       setLoading(false)

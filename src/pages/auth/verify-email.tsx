@@ -70,34 +70,6 @@ function VerifyEmail() {
     }
   }, [resendCooldown])
 
-  const handleVerify = async () => {
-    setLoading(true)
-    setError("")
-
-    const code = (document.getElementById('verification-code') as HTMLInputElement)?.value
-
-    if (!code) {
-      setError('Please enter the verification code')
-      setLoading(false)
-      return
-    }
-
-    const response = await authAPI.verifyEmail(code, email)
-
-    if (response.success) {
-      const registrationToken = response.data?.registrationToken
-      if (registrationToken) {
-        localStorage.setItem('registrationToken', registrationToken)
-      }
-      setSuccess(true)
-      localStorage.removeItem('pendingUserEmail')
-      setTimeout(() => navigate('/role-selection'), 2000)
-    } else {
-      setError(response.message || response.errors?.[0] || 'Email verification failed')
-      setLoading(false)
-    }
-  }
-
   const handleResendCode = async () => {
     setResendLoading(true)
     setError("")

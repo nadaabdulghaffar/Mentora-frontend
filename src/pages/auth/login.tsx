@@ -19,6 +19,19 @@ function Login() {
   const [sendingEmail, setSendingEmail] = useState(false)
   const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7018/api'
 
+  // Redirect already authenticated users away from login page
+  useEffect(() => {
+    if (authAPI.isAuthenticated()) {
+      const user = authAPI.getCurrentUser()
+      const role = user?.role?.toLowerCase()
+      if (role === 'mentor') {
+        navigate('/mentor/dashboard', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    }
+  }, [navigate])
+
   const handleGoogleLogin = () => {
     window.location.href = `${oauthBaseUrl}/auth/login-google?rememberMe=${rememberMe}`
   }
@@ -40,13 +53,17 @@ function Login() {
           localStorage.setItem('email', email)
         }
 
+        // تأخير صغير للتأكد من حفظ البيانات في localStorage
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // توجه إلى صفحة مختلفة حسب الدور
         const role = response.data.user?.role?.toLowerCase()
-        if (role === 'mentee') {
-          navigate('/signup/mentee-form')
-        } else if (role === 'mentor') {
-          navigate('/signup/mentor-form')
+        console.log('Attempting navigation for role:', role);
+        
+        if (role === 'mentor') {
+          navigate('/mentor/dashboard', { replace: true })
         } else {
-          navigate('/role-selection')
+          navigate('/dashboard', { replace: true })
         }
       } else {
         setError(response.message || response.errors?.[0] || 'Sign in failed')

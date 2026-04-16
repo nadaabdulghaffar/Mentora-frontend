@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../shared/components/Layout";
 import WelcomeBanner from "../components/dashboard components/WelcomeBanner";
+import MentorStatsSection from "../components/dashboard components/MentorStatsSection";
 import SearchSection from "../components/dashboard components/SearchSection";
-import SuggestedPrograms from "../components/dashboard components/SuggestedPrograms";
 import RightSidebar from "../components/dashboard components/RightSidebar";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
 
-const DashboardPage = () => {
+const MentorDashboardPage = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
@@ -20,24 +20,17 @@ const DashboardPage = () => {
                 setLoading(true);
                 setError(null);
 
-                // Load cached user from localStorage first
+                // Load cached user from localStorage only
                 const cachedUser = authAPI.getCurrentUser();
                 const token = localStorage.getItem('accessToken');
-                console.log('DashboardPage - Cached user:', cachedUser, 'token present:', !!token);
+                console.log('MentorDashboardPage - Cached user:', cachedUser, 'token present:', !!token);
                 
                 if (cachedUser && token) {
                     setUser(cachedUser);
-                    // if mentor, redirect automatically
-                    if (cachedUser.role?.toLowerCase() === 'mentor') {
-                        console.log('DashboardPage - User is mentor, redirecting...');
-                        navigate('/mentor/dashboard');
-                        return;
-                    }
                 } else {
                     // No cached user or no token available
-                    console.warn('DashboardPage - Missing auth data, redirecting to login');
+                    console.warn('MentorDashboardPage - Missing auth data, redirecting to login');
                     navigate('/login');
-                    return;
                 }
             } finally {
                 setLoading(false);
@@ -57,7 +50,7 @@ const DashboardPage = () => {
                 <div className="flex items-center justify-center min-h-screen">
                     <div className="text-center space-y-4">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                        <p className="text-gray-600">Loading dashboard...</p>
+                        <p className="text-gray-600">Loading mentor dashboard...</p>
                     </div>
                 </div>
             </Layout>
@@ -90,7 +83,7 @@ const DashboardPage = () => {
                 <div className="lg:col-span-9 space-y-4 md:space-y-6 lg:space-y-8">
                     <WelcomeBanner name={displayName} />
                     <SearchSection />
-                    <SuggestedPrograms />
+                    <MentorStatsSection />
 
                 </div>
 
@@ -103,4 +96,4 @@ const DashboardPage = () => {
     );
 };
 
-export default DashboardPage;
+export default MentorDashboardPage;
