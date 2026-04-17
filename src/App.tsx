@@ -11,6 +11,8 @@ import DashboardPage from "./pages/DashboardPage"
 import MentorDashboardPage from "./pages/MentorDashboardPage"
 import SearchMentorshipPage from "./pages/SearchMentorshipPage";
 import CreateMentorshipPage from "./pages/CreateMentorshipPage";
+import MyProgramsPage from "./pages/MyProgramsPage";
+import ClassroomPage from "./pages/ClassroomPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingRoute from "./components/OnboardingRoute"; 
 
@@ -71,6 +73,22 @@ function App() {
         element={
           <ProtectedRoute roles={[ 'mentor' ]}>
             <CreateMentorshipPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-programs"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <MyProgramsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/classroom"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <ClassroomPage />
           </ProtectedRoute>
         }
       />

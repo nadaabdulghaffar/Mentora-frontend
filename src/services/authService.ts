@@ -265,7 +265,7 @@ export const authAPI = {
 
   // التحقق من تسجيل الدخول
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('accessToken');
+    return !!localStorage.getItem('accessToken') || !!localStorage.getItem('refreshToken');
   },
 };
 

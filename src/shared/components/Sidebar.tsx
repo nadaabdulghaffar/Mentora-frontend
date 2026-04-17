@@ -9,15 +9,25 @@ import {
     ChevronDown,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
 
 const Sidebar = () => {
     const navigate = useNavigate();
+  const location = useLocation();
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [user, setUser] = useState<AuthUser | null>(null);
+  const userRole = user?.role?.toLowerCase();
+
+  const goHome = () => {
+    navigate(userRole === 'mentor' ? '/mentor/dashboard' : '/dashboard');
+  };
+
+  const goToMyPrograms = () => {
+    navigate('/my-programs');
+  };
 
     // Close when clicking outside
     useEffect(() => {
@@ -75,11 +85,21 @@ const Sidebar = () => {
                 </div>
 
                 <nav className="space-y-7">
-                    <SidebarItem icon={<Home size={24} />} label="Homepage" />
+                  <SidebarItem
+                    icon={<Home size={24} />}
+                    label="Homepage"
+                    onClick={goHome}
+                    active={location.pathname === '/dashboard' || location.pathname === '/mentor/dashboard'}
+                  />
                     <SidebarItem icon={<Mail size={24} />} label="Messages" />
                     <SidebarItem icon={<Users size={24} />} label="Community" />
                     <SidebarItem icon={<FileText size={24} />} label="Applications" />
-                    <SidebarItem icon={<BookOpen size={24} />} label="My Programs" />
+                  <SidebarItem
+                    icon={<BookOpen size={24} />}
+                    label="My Programs"
+                    onClick={goToMyPrograms}
+                    active={location.pathname === '/my-programs'}
+                  />
                     <SidebarItem icon={<Calendar size={24} />} label="Calendar" />
                 </nav>
             </div>
@@ -148,12 +168,26 @@ import type { ReactNode } from "react";
 interface SidebarItemProps {
     icon: ReactNode;
     label: string;
+  onClick?: () => void;
+  active?: boolean;
 }
 
-const SidebarItem = ({ icon, label }: SidebarItemProps) => {
+const SidebarItem = ({ icon, label, onClick, active = false }: SidebarItemProps) => {
     return (
-        <div className="flex items-center gap-3 text-gray-600 hover:text-primary
- cursor-pointer transition">
+    <div
+      className={`flex items-center gap-3 cursor-pointer transition ${
+        active ? 'text-primary' : 'text-gray-600 hover:text-primary'
+      }`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
             {icon}
             <span className="text-base font-medium">{label}</span>
         </div>

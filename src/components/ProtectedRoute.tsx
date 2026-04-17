@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Navigate } from "react-router-dom"
 import authAPI from "../services/authService"
 
@@ -7,33 +8,81 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, roles }: ProtectedRouteProps) => {
-  const isAuthenticated = authAPI.isAuthenticated()
-  const user = authAPI.getCurrentUser()
+  const [isChecking, setIsChecking] = useState(true)
+  const [isAllowed, setIsAllowed] = useState(false)
+  const [userRole, setUserRole] = useState('')
 
-  console.log('ProtectedRoute check:', { isAuthenticated, roles, hasAccessToken: !!localStorage.getItem('accessToken'), hasUser: !!user });
+  useEffect(() => {
+    let isMounted = true
 
-  if (!isAuthenticated || !user) {
-    console.warn('User not authenticated or missing local user, redirecting to login');
+    const verifyAccess = async () => {
+      const hasToken = authAPI.isAuthenticated()
+      if (!hasToken) {
+        if (isMounted) {
+          setIsAllowed(false)
+          setIsChecking(false)
+        }
+        return
+      }
+
+      const localUser = authAPI.getCurrentUser()
+      if (localUser) {
+        if (isMounted) {
+          setUserRole(localUser.role?.toLowerCase() || '')
+          setIsAllowed(true)
+          setIsChecking(false)
+        }
+        return
+      }
+
+      try {
+        const response = await authAPI.getMe()
+        if (response.success && response.data) {
+          localStorage.setItem('user', JSON.stringify(response.data))
+          if (isMounted) {
+            setUserRole(response.data.role?.toLowerCase() || '')
+            setIsAllowed(true)
+            setIsChecking(false)
+          }
+          return
+        }
+      } catch (error) {
+        console.error('ProtectedRoute: failed to resolve user from API', error)
+      }
+
+      if (isMounted) {
+        setIsAllowed(false)
+        setIsChecking(false)
+      }
+    }
+
+    verifyAccess()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  if (isChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F5F6FA]">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (!isAllowed) {
     return <Navigate to="/login" replace />
   }
 
   if (roles && roles.length > 0) {
-    const userRole = user.role?.toLowerCase() || ''
-    
-    console.log('Role check:', { userRole, allowedRoles: roles, hasUser: !!user });
-    
     if (!roles.includes(userRole)) {
-      // if user exists, try redirecting to an appropriate home
       if (userRole === 'mentor') {
-        console.log('User is mentor, redirecting to mentor dashboard');
         return <Navigate to="/mentor/dashboard" replace />
       }
       if (userRole === 'mentee') {
-        console.log('User is mentee, redirecting to mentee dashboard');
         return <Navigate to="/dashboard" replace />
       }
-      // otherwise send to login
-      console.log('Role not allowed, redirecting to login');
       return <Navigate to="/login" replace />
     }
   }
