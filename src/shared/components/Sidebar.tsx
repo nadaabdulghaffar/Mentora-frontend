@@ -1,11 +1,11 @@
 import logo from "../../assets/images/logo.svg";
 import {
     Home,
+  Compass,
     Mail,
     Users,
     FileText,
     BookOpen,
-    Calendar,
     ChevronDown,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
@@ -27,6 +27,14 @@ const Sidebar = () => {
 
   const goToMyPrograms = () => {
     navigate('/my-programs');
+  };
+
+  const goToExplore = () => {
+    navigate('/search-mentorship');
+  };
+
+  const goToMessages = () => {
+    navigate('/messages');
   };
 
     // Close when clicking outside
@@ -91,7 +99,18 @@ const Sidebar = () => {
                     onClick={goHome}
                     active={location.pathname === '/dashboard' || location.pathname === '/mentor/dashboard'}
                   />
-                    <SidebarItem icon={<Mail size={24} />} label="Messages" />
+                    <SidebarItem
+                      icon={<Compass size={24} />}
+                      label="Explore"
+                      onClick={goToExplore}
+                      active={location.pathname === '/search-mentorship'}
+                    />
+                    <SidebarItem
+                      icon={<Mail size={24} />}
+                      label="Messages"
+                      onClick={goToMessages}
+                      active={location.pathname === '/messages'}
+                    />
                     <SidebarItem icon={<Users size={24} />} label="Community" />
                     <SidebarItem icon={<FileText size={24} />} label="Applications" />
                   <SidebarItem
@@ -100,7 +119,6 @@ const Sidebar = () => {
                     onClick={goToMyPrograms}
                     active={location.pathname === '/my-programs'}
                   />
-                    <SidebarItem icon={<Calendar size={24} />} label="Calendar" />
                 </nav>
             </div>
 

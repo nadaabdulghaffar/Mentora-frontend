@@ -9,10 +9,13 @@ import ResetPassword from "./pages/auth/reset-password"
 import AuthSuccess from "./pages/auth/auth-success"
 import DashboardPage from "./pages/DashboardPage"
 import MentorDashboardPage from "./pages/MentorDashboardPage"
-import SearchMentorshipPage from "./pages/SearchMentorshipPage";
+import ExplorePage from "./pages/ExplorePage";
+import MessagesPage from "./pages/MessagesPage";
 import CreateMentorshipPage from "./pages/CreateMentorshipPage";
 import MyProgramsPage from "./pages/MyProgramsPage";
-import ClassroomPage from "./pages/ClassroomPage";
+import authAPI from './services/authService';
+import MentorClassroomPage from './pages/classroom/MentorClassroomPage';
+import MenteeClassroomPage from './pages/classroom/MenteeClassroomPage';
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingRoute from "./components/OnboardingRoute"; 
 
@@ -64,7 +67,15 @@ function App() {
         path="/search-mentorship"
         element={
           <ProtectedRoute>
-            <SearchMentorshipPage />
+            <ExplorePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/messages"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <MessagesPage />
           </ProtectedRoute>
         }
       />
@@ -88,7 +99,11 @@ function App() {
         path="/classroom"
         element={
           <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
-            <ClassroomPage />
+            {authAPI.getCurrentUser()?.role?.toLowerCase() === 'mentor' ? (
+              <MentorClassroomPage />
+            ) : (
+              <MenteeClassroomPage />
+            )}
           </ProtectedRoute>
         }
       />

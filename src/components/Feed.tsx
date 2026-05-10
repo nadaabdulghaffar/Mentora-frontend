@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Heart, MessageCircle, Share2, Bookmark, Reply as ReplyIcon } from 'lucide-react';
 
 // Types
@@ -48,6 +48,71 @@ interface CommentProps {
 
 const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
   const [showReplies, setShowReplies] = useState(false);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyInput, setReplyInput] = useState('');
+  const [localReplies, setLocalReplies] = useState<FeedComment[]>(comment.replies ?? []);
+  const [isCommentLiked, setIsCommentLiked] = useState(false);
+  const [commentLikeCount, setCommentLikeCount] = useState(comment.likes);
+  const [likedReplyIds, setLikedReplyIds] = useState<Record<string, boolean>>({});
+  const [replyLikeCounts, setReplyLikeCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    setLocalReplies(comment.replies ?? []);
+    setIsCommentLiked(false);
+    setCommentLikeCount(comment.likes);
+    const initialReplyLikeCounts = (comment.replies ?? []).reduce<Record<string, number>>((acc, reply) => {
+      acc[reply.id] = reply.likes;
+      return acc;
+    }, {});
+    setReplyLikeCounts(initialReplyLikeCounts);
+    setLikedReplyIds({});
+  }, [comment.id, comment.replies]);
+
+  const handleCommentLikeClick = () => {
+    const nextLiked = !isCommentLiked;
+    setIsCommentLiked(nextLiked);
+    setCommentLikeCount((current) => (nextLiked ? current + 1 : Math.max(0, current - 1)));
+  };
+
+  const handleReplyLikeClick = (replyId: string) => {
+    const isCurrentlyLiked = Boolean(likedReplyIds[replyId]);
+    const nextLiked = !isCurrentlyLiked;
+
+    setLikedReplyIds((prev) => ({
+      ...prev,
+      [replyId]: nextLiked,
+    }));
+
+    setReplyLikeCounts((prev) => {
+      const current = prev[replyId] ?? 0;
+      return {
+        ...prev,
+        [replyId]: nextLiked ? current + 1 : Math.max(0, current - 1),
+      };
+    });
+  };
+
+  const handleReplySubmit = () => {
+    const trimmedReply = replyInput.trim();
+    if (!trimmedReply) {
+      return;
+    }
+
+    const newReply: FeedComment = {
+      id: `reply-${Date.now()}`,
+      authorId: 'current-user',
+      authorName: 'You',
+      authorAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You',
+      content: trimmedReply,
+      timestamp: 'Just now',
+      likes: 0,
+    };
+
+    setLocalReplies((prev) => [...prev, newReply]);
+    setReplyInput('');
+    setShowReplyInput(false);
+    setShowReplies(true);
+  };
 
   return (
     <div className="space-y-2">
@@ -67,12 +132,21 @@ const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
           </div>
           <div className="mt-1 flex items-center gap-3">
             <span className="text-xs text-gray-500">{comment.timestamp}</span>
-            <button className="text-xs font-medium text-gray-600 hover:text-gray-900">
-              {comment.likes} likes
+            <button
+              onClick={handleCommentLikeClick}
+              className={`flex items-center gap-1 text-xs font-medium transition ${
+                isCommentLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
+              }`}
+            >
+              <Heart size={12} fill={isCommentLiked ? 'currentColor' : 'none'} />
+              <span>{commentLikeCount}</span>
             </button>
             {variant === 'classroom' && (
               <button
-                onClick={onReply}
+                onClick={() => {
+                  setShowReplyInput((prev) => !prev);
+                  onReply?.();
+                }}
                 className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
               >
                 <ReplyIcon size={12} />
@@ -80,6 +154,24 @@ const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
               </button>
             )}
           </div>
+
+          {variant === 'classroom' && showReplyInput && (
+            <div className="mt-2">
+              <input
+                type="text"
+                value={replyInput}
+                onChange={(e) => setReplyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleReplySubmit();
+                  }
+                }}
+                placeholder="Write a reply..."
+                className="w-full rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700 outline-none focus:border-blue-400"
+              />
+            </div>
+          )}
         </div>
         {variant === 'community' && (
           <button className="text-gray-400 hover:text-red-500">
@@ -89,18 +181,18 @@ const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
       </div>
 
       {/* Replies for Classroom */}
-      {variant === 'classroom' && comment.replies && comment.replies.length > 0 && (
+      {variant === 'classroom' && localReplies.length > 0 && (
         <div className="ml-6 space-y-2">
-          {!showReplies && comment.replies.length > 0 && (
+          {!showReplies && (
             <button
               onClick={() => setShowReplies(true)}
               className="text-xs font-medium text-blue-600 hover:text-blue-700"
             >
-              View {comment.replies.length} reply/replies
+              View {localReplies.length} reply/replies
             </button>
           )}
           {showReplies &&
-            comment.replies.map((reply) => (
+            localReplies.map((reply) => (
               <div key={reply.id} className="flex gap-2">
                 <img
                   src={reply.authorAvatar}
@@ -118,8 +210,14 @@ const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
                     <span className="text-xs text-gray-500">
                       {reply.timestamp}
                     </span>
-                    <button className="text-xs font-medium text-gray-600 hover:text-gray-900">
-                      {reply.likes} likes
+                    <button
+                      onClick={() => handleReplyLikeClick(reply.id)}
+                      className={`flex items-center gap-1 text-xs font-medium transition ${
+                        likedReplyIds[reply.id] ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
+                      }`}
+                    >
+                      <Heart size={12} fill={likedReplyIds[reply.id] ? 'currentColor' : 'none'} />
+                      <span>{replyLikeCounts[reply.id] ?? reply.likes}</span>
                     </button>
                   </div>
                 </div>
@@ -134,7 +232,6 @@ const Comment: React.FC<CommentProps> = ({ comment, variant, onReply }) => {
 // Feed Component
 
 const Feed: React.FC<FeedPostProps> = ({
-  id,
   authorName,
   authorAvatar,
   content,
@@ -150,8 +247,42 @@ const Feed: React.FC<FeedPostProps> = ({
   onReply,
   onViewAllComments,
 }) => {
-  const lastComment = comments.length > 0 ? comments[comments.length - 1] : null;
-  const hasMoreComments = comments.length > 1;
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(likes);
+  const [localComments, setLocalComments] = useState(comments);
+  const [commentInput, setCommentInput] = useState('');
+  const [showAllComments, setShowAllComments] = useState(false);
+  const lastComment = localComments.length > 0 ? localComments[localComments.length - 1] : null;
+  const hasMoreComments = localComments.length > 1;
+
+  const handleLikeClick = () => {
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikeCount((current) => (nextLiked ? current + 1 : Math.max(0, current - 1)));
+    onLike?.();
+  };
+
+  const handleAddComment = () => {
+    const trimmedComment = commentInput.trim();
+    if (!trimmedComment) {
+      return;
+    }
+
+    const newComment: FeedComment = {
+      id: `comment-${Date.now()}`,
+      authorId: 'current-user',
+      authorName: 'You',
+      authorAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You',
+      content: trimmedComment,
+      timestamp: 'Just now',
+      likes: 0,
+    };
+
+    setLocalComments((prev) => [...prev, newComment]);
+    setCommentInput('');
+    setShowAllComments(true);
+    onComment?.();
+  };
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -206,45 +337,40 @@ const Feed: React.FC<FeedPostProps> = ({
       <div className="mb-3 flex items-center justify-between">
         {variant === 'classroom' ? (
           <>
-            {/* Classroom variant: Like, Comment, Reply */}
-            <button
-              onClick={onLike}
-              className="flex items-center gap-2 text-gray-600 transition hover:text-red-500"
-            >
-              <Heart size={18} />
-              <span className="text-sm">{likes}</span>
-            </button>
-            <button
-              onClick={onComment}
-              className="flex items-center gap-2 text-gray-600 transition hover:text-blue-500"
-            >
-              <MessageCircle size={18} />
-              <span className="text-sm">{comments.length}</span>
-            </button>
-            <button
-              onClick={() => onReply?.(id)}
-              className="flex items-center gap-2 text-gray-600 transition hover:text-green-500"
-            >
-              <ReplyIcon size={18} />
-              <span className="text-sm">Reply</span>
-            </button>
+            {/* Classroom variant: Keep likes/comments adjacent and icon-only reply */}
+            <div className="flex items-center gap-6">
+              <button
+                onClick={handleLikeClick}
+                className={`flex items-center gap-2 transition ${isLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}
+              >
+                <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+                <span className="text-sm">{likeCount}</span>
+              </button>
+              <button
+                onClick={onComment}
+                className="flex items-center gap-2 text-gray-600 transition hover:text-blue-500"
+              >
+                <MessageCircle size={18} />
+                <span className="text-sm">{localComments.length}</span>
+              </button>
+            </div>
           </>
         ) : (
           <>
             {/* Community variant: Like, Comment, Share, Save */}
             <button
-              onClick={onLike}
-              className="flex items-center gap-2 text-gray-600 transition hover:text-red-500"
+              onClick={handleLikeClick}
+              className={`flex items-center gap-2 transition ${isLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}
             >
-              <Heart size={18} />
-              <span className="text-sm">{likes}</span>
+              <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+              <span className="text-sm">{likeCount}</span>
             </button>
             <button
               onClick={onComment}
               className="flex items-center gap-2 text-gray-600 transition hover:text-blue-500"
             >
               <MessageCircle size={18} />
-              <span className="text-sm">{comments.length}</span>
+              <span className="text-sm">{localComments.length}</span>
             </button>
             <button
               onClick={onShare}
@@ -265,26 +391,38 @@ const Feed: React.FC<FeedPostProps> = ({
       </div>
 
       {/* Comments Section */}
-      {comments.length > 0 && (
+      {localComments.length > 0 && (
         <div className="border-t border-gray-100 pt-3">
           {/* Show View All Comments if there are multiple comments */}
           {hasMoreComments && (
             <button
-              onClick={onViewAllComments}
+              onClick={() => {
+                setShowAllComments((prev) => !prev);
+                onViewAllComments?.();
+              }}
               className="mb-2 text-sm font-medium text-blue-600 hover:text-blue-700"
             >
-              View all {comments.length} comments
+              {showAllComments ? 'Hide comments' : `View all ${localComments.length} comments`}
             </button>
           )}
 
-          {/* Show last comment */}
-          {lastComment && (
-            <Comment
-              comment={lastComment}
-              variant={variant}
-              onReply={() => onReply?.(lastComment.id)}
-            />
-          )}
+          {/* Show comments */}
+          {showAllComments
+            ? localComments.map((comment) => (
+                <Comment
+                  key={comment.id}
+                  comment={comment}
+                  variant={variant}
+                  onReply={() => onReply?.(comment.id)}
+                />
+              ))
+            : lastComment && (
+                <Comment
+                  comment={lastComment}
+                  variant={variant}
+                  onReply={() => onReply?.(lastComment.id)}
+                />
+              )}
         </div>
       )}
 
@@ -292,13 +430,21 @@ const Feed: React.FC<FeedPostProps> = ({
       <div className="mt-3 border-t border-gray-100 pt-3">
         <div className="flex items-center gap-2">
           <img
-            src="https://via.placeholder.com/32"
+            src="https://api.dicebear.com/7.x/adventurer/svg?seed=You"
             alt="Your avatar"
             className="h-8 w-8 rounded-full"
           />
           <input
             type="text"
             placeholder="Write a comment..."
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddComment();
+              }
+            }}
             className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm placeholder-gray-500 focus:border-blue-400 focus:outline-none"
           />
         </div>

@@ -129,7 +129,7 @@ export const authAPI = {
         formData.append('linkedinUrl', profile.linkedinUrl);
       }
       if (profile.domainId) {
-        formData.append('domainId', profile.domainId);
+        formData.append('domainId', String(profile.domainId));
       }
       if (profile.bio) {
         formData.append('bio', profile.bio);

@@ -38,8 +38,9 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
 }) => {
   const progressValue = Math.max(0, Math.min(100, progress ?? 0));
   const isProgressVariant = variant === 'progress';
+  const isSimpleButtonVariant = variant === 'simple-button';
   const shouldShowProgress = progress !== undefined;
-  const hasImageHeader = variant === 'simple-button' || variant === 'dual-buttons';
+  const hasImageHeader = variant === 'dual-buttons' || (isSimpleButtonVariant && Boolean(image));
 
   return (
     <article className={`overflow-hidden rounded-2xl border border-[#D8DBE4] bg-white shadow-[0_2px_8px_rgba(22,29,47,0.06)] ${className}`}>
@@ -53,7 +54,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
         </div>
       )}
 
-      <div className="space-y-3.5 p-4">
+      <div className={`p-4 ${isSimpleButtonVariant ? 'space-y-4 md:p-5' : 'space-y-3.5'}`}>
         {(tag || phases) && (
           <div className="flex items-center gap-2 text-xs">
             {tag && (
@@ -73,13 +74,15 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
           className={`font-bold leading-tight text-[#1F2432] ${
             isProgressVariant
               ? 'text-2xl sm:text-[27px]'
-              : 'text-[26px] sm:text-[28px]'
+              : isSimpleButtonVariant
+                ? 'text-[24px] sm:text-[28px]'
+                : 'text-[26px] sm:text-[28px]'
           }`}
         >
           {title}
         </h3>
 
-        <p className={`text-[#5D6A85] ${isProgressVariant ? 'text-base' : 'text-[15px]'}`}>
+        <p className={`text-[#5D6A85] ${isProgressVariant || isSimpleButtonVariant ? 'text-base' : 'text-[15px]'}`}>
           {description}
         </p>
 
@@ -123,7 +126,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
           )}
 
           <button
-            className={`h-[54px] rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:bg-primary-dark ${
+            className={`${isSimpleButtonVariant ? 'h-[48px]' : 'h-[54px]'} rounded-xl bg-primary px-4 text-sm font-semibold text-white transition hover:bg-primary-dark ${
               variant === 'dual-buttons' ? 'flex-1' : 'w-full'
             }`}
             onClick={onPrimaryClick}
