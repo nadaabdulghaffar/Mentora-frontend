@@ -17,7 +17,7 @@ function Login() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
   const [resendCooldown, setResendCooldown] = useState(0)
   const [sendingEmail, setSendingEmail] = useState(false)
-  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7018/api'
+  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5069/api'
 
   // Redirect already authenticated users away from login page
   useEffect(() => {

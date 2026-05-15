@@ -4,11 +4,13 @@ import plantIllustration from "../../assets/images/welcome-banner/welcome-banner
 
 interface Props {
   name: string;
+  /** Secondary line under the greeting (mentor dashboard uses sessions copy). */
+  tagline?: string;
 }
 
-const WelcomeBanner = ({ name }: Props) => {
+const WelcomeBanner = ({ name, tagline }: Props) => {
   return (
-<div className="relative bg-primary text-white rounded-2xl md:rounded-3xl px-4 md:px-8 lg:px-12 py-2 md:py-3 lg:py-4 min-h-[70px] md:min-h-[85px] lg:min-h-[95px] overflow-hidden flex items-center">
+<div className="relative flex min-h-[100px] items-center overflow-hidden rounded-2xl bg-primary px-4 py-4 text-white md:min-h-[110px] md:rounded-3xl md:px-8 lg:min-h-[120px] lg:px-12 lg:py-5">
 
   {/* Graphics */}
   <img
@@ -30,8 +32,8 @@ const WelcomeBanner = ({ name }: Props) => {
       Hello , {name}
     </h2>
 
-    <p className="mt-0.5 text-sm md:text-lg lg:text-xl text-purple-100 font-medium">
-      Continue your growth journey with expert mentorship
+    <p className="mt-0.5 text-sm font-medium text-purple-100 md:text-lg lg:text-xl">
+      {tagline ?? "Continue your growth journey with expert mentorship"}
     </p>
   </div>
 

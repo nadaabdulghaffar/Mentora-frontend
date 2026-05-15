@@ -1,13 +1,15 @@
-import ProfileCompletionCard from "./right/ProfileCompletionCard";
 import UpcomingCard from "./right/UpcomingCard";
-import LearningHubCard from "./right/LearningHubCard";
+import RecommendedCommunitiesCard from "./right/RecommendedCommunitiesCard";
 
-const RightSidebar = () => {
+type RightSidebarProps = {
+  upcomingTitle?: string;
+};
+
+const RightSidebar = ({ upcomingTitle }: RightSidebarProps) => {
   return (
     <div className="space-y-6">
-      <ProfileCompletionCard />
-      <UpcomingCard />
-      <LearningHubCard />
+      <UpcomingCard title={upcomingTitle} />
+      <RecommendedCommunitiesCard />
     </div>
   );
 };

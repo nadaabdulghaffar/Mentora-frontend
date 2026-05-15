@@ -14,7 +14,7 @@ const Layout = ({ children, showTopBar = true }: Props) => {
                 <Sidebar />
             </div>
 
-            <main className="flex-1 xl:ml-72 p-4 md:p-6 lg:p-8">
+            <main className="flex-1 xl:ml-64 p-4 md:p-6 lg:p-8">
                 {showTopBar && <TopBar />}
                 {children}
             </main>

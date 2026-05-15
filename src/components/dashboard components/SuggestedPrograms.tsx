@@ -1,4 +1,5 @@
-import ProgramCard from "./ProgramCard";
+import { Link } from "react-router-dom";
+import ProgramCard from "../ProgramCard";
 
 const SuggestedPrograms = () => {
     return (
@@ -16,54 +17,59 @@ const SuggestedPrograms = () => {
                     </p>
                 </div>
 
-                <button className="text-xs md:text-sm lg:text-base text-gray-500 hover:text-primary
- transition">
+                <Link
+                    to="/suggested-programs"
+                    className="text-xs text-gray-500 transition hover:text-primary md:text-sm lg:text-base"
+                >
                     View all
-                </button>
+                </Link>
             </div>
 
             {/* Cards Wrapper */}
-            <div className="overflow-x-auto no-scrollbar">
-                <div className="flex gap-3 md:gap-6 lg:gap-8 min-w-max">
-
-                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
-                        <ProgramCard
-                            title="Career Acceleration Program"
-                            mentorName="Sarah Chen"
-                            field="Product Management"
-                            matchPercentage={92}
-                            imageUrl="https://randomuser.me/api/portraits/women/44.jpg"
-                        />
-                    </div>
-
-                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
-                        <ProgramCard
-                            title="Career Acceleration Program"
-                            mentorName="Sarah Chen"
-                            field="Product Management"
-                            matchPercentage={88}
-                            imageUrl="https://randomuser.me/api/portraits/women/45.jpg"
-                        />
-                    </div>
-
-                    <div className="w-[280px] md:w-[380px] lg:w-[420px] flex-shrink-0">
-                        <ProgramCard
-                            title="Career Acceleration Program"
-                            mentorName="Sarah Chen"
-                            field="Product Management"
-                            matchPercentage={88}
-                            imageUrl="https://randomuser.me/api/portraits/women/45.jpg"
-                        />
-                    </div>
-
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ProgramCard
+                    variant="dual-buttons"
+                    image="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80"
+                    tag="DESIGN"
+                    phases="92% MATCHING"
+                    title="UX Research Fundamentals"
+                    description="Master the art of user research with industry experts from top tech companies."
+                    author={{
+                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Moraa",
+                        name: "Moraa Zaki",
+                    }}
+                    primaryButtonText="Apply"
+                    secondaryButtonText="Details"
+                />
+                <ProgramCard
+                    variant="dual-buttons"
+                    image="https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=900&q=80"
+                    tag="LEADERSHIP"
+                    phases="88% MATCHING"
+                    title="Future Leaders Track"
+                    description="Develop soft skills and strategic thinking necessary for senior management roles."
+                    author={{
+                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Mona",
+                        name: "Mona Zaki",
+                    }}
+                    primaryButtonText="Apply"
+                    secondaryButtonText="Details"
+                />
+                <ProgramCard
+                    variant="dual-buttons"
+                    image="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80"
+                    tag="DESIGN"
+                    phases="85% MATCHING"
+                    title="UX Research Fundamentals"
+                    description="Master the craft of user-centered design through practical mentorship."
+                    author={{
+                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Moraa2",
+                        name: "Moraa Zaki",
+                    }}
+                    primaryButtonText="Apply"
+                    secondaryButtonText="Details"
+                />
             </div>
-            {/* Slider Indicators */}
-            <div className="flex justify-center items-center gap-3 mt-6">
-                <div className="w-12 h-2 bg-gray-400/70 rounded-full"></div>
-                <div className="w-5 h-2 bg-gray-300/60 rounded-full"></div>
-            </div>
-
 
         </div>
     );

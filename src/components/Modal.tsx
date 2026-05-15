@@ -4,9 +4,11 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   children: React.ReactNode
+  /** Override inner panel width/padding (default: max-w-4xl p-8) */
+  contentClassName?: string
 }
 
-export function Modal({ isOpen, onClose, children }: ModalProps) {
+export function Modal({ isOpen, onClose, children, contentClassName }: ModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -27,7 +29,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"
+        className={`relative w-full rounded-2xl bg-white shadow-2xl ${contentClassName ?? 'max-w-4xl p-8'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button

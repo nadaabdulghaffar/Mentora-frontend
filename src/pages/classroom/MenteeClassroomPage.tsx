@@ -1,4 +1,4 @@
-import ClassroomPage from './ClassroomPage';
+import ClassroomPage from './ClassroomPageRefactored.tsx';
 
 const MenteeClassroomPage = () => {
   return <ClassroomPage />;

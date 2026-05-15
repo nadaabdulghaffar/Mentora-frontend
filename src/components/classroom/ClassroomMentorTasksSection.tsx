@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import type { MentorCustomPublishedTask } from '../../pages/classroom/types';
 
 type MentorTaskCard = {
   id: string;
@@ -33,18 +35,86 @@ type ClassroomMentorTasksSectionProps = {
   mentorTaskPhasesView: MentorTaskPhaseView[];
   expandedMentorPhaseIds: string[];
   onTogglePhase: (phaseId: string) => void;
-  onAddTask: (phaseTitle?: string) => void;
   onOpenSubmissions: (taskId: string, filter?: 'all') => void;
   mentorRegistryRows: MentorRegistryRow[];
+  mentorCustomTasks: MentorCustomPublishedTask[];
+  onAddNewTask: () => void;
 };
+
+type WorkflowTaskCardProps = {
+  statusLabel: string;
+  statusTone: 'done' | 'review' | 'risk';
+  title: string;
+  description: string;
+  submissions: string;
+  avgScore: number;
+  avgLabel: string;
+  onViewSubmissions: () => void;
+  /** Optional content between description and footer (e.g. deadline, resource links) */
+  metaSlot?: ReactNode;
+};
+
+function MentorWorkflowTaskCard({
+  statusLabel,
+  statusTone,
+  title,
+  description,
+  submissions,
+  avgScore,
+  avgLabel,
+  onViewSubmissions,
+  metaSlot,
+}: WorkflowTaskCardProps) {
+  const badgeClasses =
+    statusTone === 'done'
+      ? 'bg-[#DDF6F0] text-[#0E7A5F]'
+      : statusTone === 'risk'
+        ? 'bg-[#FFE6EA] text-[#AF2F4D]'
+        : 'bg-[#EEE8FF] text-[#5E48C3]';
+
+  const scoreClasses = avgScore >= 85 ? 'text-[#0E7A5F]' : 'text-[#B03A49]';
+
+  return (
+    <div className="rounded-2xl border border-[#E6E9F2] bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+      <div className="flex items-start justify-between gap-3">
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${badgeClasses}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="mt-3 text-[22px] font-semibold leading-tight text-[#202738]">{title}</p>
+      <p className="mt-1 text-sm text-[#6E7589]">{description}</p>
+      {metaSlot ? <div className="mt-2">{metaSlot}</div> : null}
+
+      <div className="mt-4 flex items-end justify-between border-t border-[#ECEFF6] pt-3">
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs font-medium text-[#7D859B]">{submissions} Submissions</p>
+          <button
+            type="button"
+            onClick={onViewSubmissions}
+            className="inline-flex h-9 items-center rounded-lg border border-[#D9DEEA] bg-white px-3 text-xs font-semibold text-[#4D5670] transition hover:bg-[#F7F8FC]"
+          >
+            View Submissions
+          </button>
+        </div>
+
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8A91A5]">{avgLabel}</p>
+          <p className={`text-3xl font-bold leading-none ${scoreClasses}`}>{avgScore}%</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ClassroomMentorTasksSection({
   mentorTaskPhasesView,
   expandedMentorPhaseIds,
   onTogglePhase,
-  onAddTask,
   onOpenSubmissions,
   mentorRegistryRows,
+  mentorCustomTasks,
+  onAddNewTask,
 }: ClassroomMentorTasksSectionProps) {
   return (
     <>
@@ -56,9 +126,10 @@ export default function ClassroomMentorTasksSection({
           </div>
           <button
             type="button"
-            onClick={() => onAddTask()}
-            className="inline-flex h-12 items-center rounded-xl bg-[#6E56CF] px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(110,86,207,0.25)]"
+            onClick={onAddNewTask}
+            className="inline-flex items-center gap-2 rounded-xl bg-[#5E4BC5] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4F3DB0]"
           >
+            <Plus size={18} strokeWidth={2.5} />
             Add new task
           </button>
         </div>
@@ -74,13 +145,6 @@ export default function ClassroomMentorTasksSection({
                 <div className="flex items-center gap-2.5">
                   <span className={`h-2.5 w-2.5 rounded-full ${phase.dotClass}`} />
                   <p className="text-[28px] font-bold leading-none text-[#1F2432]">{phase.title}</p>
-                  <button
-                    type="button"
-                    onClick={() => onAddTask(phase.title)}
-                    className="grid h-5 w-5 place-items-center rounded-full bg-[#F2F4F9] text-[#697188]"
-                  >
-                    <Plus size={12} />
-                  </button>
                   <span className="rounded-full bg-[#F4F6FA] px-2.5 py-1 text-xs font-semibold text-[#7D859B]">
                     {phase.milestonesLabel}
                   </span>
@@ -99,50 +163,19 @@ export default function ClassroomMentorTasksSection({
               {isPhaseExpanded &&
                 (phase.tasks.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {phase.tasks.map((task) => {
-                      const badgeClasses =
-                        task.statusTone === 'done'
-                          ? 'bg-[#DDF6F0] text-[#0E7A5F]'
-                          : task.statusTone === 'risk'
-                            ? 'bg-[#FFE6EA] text-[#AF2F4D]'
-                            : 'bg-[#EEE8FF] text-[#5E48C3]';
-
-                      const scoreClasses = task.avgScore >= 85 ? 'text-[#0E7A5F]' : 'text-[#B03A49]';
-
-                      return (
-                        <div
-                          key={task.id}
-                          className="rounded-2xl border border-[#E6E9F2] bg-white p-4 shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${badgeClasses}`}>
-                              {task.statusLabel}
-                            </span>
-                          </div>
-
-                          <p className="mt-3 text-[22px] font-semibold leading-tight text-[#202738]">{task.title}</p>
-                          <p className="mt-1 text-sm text-[#6E7589]">{task.description}</p>
-
-                          <div className="mt-4 flex items-end justify-between border-t border-[#ECEFF6] pt-3">
-                            <div className="flex flex-col items-start gap-2">
-                              <p className="text-xs font-medium text-[#7D859B]">{task.submissions} Submissions</p>
-                              <button
-                                type="button"
-                                onClick={() => onOpenSubmissions(task.id)}
-                                className="inline-flex h-9 items-center rounded-lg border border-[#D9DEEA] bg-white px-3 text-xs font-semibold text-[#4D5670] transition hover:bg-[#F7F8FC]"
-                              >
-                                View Submissions
-                              </button>
-                            </div>
-
-                            <div className="text-right">
-                              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8A91A5]">{task.avgLabel}</p>
-                              <p className={`text-3xl font-bold leading-none ${scoreClasses}`}>{task.avgScore}%</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {phase.tasks.map((task) => (
+                      <MentorWorkflowTaskCard
+                        key={task.id}
+                        statusLabel={task.statusLabel}
+                        statusTone={task.statusTone}
+                        title={task.title}
+                        description={task.description}
+                        submissions={task.submissions}
+                        avgScore={task.avgScore}
+                        avgLabel={task.avgLabel}
+                        onViewSubmissions={() => onOpenSubmissions(task.id)}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <div className="grid min-h-[122px] place-items-center rounded-2xl border border-dashed border-[#E3E7F0] bg-white text-center">
@@ -152,6 +185,56 @@ export default function ClassroomMentorTasksSection({
             </div>
           );
         })}
+      </div>
+
+      <div className="rounded-3xl border border-[#E6E9F2] bg-white p-6">
+        <h2 className="text-[30px] font-bold leading-tight text-[#1F2432]">Tasks</h2>
+        <p className="mt-1 text-sm text-[#6F7689]">Tasks you publish for mentees appear here</p>
+
+        {mentorCustomTasks.length === 0 ? (
+          <div className="mt-6 grid min-h-[100px] place-items-center rounded-2xl border border-dashed border-[#E3E7F0] bg-[#FCFCFE] text-center">
+            <p className="px-4 text-sm text-[#8D95A8]">No published tasks yet. Use &quot;Add new task&quot; to create one.</p>
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {mentorCustomTasks.map((task) => (
+              <MentorWorkflowTaskCard
+                key={task.id}
+                statusLabel="Open for submissions"
+                statusTone="review"
+                title={task.title}
+                description={task.description.trim() ? task.description : 'No description provided.'}
+                submissions="0/45"
+                avgScore={0}
+                avgLabel="Average score"
+                onViewSubmissions={() => onOpenSubmissions(task.id)}
+                metaSlot={
+                  <>
+                    <p className="text-xs font-medium text-[#7D859B]">
+                      Deadline:{' '}
+                      <span className="text-[#3E4559]">{task.deadline ? task.deadline : 'Not set'}</span>
+                    </p>
+                    {task.resources.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {task.resources.map((res, i) => (
+                          <a
+                            key={`${task.id}-res-${i}`}
+                            href={res.url || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex max-w-full items-center rounded-full border border-[#DDE2EF] bg-[#F8FAFE] px-2.5 py-0.5 text-[11px] font-medium text-[#5E4BC5] ${!res.url ? 'pointer-events-none opacity-50' : ''}`}
+                          >
+                            <span className="truncate">{res.title || res.url || 'Resource'}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-3xl border border-[#E6E9F2] bg-white p-6">

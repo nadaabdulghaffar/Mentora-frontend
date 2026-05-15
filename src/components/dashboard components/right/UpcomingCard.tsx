@@ -1,13 +1,19 @@
 import { CalendarDays } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const UpcomingCard = () => {
+type UpcomingCardProps = {
+    title?: string;
+};
+
+const UpcomingCard = ({ title = "Upcoming" }: UpcomingCardProps) => {
+    const navigate = useNavigate();
     return (
         <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
 
             {/* Header */}
             <div className="flex items-center justify-between">
                 <h3 className="text-base md:text-lg lg:text-xl font-semibold text-slateInk">
-                    Upcoming
+                    {title}
                 </h3>
 
                 <CalendarDays className="w-5 h-5 text-gray-400" />
@@ -37,10 +43,7 @@ const UpcomingCard = () => {
 
             </div>
 
-            {/* Button */}
-            <button className="mt-3 w-full py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 transition font-medium text-sm md:text-base lg:text-lg text-slateInk">
-                Full calendar
-            </button>
+            
 
         </div>
     );

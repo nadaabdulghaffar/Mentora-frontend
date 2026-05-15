@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import {
-  Info,
   MoreHorizontal,
   Paperclip,
   Search,
@@ -120,7 +119,6 @@ const MessagesPage = () => {
   const [activeContactId, setActiveContactId] = useState<string | null>("sarah");
   const [conversations, setConversations] = useState<Record<string, ChatMessage[]>>(conversationByContact);
   const [messageInput, setMessageInput] = useState("");
-  const [showProfilePanel, setShowProfilePanel] = useState(true);
 
   const filteredContacts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -164,18 +162,13 @@ const MessagesPage = () => {
   return (
     <Layout showTopBar={false}>
       <section className="h-[calc(100dvh-2rem)] md:h-[calc(100dvh-3rem)] lg:h-[calc(100dvh-4rem)] min-h-[640px] overflow-hidden rounded-3xl border border-[#DEE2EC] bg-[#F7F8FC] shadow-[0_10px_30px_rgba(27,35,56,0.05)]">
-        <div className={`grid h-full grid-cols-1 lg:grid-cols-[340px_1fr] ${showProfilePanel ? "2xl:grid-cols-[340px_1fr_320px]" : "2xl:grid-cols-[340px_1fr]"}`}>
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[340px_1fr]">
           <aside className="flex h-full flex-col border-r border-[#E2E5EE] bg-white">
             <div className="border-b border-[#E2E5EE] px-5 py-5">
               <div className="mb-4 flex items-center justify-between">
                 <h1 className="text-3xl font-bold leading-none text-[#222A3A]">Messages</h1>
                 <div className="flex items-center gap-1 text-[#788097]">
-                  <button type="button" className="rounded-lg p-2 transition hover:bg-[#F1F3F8]">
-                    <SquarePen size={18} />
-                  </button>
-                  <button type="button" className="rounded-lg p-2 transition hover:bg-[#F1F3F8]">
-                    <MoreHorizontal size={18} />
-                  </button>
+                
                 </div>
               </div>
 
@@ -190,13 +183,7 @@ const MessagesPage = () => {
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setActiveContactId(null)}
-                className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
-              >
-                Write message
-              </button>
+             
             </div>
 
             <div className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -239,10 +226,10 @@ const MessagesPage = () => {
             </div>
           </aside>
 
-          <section className="flex min-w-0 flex-col border-r border-[#E2E5EE]">
+          <section className="flex min-w-0 flex-col">
             {activeContact ? (
               <>
-                <header className="flex items-center justify-between border-b border-[#E2E5EE] bg-[#F8F9FD] px-6 py-4">
+                <header className="flex items-center border-b border-[#E2E5EE] bg-[#F8F9FD] px-6 py-4">
                   <div className="flex items-center gap-3">
                     <img src={activeContact.avatar} alt={activeContact.name} className="h-11 w-11 rounded-full object-cover" />
                     <div>
@@ -250,15 +237,6 @@ const MessagesPage = () => {
                       <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#7E869C]">{activeContact.role}</p>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowProfilePanel((prev) => !prev)}
-                    className="rounded-lg p-1 text-primary transition hover:bg-[#ECEFFD]"
-                    aria-label="Toggle contact details"
-                  >
-                    <Info size={20} />
-                  </button>
                 </header>
 
                 <div className="flex-1 space-y-4 overflow-y-auto px-6 py-7">
@@ -332,48 +310,6 @@ const MessagesPage = () => {
               </div>
             )}
           </section>
-
-          {activeContact && showProfilePanel && (
-            <aside className="hidden h-full bg-white 2xl:flex 2xl:flex-col">
-              <div className="flex flex-col items-center border-b border-[#E2E5EE] px-6 py-8 text-center">
-                <img src={activeContact.avatar} alt={activeContact.name} className="h-24 w-24 rounded-3xl object-cover" />
-                <h3 className="mt-4 text-4xl font-bold leading-none text-[#242C3D]">{activeContact.name}</h3>
-                <p className="mt-2 text-lg text-[#798198]">Senior Product Designer at Google</p>
-                <span className="mt-3 rounded-full bg-[#DDF6EF] px-3 py-1 text-sm font-bold text-[#0C9D80]">4.9/5 Rating</span>
-                <p className="mt-4 text-base leading-relaxed text-[#697188]">
-                  Passionate about helping junior designers master UI systems and accessibility standards.
-                </p>
-                <button type="button" className="mt-5 text-lg font-semibold text-primary hover:underline">View Full Profile</button>
-              </div>
-
-              <div className="border-b border-[#E2E5EE] px-5 py-5">
-                <p className="text-xs font-bold tracking-[0.18em] text-[#858DA2]">CURRENT PROGRAM</p>
-                <p className="mt-3 text-3xl font-semibold text-[#253044]">Advanced UI Systems</p>
-                <div className="mt-3 h-2 rounded-full bg-[#E4E8F1]">
-                  <div className="h-2 w-[65%] rounded-full bg-primary" />
-                </div>
-                <p className="mt-2 text-sm font-semibold text-[#7D859A]">65%</p>
-              </div>
-
-              <div className="flex-1 px-5 py-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs font-bold tracking-[0.18em] text-[#858DA2]">SHARED CONTENT</p>
-                  <button type="button" className="text-xs font-semibold text-primary">View all</button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-[#E3E7F0] px-3 py-3">
-                    <p className="text-sm font-semibold text-[#2B3345]">Portfolio_Review.pdf</p>
-                    <p className="text-xs text-[#7F879D]">2.4 MB · Shared 2h ago</p>
-                  </div>
-                  <div className="rounded-2xl border border-[#E3E7F0] px-3 py-3">
-                    <p className="text-sm font-semibold text-[#2B3345]">Resources_Link</p>
-                    <p className="text-xs text-[#7F879D]">Notion Workspace</p>
-                  </div>
-                </div>
-              </div>
-            </aside>
-          )}
         </div>
       </section>
     </Layout>

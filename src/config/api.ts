@@ -2,10 +2,10 @@ import axios from 'axios';
 
 // إعدادات الـ API
 // القيمة تُقرأ من متغير بيئة VITE_API_URL الذي يمكن تعيينه عبر ملف
-// `.env` أو مباشرة عند تشغيل vite (`VITE_API_URL=http://localhost:7018/api npm run dev`).
+// `.env` أو مباشرة عند تشغيل vite (`VITE_API_URL=http://localhost:5069/api npm run dev`).
 // إذا لم يُحدد المتغير، نضع بورت التطوير الافتراضي الذي يستخدمه
 // المشروع الخلفي (يتوافق مع `launchSettings.json`).
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:7018/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5069/api';
 
 // إنشاء instance من Axios
 const apiClient = axios.create({

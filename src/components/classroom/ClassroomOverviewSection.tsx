@@ -2,12 +2,31 @@ import { Image, Paperclip, Smile, Calendar } from 'lucide-react';
 import Feed, { type FeedPostProps } from '../Feed';
 
 type ClassroomOverviewSectionProps = {
+  isMentor?: boolean;
   onSubmitTask: () => void;
   onAddPost: () => void;
+  onReviewNow?: () => void;
+  pendingReviewCount?: number;
   feedPosts: FeedPostProps[];
+  currentUserId?: string;
+  onPostUpdate?: (postId: string, content: string) => void;
+  /** Opens the same Add Post modal prefilled for editing */
+  onRequestPostEdit?: (postId: string) => void;
+  onPostDelete?: (postId: string) => void;
 };
 
-const ClassroomOverviewSection = ({ onSubmitTask, onAddPost, feedPosts }: ClassroomOverviewSectionProps) => {
+const ClassroomOverviewSection = ({
+  isMentor = false,
+  onSubmitTask,
+  onAddPost,
+  onReviewNow,
+  pendingReviewCount = 0,
+  feedPosts,
+  currentUserId = 'current-user',
+  onPostUpdate,
+  onRequestPostEdit,
+  onPostDelete,
+}: ClassroomOverviewSectionProps) => {
   return (
     <section className="space-y-5">
       <div>
@@ -53,17 +72,31 @@ const ClassroomOverviewSection = ({ onSubmitTask, onAddPost, feedPosts }: Classr
                 <Calendar size={16} strokeWidth={2} className="text-[#5C4BC7]" />
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8092]">Active Mission</p>
-                <p className="text-lg font-semibold leading-none text-[#242B3B]">Module 4: User Journey Mapping</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8092]">
+                  {isMentor ? 'Pending Review' : 'Active Mission'}
+                </p>
+                <p className="text-lg font-semibold leading-none text-[#242B3B]">
+                  {isMentor ? `${pendingReviewCount} submissions` : 'Module 4: User Journey Mapping'}
+                </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onSubmitTask}
-              className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm"
-            >
-              Submit Task
-            </button>
+            {isMentor ? (
+              <button
+                type="button"
+                onClick={onReviewNow}
+                className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm"
+              >
+                Review Now
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onSubmitTask}
+                className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm"
+              >
+                Submit Task
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -118,6 +151,10 @@ const ClassroomOverviewSection = ({ onSubmitTask, onAddPost, feedPosts }: Classr
           <Feed
             key={post.id}
             {...post}
+            currentUserId={currentUserId}
+            onPostUpdate={onPostUpdate}
+            onRequestPostEdit={onRequestPostEdit}
+            onPostDelete={onPostDelete}
             onLike={() => console.log('like post:', post.id)}
             onComment={() => console.log('comment post:', post.id)}
             onReply={(commentId) => console.log('reply to comment:', commentId)}

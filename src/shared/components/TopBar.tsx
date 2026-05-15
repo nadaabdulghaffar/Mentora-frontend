@@ -1,8 +1,22 @@
-import { Bell, Menu, X, Home, Mail, Users, FileText, BookOpen, Calendar } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Bell, Menu, X, Home, Mail, Users, FileText, BookOpen, Compass, Search } from "lucide-react";
+import { useEffect, useRef, useState, Suspense, lazy } from "react";
 import { useNavigate } from "react-router-dom";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
+
+const CreateProgramModal = lazy(() => import("../../components/create-program/CreateProgramModal"));
+
+function CreateProgramFallback() {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8 max-w-lg w-full">
+        <h2 className="text-2xl font-bold text-slateInk mb-4">Create Mentorship Program</h2>
+        <p className="text-gray-600 mb-6">Loading create program modal…</p>
+        <div className="inline-block bg-gray-100 text-gray-600 px-6 py-2 rounded-xl font-medium">Please wait</div>
+      </div>
+    </div>
+  );
+}
 
 interface Notification {
   id: number;
@@ -15,10 +29,13 @@ const TopBar = () => {
   const navigate = useNavigate();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isCreateProgramOpen, setIsCreateProgramOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [showModal, setShowModal] = useState(false);
 
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [headerSearch, setHeaderSearch] = useState("");
 
   const notifications: Notification[] = [
     {
@@ -90,41 +107,84 @@ const TopBar = () => {
     { icon: <Users size={24} />, label: "Community" },
     { icon: <FileText size={24} />, label: "Applications" },
     { icon: <BookOpen size={24} />, label: "My Programs" },
-    { icon: <Calendar size={24} />, label: "Calendar" },
+    { icon: <Compass size={24} />, label: "Explore" },
   ];
 
   return (
-    <div className="flex justify-between items-center gap-2 md:gap-3 lg:gap-6 mb-4 md:mb-6 lg:mb-8 relative">
-      
-      {/* Hamburger Menu - Mobile & Tablet Only */}
-      <div className="xl:hidden" ref={menuRef}>
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="text-slateInk hover:text-primary transition p-2"
-        >
-          {menuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+    <div className="relative mb-4 grid w-full grid-cols-1 gap-3 md:mb-6 lg:mb-8 lg:grid-cols-12 lg:items-center lg:gap-12">
+      {/* Same width as main column (e.g. WelcomeBanner below: lg:col-span-9) */}
+      <div className="flex min-w-0 items-center gap-2 md:gap-3 lg:col-span-9">
+        {/* Hamburger Menu - Mobile & Tablet Only */}
+        <div className="shrink-0 xl:hidden" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-2 text-slateInk transition hover:text-primary"
+            type="button"
+            aria-expanded={menuOpen}
+            aria-label="Open menu"
+          >
+            {menuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
 
-        {/* Mobile Navigation Drawer */}
-        {menuOpen && (
-          <div className="absolute left-0 top-12 w-64 md:w-72 bg-white rounded-2xl shadow-lg border p-4 md:p-6 z-50">
-            <nav className="space-y-4">
-              {navItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-3 text-gray-600 hover:text-primary cursor-pointer transition p-2 rounded-lg hover:bg-gray-50"
-                >
-                  {item.icon}
-              <span className="text-sm md:text-base lg:text-lg font-medium">{item.label}</span>
-                </div>
-              ))}
-            </nav>
-          </div>
-        )}
+          {menuOpen && (
+            <div className="absolute left-0 top-12 z-50 w-64 rounded-2xl border bg-white p-4 shadow-lg md:w-72 md:p-6">
+              <nav className="space-y-4">
+                {navItems.map((item, index) => (
+                  <div
+                    key={index}
+                    onClick={() => {
+                      if (item.label === 'Applications') {
+                        navigate('/applications');
+                        setMenuOpen(false);
+                      }
+                    }}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg p-2 text-gray-600 transition hover:bg-gray-50 hover:text-primary"
+                  >
+                    {item.icon}
+                    <span className="text-sm font-medium md:text-base lg:text-lg">{item.label}</span>
+                  </div>
+                ))}
+              </nav>
+            </div>
+          )}
+        </div>
+
+        <form
+          role="search"
+          className="relative min-w-0 w-full flex-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = headerSearch.trim();
+            navigate(
+              q ? `/search-mentorship?q=${encodeURIComponent(q)}` : "/search-mentorship"
+            );
+          }}
+        >
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-400"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={headerSearch}
+            onChange={(e) => setHeaderSearch(e.target.value)}
+            placeholder={
+              user?.role?.toLowerCase() === "mentor"
+                ? "Search resources, mentees, or programs..."
+                : "Search mentors, programs…"
+            }
+            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-10 pr-3 text-sm text-slateInk shadow-sm placeholder:text-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 md:py-2.5 md:pl-11 md:text-base"
+            aria-label={
+              user?.role?.toLowerCase() === "mentor"
+                ? "Search resources, mentees, and programs"
+                : "Search mentors and programs"
+            }
+          />
+        </form>
       </div>
 
-      {/* Right side items */}
-      <div className="flex items-center gap-2 md:gap-3 lg:gap-6 ml-auto">
+      {/* Right: notifications + CTA (aligned with sidebar column) */}
+      <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3 lg:col-span-3 lg:gap-6">
         {/* Notification */}
         <div className="relative" ref={notificationRef}>
           <button
@@ -173,16 +233,23 @@ const TopBar = () => {
         <button
           onClick={() => {
             if (user?.role?.toLowerCase() === 'mentor') {
-              navigate('/mentor/create-mentorship');
+              console.log('TopBar: opening create program modal');
+              setIsCreateProgramOpen(true);
             } else {
               navigate('/search-mentorship');
             }
           }}
           className="bg-primary hover:bg-primary-dark text-white px-3 md:px-5 lg:px-7 py-2 md:py-2.5 rounded-xl font-medium text-sm md:text-base lg:text-lg transition"
         >
-          {user?.role?.toLowerCase() === 'mentor' ? 'Create Mentorship' : 'Find Mentorship'}
+          {user?.role?.toLowerCase() === 'mentor' ? 'Create Program' : 'Find Mentorship'}
         </button>
       </div>
+
+      {isCreateProgramOpen && (
+        <Suspense fallback={<CreateProgramFallback />}>
+          <CreateProgramModal isOpen={isCreateProgramOpen} onClose={() => setIsCreateProgramOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };

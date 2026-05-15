@@ -25,7 +25,7 @@ function Signup() {
   const [passwordStrength, setPasswordStrength] = useState<'weak' | 'medium' | 'strong' | ''>('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
-  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:7018/api'
+  const oauthBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5069/api'
 
   const handleGoogleLogin = () => {
     window.location.href = `${oauthBaseUrl}/auth/login-google?rememberMe=false`

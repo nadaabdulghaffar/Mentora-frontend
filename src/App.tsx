@@ -11,8 +11,20 @@ import DashboardPage from "./pages/DashboardPage"
 import MentorDashboardPage from "./pages/MentorDashboardPage"
 import ExplorePage from "./pages/ExplorePage";
 import MessagesPage from "./pages/MessagesPage";
-import CreateMentorshipPage from "./pages/CreateMentorshipPage";
 import MyProgramsPage from "./pages/MyProgramsPage";
+import MyRoadmapsPage from "./pages/roadmap/MyRoadmapsPage";
+import CreateRoadmapPage from "./pages/roadmap/CreateRoadmapPage";
+import EditRoadmapPage from "./pages/roadmap/EditRoadmapPage";
+import RoadmapViewPage from "./pages/roadmap/RoadmapViewPage";
+import CommunityPage from "./pages/community/CommunityPage";
+import MentoAIPage from "./pages/MentoAIPage";
+import CommunitiesListPage from "./pages/community/CommunitiesListPage";
+import ProfilePage from "./pages/profile/ProfilePage";
+import SuggestedProgramsPage from "./pages/SuggestedProgramsPage";
+import RecommendedMentorsPage from "./pages/RecommendedMentorsPage";
+import MyApplicationsPage from "./pages/MyApplicationsPage";
+import ManageApplicantsPage from "./pages/ManageApplicantsPage";
+import ApplicationDetailsPage from "./pages/ApplicationDetailsPage";
 import authAPI from './services/authService';
 import MentorClassroomPage from './pages/classroom/MentorClassroomPage';
 import MenteeClassroomPage from './pages/classroom/MenteeClassroomPage';
@@ -64,6 +76,46 @@ function App() {
         }
       />
       <Route
+        path="/roadmap"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <Navigate to="/my-roadmaps" replace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-roadmaps"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <MyRoadmapsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap/create"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <CreateRoadmapPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap/:roadmapId/edit"
+        element={
+          <ProtectedRoute roles={[ 'mentor' ]}>
+            <EditRoadmapPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roadmap/:roadmapId"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <RoadmapViewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/search-mentorship"
         element={
           <ProtectedRoute>
@@ -80,18 +132,59 @@ function App() {
         }
       />
       <Route
-        path="/mentor/create-mentorship"
+        path="/profile"
         element={
-          <ProtectedRoute roles={[ 'mentor' ]}>
-            <CreateMentorshipPage />
+          <ProtectedRoute roles={['mentor', 'mentee']}>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile/:userId"
+        element={
+          <ProtectedRoute roles={['mentor', 'mentee']}>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Create mentorship now opens as a modal from the TopBar; the standalone page was removed. */}
       <Route
         path="/my-programs"
         element={
           <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
             <MyProgramsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/applications"
+        element={
+          <ProtectedRoute roles={['mentor', 'mentee']}>
+            <MyApplicationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/applications/:id/manage"
+        element={
+          <ProtectedRoute roles={['mentor']}>
+            <ManageApplicantsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/applications/:id"
+        element={
+          <ProtectedRoute roles={['mentor', 'mentee']}>
+            <ApplicationDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mento-ai"
+        element={
+          <ProtectedRoute roles={["mentee"]}>
+            <MentoAIPage />
           </ProtectedRoute>
         }
       />
@@ -107,7 +200,40 @@ function App() {
           </ProtectedRoute>
         }
       />
-
+      <Route
+        path="/community"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <CommunitiesListPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Dev-only route: preview community page without auth (remove before production) */}
+      <Route path="/dev-community" element={<CommunityPage />} />
+      <Route
+        path="/community/:id"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <CommunityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/suggested-programs"
+        element={
+          <ProtectedRoute roles={[ 'mentee' ]}>
+            <SuggestedProgramsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recommended-mentors"
+        element={
+          <ProtectedRoute roles={[ 'mentee' ]}>
+            <RecommendedMentorsPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   )
 }

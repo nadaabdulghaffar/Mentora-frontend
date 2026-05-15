@@ -4,6 +4,7 @@ import Layout from "../shared/components/Layout";
 import WelcomeBanner from "../components/dashboard components/WelcomeBanner";
 import SearchSection from "../components/dashboard components/SearchSection";
 import SuggestedPrograms from "../components/dashboard components/SuggestedPrograms";
+import MentorsMatch from "../components/dashboard components/MentorsMatch";
 import RightSidebar from "../components/dashboard components/RightSidebar";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
@@ -91,6 +92,7 @@ const DashboardPage = () => {
                     <WelcomeBanner name={displayName} />
                     <SearchSection />
                     <SuggestedPrograms />
+                    <MentorsMatch />
 
                 </div>
 

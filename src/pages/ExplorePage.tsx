@@ -1,9 +1,17 @@
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ProgramCard from "../components/ProgramCard";
 import Layout from "../shared/components/Layout";
 
 type ExploreTab = "mentors" | "programs" | "communities" | "roadmaps";
+
+const EXPLORE_TAB_VALUES: ExploreTab[] = ["mentors", "programs", "communities", "roadmaps"];
+
+function parseTabFromSearch(value: string | null): ExploreTab | null {
+  if (!value) return null;
+  return EXPLORE_TAB_VALUES.includes(value as ExploreTab) ? (value as ExploreTab) : null;
+}
 
 interface ExploreItem {
   id: string;
@@ -118,23 +126,48 @@ const exploreItems: ExploreItem[] = [
 
 const experienceLevels = ["Junior", "Mid-Level", "Senior"] as const;
 const specializationOptions = ["All Fields", "Design", "Frontend", "Backend"] as const;
+const toolsOptions = ["React", "TypeScript", "Node.js", "Python", "AWS", "UI Design"] as const;
+const ratingsOptions = ["1+", "2+", "3+", "4+", "4.5+"] as const;
 const DEFAULT_SPECIALIZATION = "All Fields";
-const DEFAULT_AVAILABLE_NOW = false;
-const DEFAULT_WEEKENDS_ONLY = false;
 const DEFAULT_EXPERIENCE_LEVEL = null;
+const DEFAULT_TOOLS = null;
+const DEFAULT_BEST_MATCH = false;
+const DEFAULT_RATINGS = null;
 
 const ExplorePage = () => {
-  const [activeTab, setActiveTab] = useState<ExploreTab>("mentors");
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<ExploreTab>(
+    () => parseTabFromSearch(searchParams.get("tab")) ?? "mentors"
+  );
+  const [query, setQuery] = useState(() => searchParams.get("q")?.trim() ?? "");
+
+  useEffect(() => {
+    const parsed = parseTabFromSearch(searchParams.get("tab"));
+    if (parsed) setActiveTab(parsed);
+  }, [searchParams]);
+
+  const handleTabChange = (tab: ExploreTab) => {
+    setActiveTab(tab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      },
+      { replace: true }
+    );
+  };
   const [selectedSpecialization, setSelectedSpecialization] = useState<(typeof specializationOptions)[number]>(DEFAULT_SPECIALIZATION);
-  const [availableNow, setAvailableNow] = useState(DEFAULT_AVAILABLE_NOW);
-  const [weekendsOnly, setWeekendsOnly] = useState(DEFAULT_WEEKENDS_ONLY);
+  const [selectedTools, setSelectedTools] = useState<(typeof toolsOptions)[number] | null>(DEFAULT_TOOLS);
+  const [bestMatchForYou, setBestMatchForYou] = useState(DEFAULT_BEST_MATCH);
+  const [selectedRatings, setSelectedRatings] = useState<(typeof ratingsOptions)[number] | null>(DEFAULT_RATINGS);
   const [selectedExperienceLevel, setSelectedExperienceLevel] = useState<(typeof experienceLevels)[number] | null>(DEFAULT_EXPERIENCE_LEVEL);
 
   const handleClearFilters = () => {
     setSelectedSpecialization(DEFAULT_SPECIALIZATION);
-    setAvailableNow(DEFAULT_AVAILABLE_NOW);
-    setWeekendsOnly(DEFAULT_WEEKENDS_ONLY);
+    setSelectedTools(DEFAULT_TOOLS);
+    setBestMatchForYou(DEFAULT_BEST_MATCH);
+    setSelectedRatings(DEFAULT_RATINGS);
     setSelectedExperienceLevel(DEFAULT_EXPERIENCE_LEVEL);
   };
 
@@ -199,26 +232,49 @@ const ExplorePage = () => {
               </div>
 
               <div>
-                <p className="mb-2 font-medium text-[#262D3F]">Availability</p>
-                <label className="mb-2 flex items-center gap-2 text-[#5D657A]">
-                  <input
-                    type="checkbox"
-                    checked={availableNow}
-                    onChange={(event) => setAvailableNow(event.target.checked)}
-                    className="h-4 w-4 rounded border-[#C8CEDB]"
-                  />
-                  Available now
-                </label>
-                <label className="flex items-center gap-2 text-[#5D657A]">
-                  <input
-                    type="checkbox"
-                    checked={weekendsOnly}
-                    onChange={(event) => setWeekendsOnly(event.target.checked)}
-                    className="h-4 w-4 rounded border-[#C8CEDB]"
-                  />
-                  Weekends only
-                </label>
+                <p className="mb-2 font-medium text-[#262D3F]">Tools/Technologies</p>
+                <select
+                  value={selectedTools ?? ""}
+                  onChange={(event) => setSelectedTools(event.target.value === "" ? null : event.target.value as (typeof toolsOptions)[number])}
+                  className="w-full rounded-xl border border-[#DFE3ED] bg-white px-3 py-2.5 text-[#5D657A] outline-none"
+                >
+                  <option value="">All Technologies</option>
+                  {toolsOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </div>
+
+              {activeTab !== "roadmaps" && (
+                <div>
+                  <p className="mb-2 font-medium text-[#262D3F]">Best Match For You</p>
+                  <label className="flex items-center gap-2 text-[#5D657A]">
+                    <input
+                      type="checkbox"
+                      checked={bestMatchForYou}
+                      onChange={(event) => setBestMatchForYou(event.target.checked)}
+                      className="h-4 w-4 rounded border-[#C8CEDB]"
+                    />
+                    Show best match
+                  </label>
+                </div>
+              )}
+
+              {activeTab === "mentors" && (
+                <div>
+                  <p className="mb-2 font-medium text-[#262D3F]">Ratings</p>
+                  <select
+                    value={selectedRatings ?? ""}
+                    onChange={(event) => setSelectedRatings(event.target.value === "" ? null : event.target.value as (typeof ratingsOptions)[number])}
+                    className="w-full rounded-xl border border-[#DFE3ED] bg-white px-3 py-2.5 text-[#5D657A] outline-none"
+                  >
+                    <option value="">All Ratings</option>
+                    {ratingsOptions.map((option) => (
+                      <option key={option} value={option}>{option} Stars</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <p className="mb-2 font-medium text-[#262D3F]">Experience Level</p>
@@ -230,7 +286,7 @@ const ExplorePage = () => {
                         key={level}
                         type="button"
                         aria-pressed={isSelected}
-                        onClick={() => setSelectedExperienceLevel(level)}
+                        onClick={() => setSelectedExperienceLevel(selectedExperienceLevel === level ? null : level)}
                         className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                           isSelected
                             ? "bg-primary text-white"
@@ -250,7 +306,7 @@ const ExplorePage = () => {
             <div className="mb-5 inline-flex rounded-xl bg-[#ECEEF3] p-1">
               <button
                 type="button"
-                onClick={() => setActiveTab("mentors")}
+                onClick={() => handleTabChange("mentors")}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
                   activeTab === "mentors" ? "bg-white text-[#202637] shadow-sm" : "text-[#6A7288]"
                 }`}
@@ -259,7 +315,7 @@ const ExplorePage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("programs")}
+                onClick={() => handleTabChange("programs")}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
                   activeTab === "programs" ? "bg-white text-[#202637] shadow-sm" : "text-[#6A7288]"
                 }`}
@@ -268,7 +324,7 @@ const ExplorePage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("communities")}
+                onClick={() => handleTabChange("communities")}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
                   activeTab === "communities" ? "bg-white text-[#202637] shadow-sm" : "text-[#6A7288]"
                 }`}
@@ -277,7 +333,7 @@ const ExplorePage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("roadmaps")}
+                onClick={() => handleTabChange("roadmaps")}
                 className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
                   activeTab === "roadmaps" ? "bg-white text-[#202637] shadow-sm" : "text-[#6A7288]"
                 }`}

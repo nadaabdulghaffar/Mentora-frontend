@@ -1,0 +1,147 @@
+
+import type {
+    UseFormRegister,
+    UseFormSetValue,
+} from "react-hook-form";
+
+type Props = {
+  register: UseFormRegister<any>;
+  values: any;
+  setValue: UseFormSetValue<any>;
+};
+
+const domains = [
+  "Technology",
+  "Business",
+  "Design",
+  "Marketing",
+  "AI",
+];
+
+export default function CommunityFormFields({
+  register,
+  values,
+  setValue,
+}: Props) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      {/* LEFT */}
+      <div className="space-y-5">
+        {/* Domain */}
+        <div>
+          <label className="block mb-2 text-sm font-semibold text-slateInk">
+            Domain
+          </label>
+
+          <select
+            {...register(
+              "domainId"
+            )}
+            className="w-full h-12 rounded-xl border border-gray-200 px-4 outline-none focus:border-primary"
+          >
+            <option value="">
+              Select domain
+            </option>
+
+            {domains.map(
+              (
+                item
+              ) => (
+                <option
+                  key={
+                    item
+                  }
+                  value={
+                    item
+                  }
+                >
+                  {item}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+
+        {/* Name */}
+        <div>
+          <label className="block mb-2 text-sm font-semibold text-slateInk">
+            Community Name
+          </label>
+
+          <input
+            {...register(
+              "name"
+            )}
+            placeholder="Enter community name"
+            className="w-full h-12 rounded-xl border border-gray-200 px-4 outline-none focus:border-primary"
+          />
+        </div>
+
+        {/* Desc */}
+        <div>
+          <label className="block mb-2 text-sm font-semibold text-slateInk">
+            Description
+          </label>
+
+          <textarea
+            {...register(
+              "description"
+            )}
+            rows={5}
+            placeholder="Tell members what this community is about..."
+            className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none resize-none focus:border-primary"
+          />
+        </div>
+
+        {/* Upload */}
+        <div>
+          <label className="block mb-2 text-sm font-semibold text-slateInk">
+            Community Image
+          </label>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(
+              e
+            ) =>
+              setValue(
+                "image",
+                e.target
+                  .files?.[0] ||
+                  null
+              )
+            }
+            className="block w-full text-sm"
+          />
+        </div>
+      </div>
+
+      {/* RIGHT PREVIEW */}
+      <div className="rounded-3xl border border-gray-200 bg-[#F8F9FC] p-5">
+        <div className="h-44 rounded-2xl bg-gradient-to-r from-[#EDE7FF] to-[#F6F3FF]" />
+
+        <div className="mt-5">
+          <span className="inline-flex rounded-md bg-[#F0ECFB] px-3 py-1 text-xs font-semibold text-primary">
+            {values.domainId ||
+              "Domain"}
+          </span>
+
+          <h3 className="mt-4 text-2xl font-bold text-slateInk line-clamp-2">
+            {values.name ||
+              "Community Name"}
+          </h3>
+
+          <p className="mt-3 text-sm leading-6 text-gray-500 line-clamp-4">
+            {values.description ||
+              "Your community preview will appear here while typing."}
+          </p>
+
+          <button className="mt-6 h-11 w-full rounded-xl bg-primary text-white font-semibold">
+            Join Community
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

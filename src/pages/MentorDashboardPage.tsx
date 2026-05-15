@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../shared/components/Layout";
 import WelcomeBanner from "../components/dashboard components/WelcomeBanner";
-import MentorStatsSection from "../components/dashboard components/MentorStatsSection";
-import SearchSection from "../components/dashboard components/SearchSection";
+import MentorMentorshipProgramsSection from "../components/dashboard components/MentorMentorshipProgramsSection";
+import MentorActiveApplicationsSection from "../components/dashboard components/MentorActiveApplicationsSection";
 import RightSidebar from "../components/dashboard components/RightSidebar";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
@@ -20,15 +20,12 @@ const MentorDashboardPage = () => {
                 setLoading(true);
                 setError(null);
 
-                // Load cached user from localStorage only
                 const cachedUser = authAPI.getCurrentUser();
                 const token = localStorage.getItem('accessToken');
-                console.log('MentorDashboardPage - Cached user:', cachedUser, 'token present:', !!token);
-                
+
                 if (cachedUser && token) {
                     setUser(cachedUser);
                 } else {
-                    // No cached user or no token available
                     console.warn('MentorDashboardPage - Missing auth data, redirecting to login');
                     navigate('/login');
                 }
@@ -40,16 +37,16 @@ const MentorDashboardPage = () => {
         loadUser();
     }, [navigate]);
 
-    const displayName = user 
-        ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` 
+    const displayName = user
+        ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
         : 'Guest';
 
     if (loading) {
         return (
             <Layout>
-                <div className="flex items-center justify-center min-h-screen">
-                    <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <div className="flex min-h-screen items-center justify-center">
+                    <div className="space-y-4 text-center">
+                        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary"></div>
                         <p className="text-gray-600">Loading mentor dashboard...</p>
                     </div>
                 </div>
@@ -60,13 +57,14 @@ const MentorDashboardPage = () => {
     if (error && !user) {
         return (
             <Layout>
-                <div className="flex items-center justify-center min-h-screen">
-                    <div className="text-center space-y-4">
+                <div className="flex min-h-screen items-center justify-center">
+                    <div className="space-y-4 text-center">
                         <div className="text-4xl">⚠️</div>
-                        <p className="text-red-600 font-semibold">{error}</p>
+                        <p className="font-semibold text-red-600">{error}</p>
                         <button
+                            type="button"
                             onClick={() => navigate('/login')}
-                            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark"
+                            className="rounded-lg bg-primary px-4 py-2 text-white hover:bg-primary-dark"
                         >
                             Back to Login
                         </button>
@@ -78,17 +76,19 @@ const MentorDashboardPage = () => {
 
     return (
         <Layout>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 lg:gap-12">
+            <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-12 lg:gap-12">
 
-                <div className="lg:col-span-9 space-y-4 md:space-y-6 lg:space-y-8">
-                    <WelcomeBanner name={displayName} />
-                    <SearchSection />
-                    <MentorStatsSection />
-
+                <div className="space-y-4 md:space-y-6 lg:col-span-9 lg:space-y-8">
+                    <WelcomeBanner
+                        name={displayName}
+                        tagline="Continue your growth journey with expert mentorship. You have 3 sessions scheduled for today."
+                    />
+                    <MentorMentorshipProgramsSection />
+                    <MentorActiveApplicationsSection />
                 </div>
 
-                <div className="lg:col-span-3 space-y-4 md:space-y-6 lg:space-y-8">
-                    <RightSidebar />
+                <div className="space-y-4 md:space-y-6 lg:col-span-3 lg:space-y-8">
+                    <RightSidebar upcomingTitle="Today's Sessions" />
                 </div>
 
             </div>

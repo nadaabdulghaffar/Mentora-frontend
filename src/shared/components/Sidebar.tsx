@@ -1,4 +1,5 @@
 import logo from "../../assets/images/logo.svg";
+import mentoRobot from "../../assets/images/Gemini_Generated_Image_oov0p2oov0p2oov0 1.png";
 import {
     Home,
   Compass,
@@ -6,16 +7,19 @@ import {
     Users,
     FileText,
     BookOpen,
+    Layers3,
     ChevronDown,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
 
 const Sidebar = () => {
     const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const exploreTab = searchParams.get("tab");
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -29,12 +33,28 @@ const Sidebar = () => {
     navigate('/my-programs');
   };
 
+  const goToMyRoadmaps = () => {
+    navigate('/my-roadmaps');
+  };
+
   const goToExplore = () => {
     navigate('/search-mentorship');
   };
 
   const goToMessages = () => {
     navigate('/messages');
+  };
+
+  const goToCommunity = () => {
+    navigate('/community');
+  };
+
+  const goToApplications = () => {
+    navigate('/applications');
+  };
+
+  const goToMentoAI = () => {
+    navigate("/mento-ai");
   };
 
     // Close when clicking outside
@@ -99,11 +119,14 @@ const Sidebar = () => {
                     onClick={goHome}
                     active={location.pathname === '/dashboard' || location.pathname === '/mentor/dashboard'}
                   />
-                    <SidebarItem
+                   <SidebarItem
                       icon={<Compass size={24} />}
                       label="Explore"
                       onClick={goToExplore}
-                      active={location.pathname === '/search-mentorship'}
+                      active={
+                        location.pathname === "/search-mentorship" &&
+                        exploreTab !== "programs"
+                      }
                     />
                     <SidebarItem
                       icon={<Mail size={24} />}
@@ -111,62 +134,114 @@ const Sidebar = () => {
                       onClick={goToMessages}
                       active={location.pathname === '/messages'}
                     />
-                    <SidebarItem icon={<Users size={24} />} label="Community" />
-                    <SidebarItem icon={<FileText size={24} />} label="Applications" />
+                    {userRole === "mentee" && (
+                      <SidebarItem
+                        icon={
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#A8E6CF]">
+                            <img
+                              src={mentoRobot}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
+                          </span>
+                        }
+                        label="Mento AI"
+                        onClick={goToMentoAI}
+                        active={location.pathname === "/mento-ai"}
+                      />
+                    )}
+                    <SidebarItem 
+                      icon={<Users size={24} />} 
+                      label="Community"
+                      onClick={goToCommunity}
+                      active={location.pathname === '/community'}
+                    />
+                    <SidebarItem
+                      icon={<FileText size={24} />}
+                      label="Applications"
+                      onClick={goToApplications}
+                      active={location.pathname.startsWith('/applications')}
+                    />
                   <SidebarItem
                     icon={<BookOpen size={24} />}
                     label="My Programs"
                     onClick={goToMyPrograms}
                     active={location.pathname === '/my-programs'}
                   />
+
+                  {userRole === 'mentor' && (
+                    <SidebarItem
+                      icon={<Layers3 size={24} />}
+                      label="My Roadmaps"
+                      onClick={goToMyRoadmaps}
+                      active={
+                        location.pathname === '/my-roadmaps' ||
+                        location.pathname.startsWith('/roadmap/')
+                      }
+                    />
+                  )}
+                   
                 </nav>
             </div>
 
-{/* Profile Section */}
+{/* Profile Section — tap row to open profile; chevron opens account menu */}
 <div className="relative border-t border-gray-200 pt-4 mt-6" ref={dropdownRef}>
-  <div
-    onClick={() => setOpen(!open)}
-    className="flex items-center gap-3 cursor-pointer group"
-  >
-    {/* Avatar */}
-    <img
-      src="https://randomuser.me/api/portraits/lego/1.jpg"
-      alt="profile"
-      className="w-9 h-9 rounded-full object-cover"
-    />
-
-    {/* Name + Email */}
-    <div className="flex-1 leading-tight">
-      <p className="text-sm font-semibold text-[#2E2A47]">
-        {user
-          ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
-          : "Guest"}
-      </p>
-
-      <p className="text-xs text-gray-400">
-        {user?.email ?? "—"}
-      </p>
-    </div>
-
-    {/* Chevron */}
-    <ChevronDown
-      size={18}
-      className={`text-gray-400 transition-transform duration-200 ${
-        open ? "rotate-180" : ""
-      }`}
-    />
+  <div className="flex items-center gap-1">
+    <button
+      type="button"
+      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1.5 pl-0 pr-1 text-left transition hover:bg-gray-50"
+      onClick={() => {
+        navigate('/profile');
+        setOpen(false);
+      }}
+    >
+      <img
+        src="https://randomuser.me/api/portraits/lego/1.jpg"
+        alt=""
+        className="h-9 w-9 shrink-0 rounded-full object-cover"
+      />
+      <div className="min-w-0 flex-1 leading-tight">
+        <p className="truncate text-sm font-semibold text-[#2E2A47]">
+          {user
+            ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
+            : 'Guest'}
+        </p>
+        <p className="truncate text-xs text-gray-400">{user?.email ?? '—'}</p>
+      </div>
+    </button>
+    <button
+      type="button"
+      className="shrink-0 rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+      aria-expanded={open}
+      aria-label="Account menu"
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpen((v) => !v);
+      }}
+    >
+      <ChevronDown
+        size={18}
+        className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+      />
+    </button>
   </div>
 
-  {/* Dropdown */}
   {open && (
-    <div className="absolute bottom-12 left-0 w-full bg-white shadow-lg rounded-xl py-2 border border-gray-100">
-      <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">
-        Edit Profile
+    <div className="absolute bottom-12 left-0 z-10 w-full rounded-xl border border-gray-100 bg-white py-2 shadow-lg">
+      <button
+        type="button"
+        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        onClick={() => {
+          navigate('/profile');
+          setOpen(false);
+        }}
+      >
+        My profile
       </button>
       <button
-        className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100"
-        onClick={handleLogout}
         type="button"
+        className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-gray-100"
+        onClick={handleLogout}
       >
         Logout
       </button>
