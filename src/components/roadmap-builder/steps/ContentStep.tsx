@@ -4,6 +4,10 @@ import {
   ROADMAP_STATUS,
   normalizeRoadmapStatus,
 } from "../../../types/roadmap";
+import {
+  hasDuplicatePhaseTitle,
+  isNonEmptyText,
+} from "../../../validators/roadmap/index";
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
 
 import PhaseCard from "../roadmap/PhaseCard";
@@ -45,10 +49,20 @@ export default function ContentStep() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
 
   const handleAddPhase = async () => {
-    if (!title.trim()) return;
+    if (!isNonEmptyText(title)) {
+      setTitleError("Phase title is required.");
+      return;
+    }
 
+    if (hasDuplicatePhaseTitle(phases, title)) {
+      setTitleError("A phase with this title already exists.");
+      return;
+    }
+
+    setTitleError(null);
     setSaving(true);
     await addPhase({
       title,
@@ -170,13 +184,19 @@ export default function ContentStep() {
 
                 <input
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (titleError) setTitleError(null);
+                  }}
                   className="
                     w-full h-12 rounded-2xl
                     bg-[#F3F5F9]
                     px-4 outline-none
                   "
                 />
+                {titleError && (
+                  <p className="mt-1 text-sm text-red-600 font-medium">{titleError}</p>
+                )}
               </div>
 
               {/* Summary */}

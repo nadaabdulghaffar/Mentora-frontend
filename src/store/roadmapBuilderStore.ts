@@ -23,6 +23,11 @@ import type {
 } from "../types/roadmap";
 import { MATERIAL_TYPE_MAP } from "../types/roadmap";
 
+import {
+  validateContentForSave,
+  validatePublishStructure,
+} from "../validators/roadmap/index";
+
 type Mode = "create" | "edit" | "view";
 
 interface BasicInfoState {
@@ -62,9 +67,11 @@ interface RoadmapBuilderState {
   error: string | null;
   isSaving: boolean;
   isPublishing: boolean;
+  isLoadingForEdit: boolean;
   isLoadingDomains: boolean;
   isLoadingSubDomains: boolean;
   isLoadingExperienceLevels: boolean;
+  isDirty: boolean;
   collapsedPhaseIds: string[];
   collapsedTopicIds: string[];
   startCreateSession: () => void;
@@ -82,6 +89,7 @@ interface RoadmapBuilderState {
   saveBasicInfo: () => Promise<boolean>;
   saveDraft: () => Promise<boolean>;
   publishRoadmap: () => Promise<boolean>;
+  setDirty: (isDirty: boolean) => void;
   addPhase: (payload: { title: string; summary: string; order: number; topics: LocalTopic[] }) => Promise<void>;
   updatePhase: (phaseLocalId: string, payload: { title: string; summary: string }) => Promise<void>;
   deletePhase: (phaseLocalId: string) => Promise<void>;
@@ -125,6 +133,9 @@ interface RoadmapBuilderState {
 
 const createLocalId = () => crypto.randomUUID();
 
+const normalizeAttachmentUrl = (value?: string | null) => value?.trim() ?? "";
+
+
 const defaultBasicInfo = (): BasicInfoState => ({
   title: "",
   description: "",
@@ -151,16 +162,19 @@ const defaultState = {
   error: null as string | null,
   isSaving: false,
   isPublishing: false,
+  isLoadingForEdit: false,
   isLoadingDomains: false,
   isLoadingSubDomains: false,
   isLoadingExperienceLevels: false,
   collapsedPhaseIds: [] as string[],
   collapsedTopicIds: [] as string[],
+  isDirty: false,
 };
 
 function mapMaterialType(value: unknown): MaterialType {
-  if (value === "video" || value === "pdf") return value;
-  return "article";
+  if (value === 2 || value === "video") return "video";
+  if (value === 3 || value === "pdf") return "pdf";
+  return "article"; // 1, "article", or unknown → article
 }
 
 function fromDetails(details: RoadmapDetailsDto): Pick<RoadmapBuilderState, "roadmapId" | "basicInfo" | "phases" | "mode" | "currentStep"> {
@@ -199,14 +213,25 @@ function fromDetails(details: RoadmapDetailsDto): Pick<RoadmapBuilderState, "roa
           url: material.url ?? "",
           materialType: mapMaterialType(material.materialType),
         })),
-        tasks: (topic.tasks ?? topic.topicTask ? [topic.topicTask ?? topic.tasks?.[0]].filter(Boolean) : []).map((task, taskIndex) => ({
-          _localId: `task-${task?.taskId ?? task?.id ?? topicIndex}-${taskIndex}`,
-          taskId: task?.taskId ?? task?.id,
-          title: task?.title ?? "",
-          description: task?.description ?? "",
-          deadline: task?.deadline ?? task?.deadLine ?? undefined,
-          attachmentUrl: task?.attachmentUrl ?? undefined,
-        })),
+        tasks: [
+          ...(topic.tasks ?? []),
+          ...(topic.topicTask ? [topic.topicTask] : []),
+        ]
+          .filter(
+            (task, index, self) =>
+              task != null &&
+              (task.taskId != null
+                ? self.findIndex((t) => t?.taskId === task.taskId) === index
+                : self.findIndex((t) => t?.id === task.id) === index)
+          )
+          .map((task, taskIndex) => ({
+            _localId: `task-${task?.taskId ?? task?.id ?? topicIndex}-${taskIndex}`,
+            taskId: task?.taskId ?? task?.id,
+            title: task?.title ?? "",
+            description: task?.description ?? "",
+            deadline: task?.deadline ?? task?.deadLine ?? undefined,
+            attachmentUrl: normalizeAttachmentUrl(task?.attachmentUrl),
+          })),
       })),
     })),
   };
@@ -217,10 +242,8 @@ function toSavePayload(state: RoadmapBuilderState) {
   title: state.basicInfo.title,
   description: state.basicInfo.description,
   duration: state.basicInfo.duration ?? 0,
-  // Backend validation may require numeric enum values (not null).
-  // Send 0 as a safe default when levels are not selected.
-  targetLevelFrom: state.basicInfo.targetLevelFrom ?? 0,
-  targetLevelTo: state.basicInfo.targetLevelTo ?? 0,
+  targetLevelFrom: state.basicInfo.targetLevelFrom ?? null,
+  targetLevelTo: state.basicInfo.targetLevelTo ?? null,
     technologyIds: [],
     phases: state.phases.map((phase) => ({
       phaseId: phase.phaseId,
@@ -239,15 +262,13 @@ function toSavePayload(state: RoadmapBuilderState) {
           // convert frontend material type to backend enum integer
           materialType: MATERIAL_TYPE_MAP[material.materialType],
         })),
-        topicTask: topic.tasks[0]
-          ? {
-              id: topic.tasks[0].taskId,
-              title: topic.tasks[0].title,
-              description: topic.tasks[0].description,
-              deadLine: topic.tasks[0].deadline ?? null,
-              attachmentUrl: topic.tasks[0].attachmentUrl ?? null,
-            }
-          : null,
+        tasks: topic.tasks.map((task) => ({
+          id: task.taskId,
+          title: task.title,
+          description: task.description,
+          deadLine: task.deadline ?? null,
+          attachmentUrl: normalizeAttachmentUrl(task.attachmentUrl),
+        })),
       })),
     })),
   };
@@ -307,27 +328,31 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
   },
 
   loadForEdit: async (roadmapId: number) => {
-    set({ isSaving: true, error: null });
+    set({ isLoadingForEdit: true, error: null });
     try {
       const details = await getRoadmapDetails(roadmapId);
-      set({ ...fromDetails(details), isSaving: false, collapsedPhaseIds: [], collapsedTopicIds: [] });
+      set({ ...fromDetails(details), collapsedPhaseIds: [], collapsedTopicIds: [] });
     } catch (error) {
-      set({ isSaving: false, error: error instanceof Error ? error.message : "Failed to load roadmap" });
+      set({ error: extractErrorMessage(error) });
+    } finally {
+      set({ isLoadingForEdit: false });
     }
   },
 
   loadForView: async (roadmapId: number) => {
-    set({ isSaving: true, error: null });
+    set({ isLoadingForEdit: true, error: null });
     try {
       const details = await getRoadmapDetails(roadmapId);
-      set({ ...fromDetails(details), mode: "view", currentStep: 2, isSaving: false, collapsedPhaseIds: [], collapsedTopicIds: [] });
+      set({ ...fromDetails(details), mode: "view", currentStep: 2, collapsedPhaseIds: [], collapsedTopicIds: [] });
     } catch (error) {
-      set({ isSaving: false, error: error instanceof Error ? error.message : "Failed to load roadmap" });
+      set({ error: extractErrorMessage(error) });
+    } finally {
+      set({ isLoadingForEdit: false });
     }
   },
 
   setBasicInfo: (patch) => {
-    set((state) => ({ basicInfo: { ...state.basicInfo, ...patch } }));
+    set((state) => ({ basicInfo: { ...state.basicInfo, ...patch }, isDirty: true }));
   },
 
   clearBasicInfoError: (key) => {
@@ -346,6 +371,8 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
 
   previousStep: () => set((state) => ({ currentStep: Math.max(1, state.currentStep - 1) })),
 
+  setDirty: (isDirty: boolean) => set({ isDirty }),
+
   saveBasicInfo: async () => {
     const state = get();
 
@@ -355,6 +382,19 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
     if (!state.basicInfo.skillDomainId) errors.skillDomainId = "Domain is required";
     if (!state.basicInfo.subDomainId) errors.subDomainId = "Sub-domain is required";
     if (!state.basicInfo.duration || state.basicInfo.duration <= 0) errors.duration = "Duration must be greater than 0";
+    if (state.basicInfo.targetLevelFrom == null) {
+      errors.targetLevelFrom = "Starting experience level is required";
+    }
+    if (state.basicInfo.targetLevelTo == null) {
+      errors.targetLevelTo = "Target experience level is required";
+    }
+    if (
+      state.basicInfo.targetLevelFrom != null &&
+      state.basicInfo.targetLevelTo != null &&
+      state.basicInfo.targetLevelFrom > state.basicInfo.targetLevelTo
+    ) {
+      errors.targetLevelTo = "Target level must be the same as or higher than the starting level.";
+    }
 
     if (Object.keys(errors).length > 0) {
       set({ basicInfoErrors: errors, error: "Please complete the required roadmap information." });
@@ -403,9 +443,16 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
       return false;
     }
 
+    const contentIssues = validateContentForSave(latest.phases);
+    if (contentIssues.length > 0) {
+      set({ error: contentIssues.join("\n") });
+      return false;
+    }
+
     set({ isSaving: true, error: null });
     try {
       await updateRoadmap(latest.roadmapId, toSavePayload(latest) as any);
+        set({ isDirty: false });
       return true;
     } catch (error) {
       set({ error: extractErrorMessage(error) });
@@ -416,6 +463,12 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
   },
 
   publishRoadmap: async () => {
+    const publishIssues = validatePublishStructure(get().phases);
+    if (publishIssues.length > 0) {
+      set({ error: publishIssues.join("\n") });
+      return false;
+    }
+
     const draftSaved = await get().saveDraft();
     if (!draftSaved) return false;
 
@@ -447,6 +500,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
           topics,
         },
       ],
+      isDirty: true,
     }));
   },
 
@@ -455,6 +509,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
       phases: state.phases.map((phase) =>
         phase._localId === phaseLocalId ? { ...phase, ...payload } : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -463,6 +518,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
       phases: state.phases.filter((phase) => phase._localId !== phaseLocalId),
       collapsedPhaseIds: state.collapsedPhaseIds.filter((id) => id !== phaseLocalId),
       collapsedTopicIds: state.collapsedTopicIds.filter((id) => !state.phases.find((phase) => phase._localId === phaseLocalId)?.topics.some((topic) => topic._localId === id)),
+      isDirty: true,
     }));
   },
 
@@ -486,6 +542,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -501,6 +558,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -512,6 +570,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
           : phase
       ),
       collapsedTopicIds: state.collapsedTopicIds.filter((id) => id !== topicLocalId),
+      isDirty: true,
     }));
   },
 
@@ -540,6 +599,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -562,6 +622,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -579,6 +640,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -596,10 +658,11 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
                         ...topic.tasks,
                         {
                           _localId: createLocalId(),
+                          taskId: undefined,
                           title: payload.title,
                           description: payload.description,
                           deadline: payload.deadline,
-                          attachmentUrl: payload.attachmentUrl,
+                          attachmentUrl: normalizeAttachmentUrl(payload.attachmentUrl),
                         },
                       ],
                     }
@@ -608,6 +671,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 
@@ -628,7 +692,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
                               title: payload.title,
                               description: payload.description,
                               deadline: payload.deadLine ?? undefined,
-                              attachmentUrl: payload.attachmentUrl,
+                              attachmentUrl: normalizeAttachmentUrl(payload.attachmentUrl),
                             }
                           : task
                       ),
@@ -638,6 +702,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
             }
           : phase
       ),
+      isDirty: true,
     }));
   },
 

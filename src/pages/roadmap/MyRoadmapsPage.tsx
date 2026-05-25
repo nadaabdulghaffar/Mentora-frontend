@@ -3,9 +3,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Layout from "../../shared/components/Layout";
-import ProgramCard from "../../components/ProgramCard";
+
+import RoadmapCard from "../../components/roadmap-builder/roadmap/RoadmapCard";
 
 import apiClient from "../../services/api";
+import {
+  deleteRoadmap,
+  extractErrorMessage,
+} from "../../services/roadmapService";
 
 import { useRoadmapBuilderStore } from "../../store/roadmapBuilderStore";
 
@@ -14,66 +19,89 @@ import type {
   RoadmapListItem,
 } from "../../types/roadmap";
 
+/** Matches `RoadmapExploreDto` JSON (camelCase). */
+interface ExploreRoadmapDto {
+  roadmapId: number;
+  title: string;
+  description: string;
+  skillDomainId: number;
+  subDomainId: number;
+  phasesCount: number;
+}
+
 export default function MyRoadmapPage() {
   const navigate = useNavigate();
 
-  const resetBuilderStore = () => {
-    useRoadmapBuilderStore
-      .getState()
-      .resetStore();
-  };
+  const resetStore = useRoadmapBuilderStore(
+    (s) => s.resetStore
+  );
 
   const [roadmaps, setRoadmaps] =
-    useState<RoadmapListItem[]>(
-      []
-    );
+    useState<RoadmapListItem[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [deletingId, setDeletingId] =
+    useState<number | null>(null);
+
+  const handleDelete = async (roadmapId: number) => {
+    if (!window.confirm("Delete this roadmap? This action cannot be undone.")) {
+      return;
+    }
+    setDeletingId(roadmapId);
+    try {
+      await deleteRoadmap(roadmapId);
+      setRoadmaps((prev) =>
+        prev.filter((r) => r.roadmapId !== roadmapId)
+      );
+    } catch (error) {
+      console.error(extractErrorMessage(error));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchRoadmaps =
       async () => {
         try {
-          setError(null);
           const response =
             await apiClient.get<
               ApiResponse<
-                RoadmapListItem[]
+                ExploreRoadmapDto[]
               >
             >(
-              "/Roadmap/View-my-roadmaps"
+              "/Explore/roadmaps"
             );
 
           const mappedRoadmaps =
-            Array.isArray(response.data.data)
-              ? response.data.data
-                  .filter(
-                    (item) =>
-                      Number.isFinite(Number(item.roadmapId)) &&
-                      Number(item.roadmapId) > 0
-                  )
-                  .map((item) => ({
-                    roadmapId: Number(item.roadmapId),
-                    title: String(item.title || "Roadmap"),
-                    description: String(item.description || ""),
-                    phasesCount: Number(item.phasesCount ?? 0),
-                    skillDomainId: Number(item.skillDomainId ?? 1),
-                    domainId:
-                      ((Math.max(1, Number(item.skillDomainId ?? 1)) - 1) % 4) + 1,
-                  }))
-              : [];
+            response.data.data
+              .filter(
+                (item) =>
+                  Number.isFinite(
+                    item.roadmapId
+                  ) &&
+                  item.roadmapId > 0
+              )
+              .map((item) => ({
+                roadmapId: item.roadmapId,
+
+                title: item.title,
+
+                description: item.description,
+
+                phasesCount: item.phasesCount,
+
+                skillDomainId: item.skillDomainId,
+
+                domainId:
+                  ((Math.max(1, item.skillDomainId) - 1) % 4) + 1,
+              }));
 
           setRoadmaps(
             mappedRoadmaps
           );
         } catch (error) {
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load your roadmaps."
-          );
           console.error(
             error
           );
@@ -129,7 +157,7 @@ export default function MyRoadmapPage() {
             0 && (
             <button
               onClick={() => {
-                resetBuilderStore();
+                resetStore();
                 navigate(
                   "/roadmap/create"
                 );
@@ -154,10 +182,6 @@ export default function MyRoadmapPage() {
         {loading ? (
           <div className="text-center py-20 text-[#667085]">
             Loading roadmaps...
-          </div>
-        ) : error ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
-            {error}
           </div>
         ) : roadmaps.length ===
           0 ? (
@@ -194,7 +218,7 @@ export default function MyRoadmapPage() {
 
             <button
               onClick={() => {
-                resetBuilderStore();
+                resetStore();
                 navigate(
                   "/roadmap/create"
                 );
@@ -220,7 +244,7 @@ export default function MyRoadmapPage() {
               grid
               grid-cols-1
               md:grid-cols-2
-              lg:grid-cols-3
+              xl:grid-cols-3
               gap-6
             "
           >
@@ -228,23 +252,12 @@ export default function MyRoadmapPage() {
               (
                 roadmap
               ) => (
-                <ProgramCard
-                  key={
-                    roadmap.roadmapId
-                  }
-                  variant="simple-button"
-                  tag="ROADMAP"
-                  phases={`${roadmap.phasesCount} PHASES`}
-                  title={roadmap.title}
-                  description={roadmap.description || ""}
-                  primaryButtonText="View Roadmap"
-                  onPrimaryClick={() =>
-                    navigate(
-                      `/roadmap/${roadmap.roadmapId}`
-                    )
-                  }
-                  className="h-full"
-                />
+                <RoadmapCard
+                key={roadmap.roadmapId}
+                roadmap={roadmap}
+                onDelete={() => handleDelete(roadmap.roadmapId)}
+                isDeleting={deletingId === roadmap.roadmapId}
+              />
               )
             )}
           </div>

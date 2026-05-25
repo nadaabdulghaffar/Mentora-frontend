@@ -1,39 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { useParams } from "react-router-dom";
 
+import { BarChart3, Clock4 } from "lucide-react";
+
 import Layout from "../../shared/components/Layout";
-import { MenteeRoadmap } from "../../components/classroom/roadmap/MenteeRoadmap";
+
+import PhaseCard from "../../components/roadmap-builder/roadmap/PhaseCard";
 
 import { useRoadmapBuilderStore } from "../../store/roadmapBuilderStore";
 
-type ClassroomTask = {
-  id: string;
-  title: string;
-  subtitle: string;
-  status: "completed" | "pending" | "overdue";
-};
-
-function toClassroomMaterialType(value?: string): "video" | "reading" | "template" {
-  if (value === "video") return "video";
-  if (value === "pdf") return "reading";
-  return "reading";
+function formatDurationWeeks(duration?: number) {
+  if (!duration || duration <= 0) return "—";
+  return `${duration} week${duration === 1 ? "" : "s"}`;
 }
 
 export default function RoadmapViewPage() {
   const { roadmapId } = useParams();
 
   const loadForView = useRoadmapBuilderStore((s) => s.loadForView);
+  const loadExperienceLevels = useRoadmapBuilderStore((s) => s.loadExperienceLevels);
+
   const isLoading = useRoadmapBuilderStore((s) => s.isSaving);
   const error = useRoadmapBuilderStore((s) => s.error);
 
   const basicInfo = useRoadmapBuilderStore((s) => s.basicInfo);
   const phases = useRoadmapBuilderStore((s) => s.phases);
+  const experienceLevels = useRoadmapBuilderStore((s) => s.experienceLevels);
 
-  const [expandedPhaseIds, setExpandedPhaseIds] = useState<string[]>([]);
-  const [expandedModuleIds, setExpandedModuleIds] = useState<string[]>([]);
-  const [checkedMaterialIds, setCheckedMaterialIds] = useState<string[]>([]);
-  const [checkedTaskIds, setCheckedTaskIds] = useState<string[]>([]);
+  const collapseAll = useRoadmapBuilderStore((s) => s.collapseAll);
+  const expandAll = useRoadmapBuilderStore((s) => s.expandAll);
 
   useEffect(() => {
     const id = roadmapId ? Number(roadmapId) : NaN;
@@ -42,101 +38,80 @@ export default function RoadmapViewPage() {
     }
   }, [loadForView, roadmapId]);
 
-  const classroomPhases = useMemo(() => {
-    return phases.map((phase, phaseIndex) => {
-      const modules = phase.topics.map((topic, topicIndex) => ({
-        id: `module-${phaseIndex + 1}-${topicIndex + 1}`,
-        title: topic.title || `Module ${topicIndex + 1}`,
-        subtitle: topic.summary || "",
-        materials: topic.materials.map((material, materialIndex) => ({
-          id: `material-${phaseIndex + 1}-${topicIndex + 1}-${materialIndex + 1}`,
-          title: material.title || "Material",
-          type: toClassroomMaterialType(material.materialType),
-          duration: "10 min",
-        })),
-        tasks: topic.tasks.map((task, taskIndex) => ({
-          id: `task-${phaseIndex + 1}-${topicIndex + 1}-${taskIndex + 1}`,
-          title: task.title || "Task",
-          subtitle: task.description || "Pending task",
-          status: "pending" as const,
-        })),
-      }));
-
-      const totalTasks = modules.reduce((sum, module) => sum + module.tasks.length, 0);
-
-      return {
-        id: `phase-${phaseIndex + 1}`,
-        title: `PHASE ${phaseIndex + 1}`,
-        subtitle: phase.title || `Phase ${phaseIndex + 1}`,
-        progressLabel: `${modules.length} modules • ${totalTasks} tasks`,
-        modules,
-      };
-    });
-  }, [phases]);
-
   useEffect(() => {
-    if (classroomPhases.length === 0) {
-      setExpandedPhaseIds([]);
-      setExpandedModuleIds([]);
-      return;
+    if (experienceLevels.length === 0) loadExperienceLevels();
+  }, [experienceLevels.length, loadExperienceLevels]);
+
+  const levelLabel = useMemo(() => {
+    const from = basicInfo.targetLevelFrom;
+    const to = basicInfo.targetLevelTo;
+
+    if (from == null && to == null) return "All levels";
+
+    const nameFor = (id?: number) =>
+      id == null
+        ? undefined
+        : experienceLevels.find((x) => x.id === id)?.name ?? `Level ${id}`;
+
+    const fromName = nameFor(from);
+    const toName = nameFor(to);
+
+    if (fromName && toName) {
+      return from === to ? fromName : `${fromName} → ${toName}`;
     }
-
-    if (expandedPhaseIds.length === 0) {
-      setExpandedPhaseIds([classroomPhases[0].id]);
-    }
-
-    if (expandedModuleIds.length === 0) {
-      const firstModuleId = classroomPhases[0].modules[0]?.id;
-      if (firstModuleId) setExpandedModuleIds([firstModuleId]);
-    }
-  }, [classroomPhases, expandedModuleIds.length, expandedPhaseIds.length]);
-
-  const togglePhase = (phaseId: string) => {
-    setExpandedPhaseIds((current) =>
-      current.includes(phaseId)
-        ? current.filter((id) => id !== phaseId)
-        : [...current, phaseId]
-    );
-  };
-
-  const toggleModule = (moduleId: string) => {
-    setExpandedModuleIds((current) =>
-      current.includes(moduleId)
-        ? current.filter((id) => id !== moduleId)
-        : [...current, moduleId]
-    );
-  };
-
-  const toggleMaterialCheck = (materialId: string) => {
-    setCheckedMaterialIds((current) =>
-      current.includes(materialId)
-        ? current.filter((id) => id !== materialId)
-        : [...current, materialId]
-    );
-  };
-
-  const toggleTaskCheck = (taskId: string) => {
-    setCheckedTaskIds((current) =>
-      current.includes(taskId)
-        ? current.filter((id) => id !== taskId)
-        : [...current, taskId]
-    );
-  };
-
-  const getTaskProgressPercent = (tasks: ClassroomTask[]) => {
-    if (tasks.length === 0) return 0;
-    const completedCount = tasks.filter(
-      (task) => task.status === "completed" || checkedTaskIds.includes(task.id)
-    ).length;
-    return Math.round((completedCount / tasks.length) * 100);
-  };
+    return fromName ?? toName ?? "All levels";
+  }, [basicInfo.targetLevelFrom, basicInfo.targetLevelTo, experienceLevels]);
 
   return (
     <Layout>
       <div className="max-w-[1050px] mx-auto px-4 space-y-6">
-        <div className="rounded-2xl border border-[#E7EBF0] bg-white p-5">
-          <h2 className="text-[24px] font-bold text-[#1F2432]">{basicInfo.title || "Roadmap"}</h2>
-          <p className="mt-2 text-[15px] text-[#6F7689]">{basicInfo.description || "Sharpen your skills through step-by-step challenges and expert tips."}</p>
+        {/* 1) BASIC INFO HEADER CARD */}
+        <div className="bg-white rounded-[24px] border border-[#ECEFF5] px-7 py-6">
+          <div className="flex items-start justify-between gap-6 flex-wrap">
+            <div className="min-w-0">
+              <h1 className="text-[32px] leading-[40px] font-bold text-[#1F2432]">
+                {basicInfo.title || "Roadmap"}
+              </h1>
+              <p className="mt-2 text-[16px] text-[#7B869C] leading-7">
+                {basicInfo.description || "—"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-7 shrink-0">
+              <div className="flex items-center gap-2 text-[#667085] text-sm font-semibold">
+                <BarChart3 size={16} className="text-primary" />
+                <span>Level: {levelLabel}</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-[#667085] text-sm font-semibold">
+                <Clock4 size={16} className="text-primary" />
+                <span>Duration: {formatDurationWeeks(basicInfo.duration)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2) COLLAPSE CONTROLS SECTION */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h2 className="text-[20px] font-bold text-[#1F2432]">
+            Roadmap Structure
+          </h2>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={expandAll}
+              className="text-primary text-sm font-semibold hover:opacity-80 transition"
+            >
+              Expand All
+            </button>
+            <span className="text-[#D0D5DD]">|</span>
+            <button
+              onClick={collapseAll}
+              className="text-primary text-sm font-semibold hover:opacity-80 transition"
+            >
+              Collapse All
+            </button>
+          </div>
         </div>
 
         {/* Loading / Error */}
@@ -148,20 +123,12 @@ export default function RoadmapViewPage() {
           <div className="text-sm text-red-600 font-medium">{error}</div>
         ) : null}
 
+        {/* 3) ROADMAP STRUCTURE SECTION */}
         {!isLoading && !error && (
           <div className="space-y-6">
-            <MenteeRoadmap
-              phases={classroomPhases}
-              expandedPhaseIds={expandedPhaseIds}
-              expandedModuleIds={expandedModuleIds}
-              checkedMaterialIds={checkedMaterialIds}
-              checkedTaskIds={checkedTaskIds}
-              onTogglePhase={togglePhase}
-              onToggleModule={toggleModule}
-              onToggleMaterial={toggleMaterialCheck}
-              onToggleTask={toggleTaskCheck}
-              getTaskProgressPercent={getTaskProgressPercent}
-            />
+            {phases.map((phase) => (
+              <PhaseCard key={phase._localId} phase={phase} />
+            ))}
           </div>
         )}
       </div>

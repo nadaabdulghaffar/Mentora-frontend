@@ -11,6 +11,11 @@ import { CommentThread } from './CommentThread';
 import type { CommunityThread, ThreadComment } from '../../pages/community/types';
 import { formatTimestamp } from '../../pages/community/utils/threadUtils';
 
+import {
+  getPostComments,
+} from "../../services/communityService";
+
+
 interface ThreadModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -78,7 +83,12 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
   currentUserRole = 'member',
 }) => {
   const [commentInput, setCommentInput] = useState('');
-  const [localComments, setLocalComments] = useState<ThreadComment[]>(thread.comments);
+
+const [localComments, setLocalComments] =
+  useState<ThreadComment[]>(
+    thread.comments || []
+  );
+
   const [shareOpen, setShareOpen] = useState(false);
 
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
@@ -101,10 +111,78 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
     return `${window.location.origin}${path}?thread=${thread.id}`;
   }, [thread.communityId, thread.id]);
 
-  // Keep list in sync when parent updates thread (edit/delete/reply from useThreads)
-  useEffect(() => {
-    setLocalComments(thread.comments);
-  }, [thread]);
+ 
+
+
+useEffect(() => {
+  const fetchComments =
+    async () => {
+      try {
+        const comments =
+          await getPostComments(
+            thread.id
+          );
+
+        const mappedComments =
+          comments.map(
+            (comment) => ({
+              id:
+                comment.communityCommentId,
+
+              authorId:
+                comment.authorId,
+
+              authorName:
+                comment.authorName,
+
+              authorAvatar:
+                comment.authorProfilePicture ||
+                "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
+
+              content:
+                comment.content,
+
+              timestamp:
+                comment.createdAt,
+
+              likes: 0,
+
+              isLiked:
+                false,
+
+              replies: [],
+
+              canEdit:
+                comment.authorId ===
+                currentUserId,
+
+              canDelete:
+                comment.authorId ===
+                currentUserId,
+            })
+          );
+
+        setLocalComments(
+          mappedComments
+        );
+      } catch (error) {
+        console.error(
+          "Failed to fetch comments",
+          error
+        );
+      }
+    };
+
+  if (isOpen) {
+    fetchComments();
+  }
+}, [
+  isOpen,
+  thread.id,
+  currentUserId,
+]);
+
+
 
   useEffect(() => {
     if (!isOpen) setShareOpen(false);
@@ -170,10 +248,66 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
       canEdit: true,
     };
 
-    setLocalComments((prev) => [newComment, ...prev]);
-    onCommentSubmit?.(trimmed);
-    setCommentInput('');
+  
+setLocalComments(
+  (prev) => [
+    newComment,
+    ...prev,
+  ]
+);
+
+
+onCommentSubmit?.(
+  trimmed
+);
+
+setCommentInput(
+  ''
+);
+};
+
+
+const handleLocalDelete =
+  (commentId: string) => {
+    setLocalComments(
+      (prev) =>
+        prev.filter(
+          (c) =>
+            c.id !==
+            commentId
+        )
+    );
+
+    onCommentDelete?.(
+      commentId
+    );
   };
+
+const handleLocalEdit =
+  (
+    commentId: string,
+    content: string
+  ) => {
+    setLocalComments(
+      (prev) =>
+        prev.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                content,
+              }
+            : c
+        )
+    );
+
+    onCommentEdit?.(
+      commentId,
+      content
+    );
+  };
+
+
+
 
   const handleCopyShareLink = async () => {
     if (!shareLink) return;
@@ -406,7 +540,7 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
         <div id="thread-comments">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900">
-              Comments ({localComments.length})
+Comments ({localComments.length})
             </h3>
           </div>
 
@@ -460,8 +594,8 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
                   comment={comment}
                   onLike={onCommentLike}
                   onReply={onCommentReply}
-                  onEdit={onCommentEdit}
-                  onDelete={onCommentDelete}
+                 onEdit={handleLocalEdit}
+onDelete={handleLocalDelete}
                   currentUserId={currentUserId}
                   variant="community"
                 />

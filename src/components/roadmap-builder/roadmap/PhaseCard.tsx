@@ -9,6 +9,10 @@ import {
 
 import type { LocalPhase } from "../../../types/roadmap";
 
+import {
+  hasDuplicatePhaseTitle,
+  hasDuplicateTopicTitleAcrossRoadmap,
+} from "../../../validators/roadmap/index";
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
 
 import TopicCard from "./TopicCard";
@@ -41,6 +45,7 @@ export default function PhaseCard({ phase }: Props) {
     (state) => state.togglePhaseCollapsed
   );
 
+  const phases = useRoadmapBuilderStore((state) => state.phases);
   const [editing, setEditing] = useState(false);
   const [showTopicForm, setShowTopicForm] = useState(false);
 
@@ -50,6 +55,8 @@ export default function PhaseCard({ phase }: Props) {
   const [topicSummary, setTopicSummary] = useState("");
   const [saving, setSaving] = useState(false);
   const [addingTopic, setAddingTopic] = useState(false);
+  const [phaseError, setPhaseError] = useState<string | null>(null);
+  const [topicError, setTopicError] = useState<string | null>(null);
 
   useEffect(() => {
     if (readonly) {
@@ -59,14 +66,38 @@ export default function PhaseCard({ phase }: Props) {
   }, [readonly]);
 
   const handleSave = async () => {
+    if (!title.trim()) {
+      setPhaseError("Phase title is required.");
+      return;
+    }
+
+    if (hasDuplicatePhaseTitle(phases, title, phase._localId)) {
+      setPhaseError("Phase title must be unique.");
+      return;
+    }
+
     setSaving(true);
     await updatePhase(phase._localId, { title, summary });
     setSaving(false);
     setEditing(false);
+    setPhaseError(null);
   };
 
   const handleAddTopic = async () => {
-    if (!topicTitle.trim()) return;
+    if (!topicTitle.trim()) {
+      setTopicError("Topic title is required.");
+      return;
+    }
+
+    if (
+      hasDuplicateTopicTitleAcrossRoadmap(phases, topicTitle, {
+        phaseLocalId: phase._localId,
+        topicLocalId: undefined,
+      })
+    ) {
+      setTopicError("Topic title must be unique within the roadmap.");
+      return;
+    }
 
     setAddingTopic(true);
     await addTopic(phase._localId, {
@@ -80,6 +111,7 @@ export default function PhaseCard({ phase }: Props) {
 
     setTopicTitle("");
     setTopicSummary("");
+    setTopicError(null);
     setShowTopicForm(false);
   };
 
@@ -92,13 +124,19 @@ export default function PhaseCard({ phase }: Props) {
             <div className="space-y-4">
               <input
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (phaseError) setPhaseError(null);
+                }}
                 className="
                   w-full h-12 rounded-2xl
                   bg-[#F3F5F9]
                   px-4 outline-none
                 "
               />
+              {phaseError && (
+                <p className="mt-1 text-sm text-red-600 font-medium">{phaseError}</p>
+              )}
 
               <textarea
                 rows={3}
@@ -226,13 +264,19 @@ export default function PhaseCard({ phase }: Props) {
                   <input
                     placeholder="Topic title"
                     value={topicTitle}
-                    onChange={(e) => setTopicTitle(e.target.value)}
+                    onChange={(e) => {
+                      setTopicTitle(e.target.value);
+                      if (topicError) setTopicError(null);
+                    }}
                     className="
                       w-full h-12 rounded-2xl
                       bg-[#F3F5F9]
                       px-4 outline-none
                     "
                   />
+                  {topicError && (
+                    <p className="mt-1 text-sm text-red-600 font-medium">{topicError}</p>
+                  )}
 
                   <textarea
                     rows={3}

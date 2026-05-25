@@ -169,9 +169,8 @@ export interface UpdateRoadmapPayload {
   title: string;
   description: string;
   duration: number;
-  /** Sent on every save; required by backend validation (non-null enum values). */
-  targetLevelFrom: number;
-  targetLevelTo: number;
+  targetLevelFrom?: number | null;
+  targetLevelTo?: number | null;
   technologyIds: number[];
   phases: UpdatePhasePayload[];
 }
@@ -190,7 +189,7 @@ export interface UpdateTopicPayload {
   summary: string;
   order: number;
   materials: UpdateMaterialPayload[];
-  topicTask: UpdateTaskPayload | null;
+  tasks: UpdateTaskPayload[];
 }
 
 export interface UpdateMaterialPayload {
@@ -353,7 +352,7 @@ export const createTask =
         {
           ...payload,
           id: topicId,
-          attachmentUrl: payload.attachmentUrl ?? "",
+          attachmentUrl: payload.attachmentUrl?.trim() ?? "",
         }
       );
     return unwrapRoadmapEnvelope(response.data);
@@ -368,7 +367,7 @@ export const updateTask =
       `/Roadmap/tasks/${taskId}`,
       {
         ...payload,
-        attachmentUrl: payload.attachmentUrl ?? "",
+        attachmentUrl: payload.attachmentUrl?.trim() ?? "",
       }
     );
   };
@@ -377,6 +376,13 @@ export const deleteTask =
   async (taskId: number): Promise<void> => {
     await apiClient.delete(
       `/Roadmap/tasks/${taskId}`
+    );
+  };
+
+export const deleteRoadmap =
+  async (roadmapId: number): Promise<void> => {
+    await apiClient.delete(
+      `/Roadmap/${roadmapId}`
     );
   };
 

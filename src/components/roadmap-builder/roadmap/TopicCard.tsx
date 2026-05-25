@@ -9,7 +9,7 @@ import {
 
 import type { LocalTopic } from "../../../types/roadmap";
 
-import { MAX_TASKS_PER_TOPIC } from "../../../validators/roadmap";
+import { hasDuplicateTopicTitleAcrossRoadmap } from "../../../validators/roadmap/index";
 
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
 
@@ -43,12 +43,11 @@ export default function TopicCard({ topic, phaseId }: Props) {
     (state) => state.toggleTopicCollapsed
   );
 
+  const phases = useRoadmapBuilderStore((state) => state.phases);
   const [editing, setEditing] = useState(false);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
 
-  const taskSlotFull =
-    topic.tasks.length >= MAX_TASKS_PER_TOPIC;
   const [title, setTitle] = useState(topic.title);
   const [summary, setSummary] = useState(topic.summary);
   const [saving, setSaving] = useState(false);
@@ -62,6 +61,19 @@ export default function TopicCard({ topic, phaseId }: Props) {
   }, [readonly]);
 
   const handleSaveTopic = async () => {
+    if (!title.trim()) {
+      return;
+    }
+
+    if (
+      hasDuplicateTopicTitleAcrossRoadmap(phases, title, {
+        phaseLocalId: phaseId,
+        topicLocalId: topic._localId,
+      })
+    ) {
+      return;
+    }
+
     setSaving(true);
     await updateTopic(phaseId, topic._localId, { title, summary });
     setSaving(false);
@@ -269,25 +281,16 @@ export default function TopicCard({ topic, phaseId }: Props) {
               {!readonly && (
                 <button
                   type="button"
-                  onClick={() =>
-                    !taskSlotFull && setShowTaskModal(true)
-                  }
-                  disabled={taskSlotFull}
-                  title={
-                    taskSlotFull
-                      ? "Each topic has one task. Add another topic for more activities."
-                      : "Add or manage task"
-                  }
+                  onClick={() => setShowTaskModal(true)}
+                  title="Add or manage tasks"
                   className="
                     flex items-center gap-2
                     text-sm font-semibold transition
                     text-primary hover:opacity-80
-                    disabled:opacity-40 disabled:cursor-not-allowed
-                    disabled:text-[#98A2B3]
                   "
                 >
                   <Plus size={16} />
-                  {taskSlotFull ? "Task added" : "Add Task"}
+                  Add Task
                 </button>
               )}
             </div>

@@ -18,6 +18,10 @@ import EditRoadmapPage from "./pages/roadmap/EditRoadmapPage";
 import RoadmapViewPage from "./pages/roadmap/RoadmapViewPage";
 import CommunityPage from "./pages/community/CommunityPage";
 import MentoAIPage from "./pages/MentoAIPage";
+
+import MyCommunitiesPage from "./pages/community/MyCommunitiesPage";
+
+
 import CommunitiesListPage from "./pages/community/CommunitiesListPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import SuggestedProgramsPage from "./pages/SuggestedProgramsPage";
@@ -208,6 +212,16 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+<Route
+  path="/my-communities"
+  element={
+    <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+      <MyCommunitiesPage />
+    </ProtectedRoute>
+  }
+/>
+
       {/* Dev-only route: preview community page without auth (remove before production) */}
       <Route path="/dev-community" element={<CommunityPage />} />
       <Route

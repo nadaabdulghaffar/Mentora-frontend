@@ -11,6 +11,7 @@ import {
 import ModalBase from "../shared/ModalBase";
 
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
+import { validateMaterialInput } from "../../../validators/roadmap/index";
 
 import type { MaterialType } from "../../../types/roadmap";
 
@@ -48,6 +49,7 @@ export default function AddMaterialModal({
   ]);
 
   const [saving, setSaving] = useState(false);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
 
   const handleChange = (
     rowId: string,
@@ -59,6 +61,14 @@ export default function AddMaterialModal({
         row.id === rowId ? { ...row, [key]: value } : row
       )
     );
+    // Clear error for this row when user edits any field
+    if (rowErrors[rowId]) {
+      setRowErrors((prev) => {
+        const next = { ...prev };
+        delete next[rowId];
+        return next;
+      });
+    }
   };
 
 
@@ -107,21 +117,33 @@ export default function AddMaterialModal({
   };
 
   const handleSave = async () => {
-    const validRows = rows.filter((row) => row.title.trim());
-    if (validRows.length === 0) return;
+    // Validate each row individually
+    const newErrors: Record<string, string> = {};
+    for (const row of rows) {
+      const err = validateMaterialInput({
+        title: row.title,
+        url: row.url,
+        materialType: row.materialType,
+      });
+      if (err) newErrors[row.id] = err;
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setRowErrors(newErrors);
+      return;
+    }
+    setRowErrors({});
 
     setSaving(true);
     await addMaterials(
       phaseId,
       topicId,
-      validRows.map((row) => ({
+      rows.map((row) => ({
         title: row.title,
         url: row.url,
         materialType: row.materialType,
       }))
     );
     setSaving(false);
-    /* Keep modal open if store rejected input */
     const hadError = !!useRoadmapBuilderStore.getState().error;
     if (!hadError) {
       setRows([
@@ -132,6 +154,7 @@ export default function AddMaterialModal({
           materialType: "article",
         },
       ]);
+      setRowErrors({});
       onClose();
     }
   };
@@ -241,6 +264,9 @@ export default function AddMaterialModal({
                     px-4 outline-none
                   "
                 />
+                {rowErrors[row.id] && (
+                  <p className="mt-1 text-sm text-red-600 font-medium">{rowErrors[row.id]}</p>
+                )}
               </div>
             </div>
 

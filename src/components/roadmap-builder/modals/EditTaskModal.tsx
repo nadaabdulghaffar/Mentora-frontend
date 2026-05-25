@@ -10,6 +10,7 @@ import ModalBase from "../shared/ModalBase";
 import type { LocalTask } from "../../../types/roadmap";
 
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
+import { validateTaskInput } from "../../../validators/roadmap/index";
 
 interface Props {
   open: boolean;
@@ -35,45 +36,44 @@ export default function EditTaskModal({
   const [deadline, setDeadline] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [taskErrors, setTaskErrors] = useState<Partial<{ title: string; description: string; deadline: string; attachmentUrl: string }>>({});
 
   useEffect(() => {
     if (!task) return;
     setTitle(task.title);
     setDescription(task.description || "");
     setDeadline(task.deadline || "");
-    setAttachmentUrl(task.attachmentUrl || "");
+    setAttachmentUrl(task.attachmentUrl ?? "");
   }, [task]);
 
  const handleSave = async () => {
   if (!task) return;
 
-  console.log({
-    title,
-    description,
-    deadline,
-    attachmentUrl,
-  });
+   const errors = validateTaskInput({ title, description, deadline: deadline || undefined, attachmentUrl: attachmentUrl.trim() });
+   if (errors) {
+     setTaskErrors(errors);
+     return;
+   }
 
-  setSaving(true);
-  
-await updateTask(
-  phaseId,
-  topicId,
-  task._localId,
-  {
-    title,
-    description: description || "",
-    deadLine: deadline || null,
-    attachmentUrl: attachmentUrl.trim() || "",
-  }
-);
+   setTaskErrors({});
+   setSaving(true);
+   const trimmedUrl = attachmentUrl.trim();
+   await updateTask(
+     phaseId,
+     topicId,
+     task._localId,
+     {
+       title,
+       description: description || "",
+       deadLine: deadline || null,
+       attachmentUrl: trimmedUrl,
+     }
+   );
 
-  setSaving(false);
+   setSaving(false);
 
-  const hadError =
-    !!useRoadmapBuilderStore.getState().error;
-
-  if (!hadError) onClose();
+   const hadError = !!useRoadmapBuilderStore.getState().error;
+   if (!hadError) onClose();
 };
 
   return (
@@ -99,7 +99,10 @@ await updateTask(
 
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (taskErrors.title) setTaskErrors((p) => ({ ...p, title: undefined }));
+            }}
             className="
               w-full h-12 rounded-2xl
               bg-[#F3F5F9]
@@ -124,7 +127,10 @@ await updateTask(
           <textarea
             rows={5}
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              if (taskErrors.description) setTaskErrors((p) => ({ ...p, description: undefined }));
+            }}
             className="
               w-full rounded-2xl
               bg-[#F3F5F9]
@@ -146,98 +152,58 @@ await updateTask(
             "
           >
             <CalendarDays size={15} />
-            DEADLINE
+            DEADLINE (OPTIONAL)
           </label>
 
           <input
             type="date"
             value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
+            onChange={(e) => {
+              setDeadline(e.target.value);
+              if (taskErrors.deadline) setTaskErrors((p) => ({ ...p, deadline: undefined }));
+            }}
             className="
               w-full h-12 rounded-2xl
               bg-[#F3F5F9]
               px-4 outline-none
             "
           />
+          {taskErrors.deadline && (
+            <p className="mt-1 text-sm text-red-600 font-medium">{taskErrors.deadline}</p>
+          )}
         </div>
 
-       <div>
-  <label
-    className="
-      block text-xs font-bold
-      tracking-wide
-      text-[#475467]
-      mb-2
-    "
-  >
-    ATTACHMENT (OPTIONAL)
-  </label>
+        {/* attachment URL */}
+        <div>
+          <label
+            className="
+              block text-xs font-bold
+              tracking-wide
+              text-[#475467]
+              mb-2
+            "
+          >
+            ATTACHMENT URL
+          </label>
 
-  {!attachmentUrl ? (
-    <label
-      className="
-        flex items-center justify-center
-        w-full h-[120px]
-        rounded-2xl
-        border-2 border-dashed
-        border-primary/20
-        bg-[#F9FAFB]
-        cursor-pointer
-        hover:bg-primary/5
-        transition
-      "
-    >
-      <div className="text-center">
-        <p className="font-semibold text-primary">
-          Upload File
-        </p>
-
-        <p className="text-sm text-[#667085] mt-1">
-          PDF, DOC, ZIP...
-        </p>
-      </div>
-
-      <input
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-
-          if (!file) return;
-
-          setAttachmentUrl(file.name);
-        }}
-      />
-    </label>
-  ) : (
-    <div
-      className="
-        flex items-center justify-between
-        p-4 rounded-2xl
-        bg-[#F3F5F9]
-        border border-[#E4E7EC]
-      "
-    >
-      <p className="font-medium text-[#344054]">
-        {attachmentUrl}
-      </p>
-
-      <button
-        type="button"
-        onClick={() => setAttachmentUrl("")}
-        className="
-          w-8 h-8 rounded-full
-          bg-[#FDECEC]
-          text-red-500
-          flex items-center justify-center
-          hover:opacity-80
-        "
-      >
-        ✕
-      </button>
-    </div>
-  )}
-</div>
+          <input
+            type="url"
+            placeholder="https://example.com/resource"
+            value={attachmentUrl}
+            onChange={(e) => {
+              setAttachmentUrl(e.target.value);
+              if (taskErrors.attachmentUrl) setTaskErrors((p) => ({ ...p, attachmentUrl: undefined }));
+            }}
+            className="
+              w-full h-12 rounded-2xl
+              bg-[#F3F5F9]
+              px-4 outline-none
+            "
+          />
+          {taskErrors.attachmentUrl && (
+            <p className="mt-1 text-sm text-red-600 font-medium">{taskErrors.attachmentUrl}</p>
+          )}
+        </div>
 
         {/* footer */}
         <div className="flex justify-end gap-4 pt-2">

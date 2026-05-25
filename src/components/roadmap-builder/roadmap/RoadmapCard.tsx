@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   MoreVertical,
   Layers3,
+  Trash2,
 } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
@@ -13,10 +14,14 @@ import { ROADMAP_DOMAIN_META } from "../../../constants/roadmapDomains";
 
 interface Props {
   roadmap: RoadmapListItem;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 export default function RoadmapCard({
   roadmap,
+  onDelete,
+  isDeleting = false,
 }: Props) {
   const navigate = useNavigate();
 
@@ -133,16 +138,31 @@ export default function RoadmapCard({
               </button>
 
               <button
+                onClick={() => {
+                  setOpenMenu(false);
+                  onDelete?.();
+                }}
+                disabled={isDeleting}
                 className="
                   w-full h-11
                   rounded-xl
                   text-left px-4
+                  flex items-center gap-2
                   text-red-500
                   hover:bg-red-50
                   transition
+                  disabled:opacity-50 disabled:cursor-not-allowed
                 "
               >
-                Unpublish 
+                {isDeleting ? (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <Trash2 size={15} />
+                )}
+                {isDeleting ? "Deleting…" : "Delete Roadmap"}
               </button>
             </div>
           )}

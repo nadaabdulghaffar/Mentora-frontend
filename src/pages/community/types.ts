@@ -42,6 +42,12 @@ export interface Community {
   isPublic: boolean;
   createdDate: string;
   isJoined?: boolean;
+
+currentUserRole?: string;
+
+canManage?: boolean;
+
+
 }
 
 export interface CommunitySettings {
@@ -157,4 +163,38 @@ export interface CommunityFeedResponse {
 export interface ThreadDetailResponse {
   thread: CommunityThread;
   relatedThreads?: CommunityThread[];
+}
+
+
+
+export interface CreateCommunityPayload {
+  name: string;
+  description: string;
+  coverImageUrl?: string;
+  domainId: number;
+}
+
+export interface CommunityResponse {
+  communityId: string;
+
+  name: string;
+  description: string;
+
+  coverImageUrl?: string;
+
+  domainId: number;
+
+  membersCount: number;
+  postsCount: number;
+
+  createdAt: string;
+
+  createdByUserName: string;
+  createdByUserProfilePicture?: string;
+
+  isMember: boolean;
+
+  currentUserRole: string;
+
+  canManage: boolean;
 }

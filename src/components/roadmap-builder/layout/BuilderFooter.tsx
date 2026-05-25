@@ -44,6 +44,10 @@ export default function BuilderFooter() {
     (state) => state.isPublishing
   );
 
+  const isDirty = useRoadmapBuilderStore(
+    (state) => state.isDirty
+  );
+
   const error = useRoadmapBuilderStore(
     (state) => state.error
   );
@@ -155,22 +159,28 @@ export default function BuilderFooter() {
             {/* RIGHT SIDE */}
             <div className="flex items-center gap-3">
               {/* Cancel */}
-              <button
-                id="builder-edit-cancel"
-                onClick={handleCancelEdit}
-                disabled={anyBusy}
-                className="
-                  h-11 px-6 rounded-2xl
-                  border border-[#D0D5DD]
-                  text-[#475467]
-                  text-sm font-semibold
-                  hover:bg-[#F2F4F7]
-                  transition
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                "
-              >
-                Cancel
-              </button>
+            <button
+              id="builder-edit-cancel"
+              onClick={() => {
+                if (isDirty) {
+                  const ok = window.confirm('You have unsaved changes. Cancel and discard them?');
+                  if (!ok) return;
+                }
+                handleCancelEdit();
+              }}
+              disabled={anyBusy}
+              className="
+                h-11 px-6 rounded-2xl
+                border border-[#D0D5DD]
+                text-[#475467]
+                text-sm font-semibold
+                hover:bg-[#F2F4F7]
+                transition
+                disabled:opacity-50 disabled:cursor-not-allowed
+              "
+            >
+              Cancel
+            </button>
 
               {/* Save Changes */}
               <button

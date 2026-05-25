@@ -290,11 +290,7 @@ export const useThreads = ({ initialThreads }: UseThreadsOptions) => {
     selectedThread,
 
     // Thread operations
-    addThread,
-    updateThread,
-    deleteThread,
-    getThreadById,
-    setSelectedThread,
+    addThread, updateThread, deleteThread, setThreads, getThreadById, setSelectedThread,
 
     // Like operations
     toggleThreadLike,

@@ -606,16 +606,22 @@ const Feed: React.FC<FeedPostProps> = ({
     setPostMenuCoords(null);
   }, []);
 
-  const showPostEdit =
-    variant === 'classroom' &&
-    authorId === currentUserId &&
-    Boolean(onRequestPostEdit || onPostUpdate) &&
-    canEdit !== false;
-  const showPostDelete =
-    variant === 'classroom' &&
-    authorId === currentUserId &&
-    Boolean(onPostDelete) &&
-    canDelete !== false;
+
+const showPostEdit =
+  authorId === currentUserId &&
+  Boolean(
+    onRequestPostEdit ||
+      onPostUpdate
+  ) &&
+  canEdit !== false;
+
+const showPostDelete =
+  authorId === currentUserId &&
+  Boolean(
+    onPostDelete
+  ) &&
+  canDelete !== false;
+
   const showPostOwnerMenu = (showPostEdit || showPostDelete) && !isEditingPost;
 
   useEffect(() => {
@@ -699,9 +705,10 @@ const Feed: React.FC<FeedPostProps> = ({
     onPostDelete?.(id);
   };
 
-  const postOwnerMenuPortal =
-    variant === 'classroom' &&
-    postMenuOpen &&
+  
+const postOwnerMenuPortal =
+  postMenuOpen &&
+
     postMenuCoords &&
     typeof document !== 'undefined' &&
     createPortal(
@@ -822,7 +829,9 @@ const Feed: React.FC<FeedPostProps> = ({
         )}
       </div>
 
-      {variant === 'classroom' && isEditingPost && onPostUpdate && !onRequestPostEdit ? (
+  
+{isEditingPost
+ && onPostUpdate && !onRequestPostEdit ? (
         <div className="mb-3 space-y-2">
           <textarea
             value={editPostContent}

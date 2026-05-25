@@ -1,9 +1,15 @@
+
 import { useForm } from "react-hook-form";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
+
 import BaseModal from "../modals/BaseModal";
 import CommunityFormFields from "./CommunityFormFields";
-import { createCommunity, extractErrorMessage } from "../../services/communityService";
+
+import {
+  createCommunity,
+  extractErrorMessage,
+} from "../../services/communityService";
 
 type Props = {
   isOpen: boolean;
@@ -14,7 +20,7 @@ type CommunityFormData = {
   domainId: string;
   name: string;
   description: string;
-  image: File | null;
+  coverImageUrl: string;
 };
 
 export default function CreateCommunityModal({
@@ -32,12 +38,15 @@ export default function CreateCommunityModal({
       domainId: "",
       name: "",
       description: "",
-      image: null,
+      coverImageUrl: "",
     },
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
+
+  const [submitError, setSubmitError] =
+    useState<string | null>(null);
 
   const values = watch();
 
@@ -46,64 +55,59 @@ export default function CreateCommunityModal({
   ========================= */
 
   const hasChanges =
-    values.domainId
-      ?.trim()
-      .length > 0 ||
-    values.name
-      ?.trim()
-      .length > 0 ||
-    values.description
-      ?.trim()
-      .length > 0 ||
-    values.image !==
-      null;
+    values.domainId?.trim().length > 0 ||
+    values.name?.trim().length > 0 ||
+    values.description?.trim().length > 0 ||
+    values.coverImageUrl?.trim().length > 0;
 
   /* =========================
      SUBMIT
   ========================= */
 
-  const submitHandler = (
+  const submitHandler = async (
     data: CommunityFormData
   ) => {
     setSubmitError(null);
+
     setIsSubmitting(true);
 
-    (async () => {
-      try {
-        // convert domainId to a safe value
-        const payload = {
-          ...data,
-          domainId: data.domainId || "",
-        };
+    try {
+      const payload = {
+        ...data,
+        domainId: Number(data.domainId),
+      };
 
-        await createCommunity(payload as any);
+      await createCommunity(payload);
 
-        reset();
-        onClose();
-      } catch (err) {
-        if (axios.isAxiosError(err)) {
-          setSubmitError(extractErrorMessage(err));
-        } else if (err instanceof Error) {
-          setSubmitError(err.message);
-        } else {
-          setSubmitError("Something went wrong");
-        }
-      } finally {
-        setIsSubmitting(false);
+      reset();
+
+      onClose();
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setSubmitError(
+          extractErrorMessage(err)
+        );
+      } else if (err instanceof Error) {
+        setSubmitError(err.message);
+      } else {
+        setSubmitError(
+          "Something went wrong"
+        );
       }
-    })();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /* =========================
      DISCARD
   ========================= */
 
-  const handleDiscard =
-    () => {
-      reset();
+  const handleDiscard = () => {
+    reset();
 
-      onClose();
-    };
+    onClose();
+  };
 
   /* =========================
      FOOTER
@@ -125,7 +129,9 @@ export default function CreateCommunityModal({
         disabled={isSubmitting}
         className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
       >
-        {isSubmitting ? "Creating…" : "Create Community"}
+        {isSubmitting
+          ? "Creating…"
+          : "Create Community"}
       </button>
     </div>
   );
@@ -134,22 +140,22 @@ export default function CreateCommunityModal({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      onDiscard={
-        handleDiscard
-      }
+      onDiscard={handleDiscard}
       title="Create Community"
       subtitle="Build a focused space where members connect and grow together."
       width="lg:max-w-5xl"
-      hasChanges={
-        hasChanges
-      }
+      hasChanges={hasChanges}
       footer={footer}
     >
       {submitError && (
-        <p className="text-sm text-red-600 mb-4 whitespace-pre-wrap" role="alert">
+        <p
+          className="text-sm text-red-600 mb-4 whitespace-pre-wrap"
+          role="alert"
+        >
           {submitError}
         </p>
       )}
+
       <CommunityFormFields
         register={register}
         values={values}
@@ -158,3 +164,4 @@ export default function CreateCommunityModal({
     </BaseModal>
   );
 }
+

@@ -25,9 +25,20 @@ export type RoadmapStatus =
   (typeof ROADMAP_STATUS)[keyof typeof ROADMAP_STATUS];
 
 export function normalizeRoadmapStatus(
-  status?: string | null
+  status?: string | number | null
 ): RoadmapStatus {
-  const normalized = status?.trim().toLowerCase();
+  let normalized: string | undefined;
+
+  if (typeof status === "string") {
+    normalized = status.trim().toLowerCase();
+  } else if (typeof status === "number") {
+    // Common backend numeric mapping: 1 -> draft, 2 -> published, 3 -> archived
+    if (status === 2) normalized = "published";
+    else if (status === 3) normalized = "archived";
+    else normalized = "draft";
+  } else {
+    normalized = undefined;
+  }
 
   if (!normalized) {
     return ROADMAP_STATUS.Draft;
@@ -180,7 +191,7 @@ export interface LocalTask {
   title: string;
   description: string;
   deadline?: string;
-  attachmentUrl?: string;
+  attachmentUrl: string;
 }
 
 export interface LocalTopic {

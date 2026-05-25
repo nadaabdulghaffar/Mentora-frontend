@@ -27,23 +27,42 @@ interface PostCardProps {
   isCompact?: boolean;
 }
 
+
+
 function threadOwnerCanEdit(
   uid: string | undefined,
   t: CommunityThread,
   hasHandler: boolean
 ): boolean {
-  if (!uid || t.authorId !== uid || !hasHandler) return false;
+  if (
+    !uid ||
+    t.authorId !== uid ||
+    !hasHandler
+  )
+    return false;
+
   return t.canEdit !== false;
 }
+
+
+
+
 
 function threadOwnerCanDelete(
   uid: string | undefined,
   t: CommunityThread,
   hasHandler: boolean
 ): boolean {
-  if (!uid || t.authorId !== uid || !hasHandler) return false;
+  if (
+    !uid ||
+    t.authorId !== uid ||
+    !hasHandler
+  )
+    return false;
+
   return t.canDelete !== false;
 }
+
 
 /**
  * PostCard - Displays a single post/thread in a card format
