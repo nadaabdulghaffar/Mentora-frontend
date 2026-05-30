@@ -28,6 +28,7 @@ import {
   type CreateProgramApiInput,
   type CreateProgramApiResponse,
   updateProgram,
+  uploadProgramImage,
 } from "../../services/programService";
 
 type Props = {
@@ -188,6 +189,15 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
 
     const safeRoadmapId = resolveRoadmapIdForSubmit(data.roadmapId, data.subDomainId, roadmapAllowList);
 
+    let uploadedImageUrl: string | undefined;
+
+if (data.image) {
+  const uploadRes = await uploadProgramImage(data.image);
+
+  uploadedImageUrl =
+    uploadRes?.data?.fileUrl;
+}
+
     const input: CreateProgramApiInput = {
       title: data.title,
       description: data.description,
@@ -202,6 +212,12 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
       roadmapId: safeRoadmapId,
       questions: apiQuestions,
       status: kind === "publish" ? PROGRAM_POST_STATUS.PUBLISHED : PROGRAM_POST_STATUS.DRAFT,
+      programImageUrl: uploadedImageUrl,
+      deadline: data.deadline
+  ? new Date(data.deadline).toISOString()
+  : null,
+
+      
     };
 
     setIsSubmitting(true);
@@ -328,6 +344,9 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
   return (
     <Formik
       enableReinitialize
+      validateOnChange={false}
+  validateOnBlur={false}
+
       initialValues={mergedInitialValues}
       validate={async (values) => {
         try {
@@ -362,8 +381,8 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
           values.educationLevel > 0 ||
           values.targetLevel > 0 ||
           values.capacity > 1 ||
-          values.duration?.trim().length > 0 ||
-          values.availability?.trim().length > 0 ||
+          (values.duration?.trim()?.length ?? 0) > 0 ||
+          (values.availability?.trim()?.length ?? 0) > 0 ||
           (values.technologies && values.technologies.length > 0) ||
           values.questions?.length > 0 ||
           !!values.image ||

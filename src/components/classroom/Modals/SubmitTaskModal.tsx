@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect
+ } from 'react';
 import { X } from 'lucide-react';
+
 
 export interface SubmissionLink {
   id: string;
@@ -9,9 +11,19 @@ export interface SubmissionLink {
 
 interface SubmitTaskModalProps {
   isOpen: boolean;
+
   onClose: () => void;
-  onSubmit: (links: SubmissionLink[], notes: string) => void;
+
+  onSubmit: (
+    links: SubmissionLink[],
+    notes: string
+  ) => void;
+
   taskTitle?: string;
+
+  initialLinks?: SubmissionLink[];
+
+  initialNotes?: string;
 }
 
 const SubmitTaskModal: React.FC<SubmitTaskModalProps> = ({
@@ -19,11 +31,45 @@ const SubmitTaskModal: React.FC<SubmitTaskModalProps> = ({
   onClose,
   onSubmit,
   taskTitle = 'Task',
+  initialLinks = [],
+  initialNotes = '',
 }) => {
   const [submissionLinks, setSubmissionLinks] = useState<SubmissionLink[]>([
     { id: '1', title: '', url: '' },
   ]);
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+
+  if (!isOpen) {
+    return;
+  }
+
+  if (
+    initialLinks.length > 0
+  ) {
+
+    setSubmissionLinks(
+      initialLinks
+    );
+
+  }
+
+  if (
+    initialNotes
+  ) {
+
+    setNotes(
+      initialNotes
+    );
+
+  }
+
+}, [
+  isOpen,
+  initialLinks,
+  initialNotes,
+]);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const handleAddLink = () => {

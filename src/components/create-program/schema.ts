@@ -150,13 +150,13 @@ export const createProgramSchema = z
 
     availability:
       z.string().optional(),
-
-    technologies: z
-      .array(
-        technologyRequirementSchema
-      )
-      .default([]),
-
+      
+technologies: z
+  .array(technologyRequirementSchema)
+  .min(
+    1,
+    "Please select at least one technology"
+  ),
     /** Optional roadmap */
     roadmapId: z
       .union([
@@ -177,10 +177,24 @@ export const createProgramSchema = z
       )
       .optional(),
 
-    /** Optional; stored locally only until backend supports it. */
-    deadline: z
-      .string()
-      .optional(),
+deadline: z
+  .string()
+  .min(1, "Please select an application deadline")
+  .refine(
+    (value) => {
+      const selectedDate = new Date(value);
+      const today = new Date();
+
+      today.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+
+      return selectedDate > today;
+    },
+    {
+      message:
+        "Please choose a future application deadline",
+    }
+  ),
 
     questions: z
       .array(

@@ -1,5 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useParams } from "react-router-dom";
 import authAPI from '../../services/authService';
+import { classroomService } from '../../services/classroomService';
 import Layout from '../../shared/components/Layout';
 import ClassroomTabsNav from '../../components/classroom/ClassroomTabsNav';
 import ClassroomOverviewSection from '../../components/classroom/ClassroomOverviewSection';
@@ -9,6 +11,25 @@ import ClassroomMentorTasksSection from '../../components/classroom/ClassroomMen
 import ClassroomStudentsSection from '../../components/classroom/ClassroomStudentsSection';
 import TaskBadge from '../../components/classroom/TaskBadge.tsx';
 import type { FeedPostProps } from '../../components/Feed';
+import MentorNewSessionModal from '../../components/classroom/Modals/MentorNewSessionModal';
+import SessionDetailsModal from '../../components/classroom/Modals/SessionDetailsModal';
+
+import type {
+  SubmissionLink
+} from "../../components/classroom/Modals/SubmitTaskModal";
+
+import { getProgramView  }
+from "../../services/programService";
+import { taskSubmissionService }
+from "../../services/taskSubmissionService";
+import { useRoadmapBuilderStore }
+from "../../store/roadmapBuilderStore";
+
+import { mentorTaskService }
+from "../../services/mentorTaskService";
+
+
+
 import {
   useTasksState,
   useMentorTasksState,
@@ -34,7 +55,22 @@ import {
   type MentorSubmissionSummary,
   type MentorSubmissionReview,
   type MentorNewTaskResourceRow,
+  type FeedbackView,
 } from '../../components/classroom/Modals';
+import type { BackendSubmissionResponse } from '../../components/classroom/types.ts';
+
+
+const mapSession = (session: any) => ({
+  id: String(session.sessionId),
+  title: session.title,
+  dateLabel: `${session.dateDisplay} • ${session.timeDisplay}`,
+  duration: "60 min",
+  live: session.isJoinable,
+  meetingLink: session.meetingLink,
+  scheduledAt: session.scheduledAt,
+});
+
+
 
 type MentorTaskPhaseView = {
   id: string;
@@ -63,70 +99,37 @@ type MentorRegistryRow = {
   statusLabel: string;
 };
 
-const mentorSubmissionData: Record<string, MentorSubmissionReview[]> = {
-  'mentor-task-1': [
-    {
-      id: 'mentor-sub-1',
-      studentName: 'Sarah Jenkins',
-      studentAvatar: 'https://randomuser.me/api/portraits/women/68.jpg',
-      submittedAt: 'Oct 24, 2023 at 2:45 PM',
-      submittedAtLabel: 'Submitted Oct 24, 2023 at 2:45 PM',
-      fileCount: 2,
-      reviewStatus: 'reviewed',
-      taskTitle: 'Typography Systems',
-      attachments: [
-        { id: 'a1', name: 'Typography_Final.pdf', type: 'pdf', sizeLabel: '2.4 MB' },
-        { id: 'a2', name: 'Design_Process.docx', type: 'doc', sizeLabel: '1.1 MB' },
-      ],
-      grade: 70,
-      feedback:
-        'Your exploration of vertical rhythm and scale contrast shows a deep understanding of hierarchy. For your next iteration, tighten the tracking on larger headlines to create more visual impact.',
-      summary: 'Great work overall.',
-    },
-    {
-      id: 'mentor-sub-2',
-      studentName: 'Mina Ali',
-      studentAvatar: 'https://randomuser.me/api/portraits/women/12.jpg',
-      submittedAt: 'Oct 23, 2023 at 11:10 AM',
-      submittedAtLabel: 'Submitted Oct 23, 2023 at 11:10 AM',
-      fileCount: 1,
-      reviewStatus: 'pending',
-      taskTitle: 'Typography Systems',
-      attachments: [
-        { id: 'a3', name: 'Typography_Mockup.pdf', type: 'pdf', sizeLabel: '3.1 MB' },
-      ],
-      grade: 82,
-      feedback: 'Good direction. The structure is clean, but the display hierarchy needs a stronger contrast range.',
-      summary: 'Solid draft.',
-    },
-  ],
-  'mentor-task-2': [
-    {
-      id: 'mentor-sub-3',
-      studentName: 'Ahmed Omar',
-      studentAvatar: 'https://randomuser.me/api/portraits/men/21.jpg',
-      submittedAt: 'Oct 22, 2023 at 6:20 PM',
-      submittedAtLabel: 'Submitted Oct 22, 2023 at 6:20 PM',
-      fileCount: 1,
-      reviewStatus: 'pending',
-      taskTitle: 'User Journey Mapping',
-      attachments: [
-        { id: 'a4', name: 'Journey_Map.pdf', type: 'pdf', sizeLabel: '2.9 MB' },
-      ],
-      grade: 76,
-      feedback: 'Your journey map captures the pain points well. Add more detail to the post-onboarding step.',
-      summary: 'Good structure.',
-    },
-  ],
-};
+
 
 type MenteeTasksSectionProps = {
   taskItems: ClassroomTask[];
-  onSubmitTask: (taskId: string) => void;
-  onViewSubmission: (taskId: string) => void;
-  onViewFeedback: (taskId: string) => void;
-  onViewTaskDetails: (taskId: string) => void;
+
+  onSubmitTask: (
+    taskId: string
+  ) => void;
+
+  onViewSubmission: (
+    taskId: string
+  ) => void;
+
+  onViewFeedback: (
+    taskId: string
+  ) => void;
+
+  onViewTaskDetails: (
+    taskId: string
+  ) => void;
+
+  onViewRevisionFeedback: (
+    task: ClassroomTask
+  ) => void;
+
+  onResubmitTask: (
+    taskId: string
+  ) => void;
+
   title: string;
+
   subtitle: string;
 };
 
@@ -136,6 +139,8 @@ const MenteeTasksSection = ({
   onViewSubmission,
   onViewFeedback,
   onViewTaskDetails,
+  onViewRevisionFeedback,
+  onResubmitTask,
   title,
   subtitle,
 }: MenteeTasksSectionProps) => {
@@ -190,8 +195,21 @@ const MenteeTasksSection = ({
                   <article key={task.id} className="rounded-2xl border border-[#E6E9F2] bg-[#FCFCFE] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#7A8094]">{task.category}</p>
-                        <h3 className="mt-1 text-lg font-semibold leading-tight text-[#1F2432]">{task.title}</h3>
+<p
+  className="
+    text-xs
+    font-semibold
+    uppercase
+    tracking-[0.12em]
+    text-[#7A8094]
+  "
+>
+  {task.deadline
+    ? `Due ${new Date(
+        task.deadline
+      ).toLocaleDateString()}`
+    : task.category}
+</p>                        <h3 className="mt-1 text-lg font-semibold leading-tight text-[#1F2432]">{task.title}</h3>
                       </div>
                       <TaskBadge label={task.badge} tone={task.badgeTone} />
                     </div>
@@ -199,24 +217,67 @@ const MenteeTasksSection = ({
                     <p className="mt-3 text-sm leading-6 text-[#5E667D]">{task.description}</p>
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {column.id === 'todo' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onViewTaskDetails(task.id)}
-                            className="rounded-xl border border-[#D5CCFF] bg-white px-4 py-2 text-sm font-semibold text-[#5B45BE]"
-                          >
-                            View Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSubmitTask(task.id)}
-                            className="rounded-xl bg-[#6E56CF] px-4 py-2 text-sm font-semibold text-white"
-                          >
-                            Submit Task
-                          </button>
-                        </>
-                      )}
+{column.id === "todo" && (
+
+  task.isRevisionRequest ? (
+
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onViewRevisionFeedback(
+            task
+          )
+        }
+        className="rounded-xl border border-[#D5CCFF] bg-white px-4 py-2 text-sm font-semibold text-[#5B45BE]"
+      >
+        View Feedback
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          onResubmitTask(
+            task.id
+          )
+        }
+        className="rounded-xl bg-[#6E56CF] px-4 py-2 text-sm font-semibold text-white"
+      >
+        Resubmit
+      </button>
+    </>
+
+  ) : (
+
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onViewTaskDetails(
+            task.id
+          )
+        }
+        className="rounded-xl border border-[#D5CCFF] bg-white px-4 py-2 text-sm font-semibold text-[#5B45BE]"
+      >
+        View Details
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          onSubmitTask(
+            task.id
+          )
+        }
+        className="rounded-xl bg-[#6E56CF] px-4 py-2 text-sm font-semibold text-white"
+      >
+        Submit Task
+      </button>
+    </>
+
+  )
+
+)}
 
                       {column.id === 'submitted' && (
                         <button
@@ -249,83 +310,107 @@ const MenteeTasksSection = ({
   );
 };
 
-const mentorTaskPhases: MentorTaskPhaseView[] = [
-  {
-    id: 'mentor-phase-1',
-    title: 'Foundations',
-    dotClass: 'bg-[#0B8A73]',
-    milestonesLabel: '2 Milestones',
-    tasks: [
-      {
-        id: 'mentor-task-1',
-        title: 'Finalize Core Visual Guidelines',
-        description: 'Establish the fundamental visual language and principles for the project.',
-        statusLabel: 'Milestone Achieved',
-        statusTone: 'done',
-        submissions: '42/45',
-        avgScore: 91,
-        avgLabel: 'Average score',
-      },
-      {
-        id: 'mentor-task-2',
-        title: 'Deliver Brand Typography Style Guide',
-        description: 'Documenting all typography hierarchy and systematic scale implementation.',
-        statusLabel: 'Requires review for next step',
-        statusTone: 'review',
-        submissions: '38/45',
-        avgScore: 88,
-        avgLabel: 'Average score',
-      },
-    ],
-  },
-  {
-    id: 'mentor-phase-2',
-    title: 'Advanced UX',
-    dotClass: 'bg-[#6E56CF]',
-    milestonesLabel: '2 Milestones',
-    tasks: [
-      {
-        id: 'mentor-task-3',
-        title: 'Deliver Wireframe Prototype',
-        description: 'Complete functional prototype demonstrating complex interaction logic and flows.',
-        statusLabel: 'Requires review for next step',
-        statusTone: 'review',
-        submissions: '12/45',
-        avgScore: 27,
-        avgLabel: 'Average score',
-      },
-      {
-        id: 'mentor-task-4',
-        title: 'Conduct Usability Study & Map Personas',
-        description: 'Comprehensive user research findings translated into actionable persona mappings.',
-        statusLabel: 'Requires review for next step',
-        statusTone: 'risk',
-        submissions: '2/45',
-        avgScore: 10,
-        avgLabel: 'Average score',
-      },
-    ],
-  },
-  {
-    id: 'mentor-phase-3',
-    title: 'Visual Systems',
-    dotClass: 'bg-[#B9692E]',
-    milestonesLabel: 'Planned',
-    tasks: [],
-  },
-];
+
 
 const ClassroomPage = ({}: Record<string, never> = {}) => {
+  const { programId } = useParams();
+  const classroomProgramId =
+  Number(programId);
+
   const user = authAPI.getCurrentUser();
   const role = user?.role?.toLowerCase?.()?.trim?.() || '';
   const isMentor = role === 'mentor';
 
   const tasksState = useTasksState(CONSTANTS.initialTasks);
+  const { setTaskItems } = tasksState;
+
+  const [classroomData, setClassroomData] =
+  useState<any>(null);
+
+  const [roadmapId, setRoadmapId] =
+  useState<number | null>(null);
+
+  const [haveLoadedRoadmapTasks, setHaveLoadedRoadmapTasks] = useState(false);
+
   const mentorTasksState = useMentorTasksState();
   const studentsState = useStudentsState(CONSTANTS.initialMentorStudents);
   const roadmapState = useRoadmapState(CONSTANTS.roadmapPhases);
   const modals = useClassroomModals();
   const [feedPosts, setFeedPosts] = useState<FeedPostProps[]>(CONSTANTS.classroomFeedPosts);
+
+  const [sessions, setSessions] = useState([]);
+const [sessionsLoading, setSessionsLoading] = useState(true);
+const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+
+const [isSchedulingSession, setIsSchedulingSession] = useState(false);
+
+const [sessionTitle, setSessionTitle] = useState('');
+const [sessionDate, setSessionDate] = useState('');
+const [sessionTime, setSessionTime] = useState('');
+const [meetingLink, setMeetingLink] = useState('');
+
+const [selectedSession, setSelectedSession] = useState<any>(null);
+const [showSessionDetailsModal, setShowSessionDetailsModal] = useState(false);
+
+const [editingSession, setEditingSession] = useState<any>(null);
+
+const [
+  mentorFullSubmissions,
+  setMentorFullSubmissions,
+] = useState<
+  BackendSubmissionResponse[]
+>([]);
+
+
+const [
+  resubmitLinks,
+  setResubmitLinks
+] = useState<
+  SubmissionLink[]
+>([]);
+
+const [
+  resubmitNotes,
+  setResubmitNotes
+] = useState('');
+
+
+const [
+  selectedSubmission,
+  setSelectedSubmission,
+] = useState<any>(null);
+
+const [
+  editingSubmissionId,
+  setEditingSubmissionId
+] = useState<number | null>(
+  null
+);
+
+const [
+  isLoadingSubmission,
+  setIsLoadingSubmission,
+] = useState(false);
+
+
+
+const [
+  selectedFeedback,
+  setSelectedFeedback
+] = useState<FeedbackView | null>(
+  null
+);
+
+const [
+  mentorSubmissionsForActiveTask,
+  setMentorSubmissionsForActiveTask,
+] = useState<
+  MentorSubmissionSummary[]
+>([]);
+
+
+
+
   const mentorRoadmapPhaseIds = CONSTANTS.mentorRoadmapPhasesData.map((phase) => phase.id);
   const mentorRoadmapModuleIds = CONSTANTS.mentorRoadmapPhasesData.flatMap((phase) =>
     phase.modules.map((module) => module.id)
@@ -344,9 +429,664 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
     mentorRoadmapModuleIds[0] ?? '',
   ].filter(Boolean));
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
-  const [selectedMentorSubmission, setSelectedMentorSubmission] = useState<MentorSubmissionReview | null>(null);
-  const [mentorSubmissionsByTask, setMentorSubmissionsByTask] = useState<Record<string, MentorSubmissionReview[]>>(mentorSubmissionData);
+
+
+const [
+  selectedMentorSubmission,
+  setSelectedMentorSubmission,
+] = useState<
+  MentorSubmissionReview | null
+>(null);
+
+
   const [mentorCustomTasks, setMentorCustomTasks] = useState<MentorCustomPublishedTask[]>([]);
+
+  const phases =
+  useRoadmapBuilderStore(
+    (s) => s.phases
+  );
+  const loadForView = useRoadmapBuilderStore((s) => s.loadForView);
+  console.log(
+  "CLASSROOM PHASES:",
+  phases
+);
+
+const [mentorTaskPhasesView, setMentorTaskPhasesView] =
+useState<MentorTaskPhaseView[]>([]);
+
+const [mentorRegistryRows, setMentorRegistryRows] =
+useState<MentorRegistryRow[]>([]);
+
+
+
+
+
+  // ensure roadmap phases are loaded into the builder store even if the roadmap tab
+  // component isn't mounted. This moves the responsibility to the page-level.
+  useEffect(() => {
+    if (!roadmapId) return;
+    loadForView(roadmapId);
+  }, [roadmapId, loadForView]);
+
+  useEffect(() => {
+    const fetchSessions = async () => {
+      try {
+        setSessionsLoading(true);
+
+        const data = await classroomService.getSessions(classroomProgramId);
+        console.log("Sessions Response:", data);
+        setSessions(data.data.map(mapSession));
+      } catch (error) {
+        console.error("Failed to fetch sessions:", error);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+
+    const fetchClassroom = async () => {
+      try {
+        const response = await classroomService.getClassroom(classroomProgramId);
+
+        if (response.success) {
+          setClassroomData(response.data);
+          console.log(response.data);
+
+          const programResponse = await getProgramView(classroomProgramId);
+          setRoadmapId(programResponse.roadmap?.roadmapId ?? null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch classroom", error);
+      }
+    };
+
+    fetchSessions();
+    fetchClassroom();
+  }, [classroomProgramId]);
+
+useEffect(() => {
+
+  if (!isMentor || !classroomProgramId) {
+    return;
+  }
+
+  const fetchMentorTasks = async () => {
+
+    try {
+
+      const response =
+        await mentorTaskService.getTaskRegistry(
+          classroomProgramId
+        );
+
+      const registry =
+        Array.isArray(response.data)
+          ? response.data
+          : [];
+
+     console.log(
+  "MENTOR TASK REGISTRY RAW:",
+  response
+);
+
+console.log(
+  "MENTOR TASK REGISTRY DATA:",
+  response.data
+);
+
+    } catch (error) {
+
+      console.error(
+        "Failed to fetch mentor task registry",
+        error
+      );
+
+    }
+
+  };
+
+  fetchMentorTasks();
+
+}, [isMentor, classroomProgramId]);
+
+useEffect(() => {
+
+  if (!isMentor || !classroomProgramId) {
+    return;
+  }
+
+  const fetchMentorRegistry =
+    async () => {
+
+      try {
+
+        const response =
+          await mentorTaskService
+            .getTaskRegistry(
+              classroomProgramId
+            );
+
+        const registry =
+          Array.isArray(response.data)
+            ? response.data
+            : [];
+
+        console.log(
+          "MENTOR TASK REGISTRY:",
+          registry
+        );
+
+       const groupedPhases =
+  registry.reduce(
+    (
+      acc: any,
+      task: any
+    ) => {
+
+      const phaseName =
+        task.phaseName ||
+        "General";
+
+      if (
+        !acc[phaseName]
+      ) {
+
+        acc[
+          phaseName
+        ] = {
+
+          id:
+            `phase-${phaseName}`,
+
+          title:
+            phaseName,
+
+          dotClass:
+            "bg-[#6E56CF]",
+
+          milestonesLabel:
+            `${task.totalSubmissions || 0} submissions`,
+
+          tasks: [],
+
+        };
+
+      }
+
+      acc[
+        phaseName
+      ].tasks.push({
+
+        id: String(
+          task.taskId
+        ),
+
+        title:
+          task.taskName,
+
+        description:
+          "",
+
+        statusLabel:
+          task.status ||
+          "Open",
+
+        statusTone:
+          Number(
+            task.averageScore || 0
+          ) >= 85
+            ? "done"
+            : Number(
+                task.averageScore || 0
+              ) >= 50
+            ? "review"
+            : "risk",
+
+        submissions:
+          `${task.totalSubmissions || 0}/${task.totalStudents || 0}`,
+
+        avgScore:
+          Number(
+            task.averageScore || 0
+          ),
+
+        avgLabel:
+          "Average score",
+
+      });
+
+      return acc;
+
+    },
+    {}
+  );
+
+setMentorTaskPhasesView(
+  Object.values(
+    groupedPhases
+  ) as MentorTaskPhaseView[]
+);
+
+        setMentorTaskPhasesView(
+          Object.values(
+            groupedPhases
+          ) as MentorTaskPhaseView[]
+        );
+
+const mappedRegistry =
+  registry.map(
+    (task: any) => ({
+
+      id: String(
+        task.taskId
+      ),
+
+      title:
+        task.taskName,
+
+      phase:
+        task.phaseName ||
+        "General",
+
+      submissions:
+        `${task.totalSubmissions || 0}/${task.totalStudents || 0}`,
+
+      avgScore:
+        Number(
+          task.averageScore || 0
+        ),
+
+      statusTone:
+        Number(
+          task.averageScore || 0
+        ) >= 85
+          ? "done"
+          : "neutral",
+
+      statusLabel:
+        task.status ||
+        "Open",
+
+    })
+  );
+
+setMentorRegistryRows(
+  mappedRegistry
+);
+
+      } catch (error) {
+
+        console.error(
+          "Failed to fetch mentor registry",
+          error
+        );
+
+      }
+
+    };
+
+  fetchMentorRegistry();
+
+}, [
+  isMentor,
+  classroomProgramId,
+]);
+
+
+useEffect(() => {
+
+  // mentor should NOT call mentee roadmap task endpoint
+  if (isMentor) {
+    return;
+  }
+
+  if (
+    !roadmapId ||
+    haveLoadedRoadmapTasks ||
+    !phases.length
+  ) {
+    return;
+  }
+
+  const validPhaseIds = phases
+    .map((phase) =>
+      Number(phase.phaseId)
+    )
+    .filter(Boolean);
+
+  if (!validPhaseIds.length) {
+    return;
+  }
+
+  let isCancelled = false;
+
+  const fetchRoadmapTasks = async () => {
+
+    try {
+
+      const [
+        todoResponses,
+        submittedResponses,
+        reviewedResponses,
+      ] = await Promise.all([
+
+        Promise.all(
+          validPhaseIds.map(
+            (phaseId) =>
+              taskSubmissionService.getPhaseTasks(
+                phaseId
+              )
+          )
+        ),
+
+        Promise.all(
+          validPhaseIds.map(
+            (phaseId) =>
+              taskSubmissionService.getPhaseTasks(
+                phaseId,
+                "Submitted"
+              )
+          )
+        ),
+
+        Promise.all(
+          validPhaseIds.map(
+            (phaseId) =>
+              taskSubmissionService.getPhaseTasks(
+                phaseId,
+                "Reviewed"
+              )
+          )
+        ),
+
+      ]);
+
+      if (isCancelled) {
+        return;
+      }
+
+      const todoTasks =
+        todoResponses.flatMap((r) =>
+          Array.isArray(r.data)
+            ? r.data
+            : []
+        );
+
+      const submittedTasks =
+        submittedResponses.flatMap((r) =>
+          Array.isArray(r.data)
+            ? r.data
+            : []
+        );
+
+      const reviewedTasks =
+        reviewedResponses.flatMap((r) =>
+          Array.isArray(r.data)
+            ? r.data
+            : []
+        );
+
+      console.log(
+        "TODO TASKS:",
+        todoTasks
+      );
+
+      console.log(
+        "SUBMITTED TASKS:",
+        submittedTasks
+      );
+
+      console.log(
+        "REVIEWED TASKS:",
+        reviewedTasks
+      );
+
+      const mappedTasks = [
+
+        ...todoTasks,
+        ...submittedTasks,
+        ...reviewedTasks,
+
+      ].map(
+        (task: any): ClassroomTask => ({
+
+          id: String(task.taskId),
+
+          title: task.taskTitle,
+
+          description:
+            task.taskDescription,
+
+          category:
+            "Roadmap Task",
+
+          deadline:
+            task.deadLine,
+
+          resources:
+            task.attachmentUrl
+              ? [
+                  {
+                    id:
+                      `resource-${task.taskId}`,
+
+                    name:
+                      task.attachmentName ||
+                      "Task Attachment",
+
+                    type:
+                      "link" as const,
+
+                    url:
+                      task.attachmentUrl,
+                  },
+                ]
+              : [],
+
+          status: (
+            String(
+              task.personalStatus ?? ''
+            ).toLowerCase() ===
+            'submitted'
+              ? 'submitted'
+              : String(
+                  task.personalStatus ?? ''
+                ).toLowerCase() ===
+                'reviewed'
+              ? 'reviewed'
+              : 'todo'
+          ) as
+            | 'todo'
+            | 'submitted'
+            | 'reviewed',
+
+badge:
+
+task.submission?.review
+  ?.isRevisionRequest
+
+  ? "Revision Requested"
+
+  : String(
+      task.personalStatus ?? ''
+    ).toLowerCase() ===
+    "submitted"
+
+  ? "Under Review"
+
+  : String(
+      task.personalStatus ?? ''
+    ).toLowerCase() ===
+    "reviewed"
+
+  ? "Completed"
+
+  : task.deadLine &&
+    new Date(task.deadLine) < new Date()
+
+  ? "Overdue"
+
+  : "To Do",
+
+badgeTone:
+
+task.submission?.review
+  ?.isRevisionRequest
+
+  ? "danger"
+
+  : String(
+      task.personalStatus ?? ''
+    ).toLowerCase() ===
+    "reviewed"
+
+  ? "success"
+
+  : String(
+      task.personalStatus ?? ''
+    ).toLowerCase() ===
+    "submitted"
+
+  ? "neutral"
+
+  : task.deadLine &&
+    new Date(task.deadLine) < new Date()
+
+  ? "danger"
+
+  : "neutral",
+
+        submissionDate:
+  undefined,
+
+submissionId:
+  task.submission?.submissionId,
+
+isRevisionRequest:
+  task.submission?.review
+    ?.isRevisionRequest ?? false,
+
+revisionFeedback:
+  task.submission?.review
+    ?.feedback ?? "",
+
+revisionGrade:
+  task.submission?.review
+    ?.grade ?? 0,
+
+
+        })
+      );
+
+      setTaskItems(
+        mappedTasks
+      );
+
+      setHaveLoadedRoadmapTasks(
+        true
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to fetch roadmap tasks",
+        error
+      );
+
+    }
+
+  };
+
+  fetchRoadmapTasks();
+
+  return () => {
+    isCancelled = true;
+  };
+
+}, [
+  roadmapId,
+  phases,
+  haveLoadedRoadmapTasks,
+  setTaskItems,
+  isMentor,
+]);
+
+useEffect(() => {
+  setHaveLoadedRoadmapTasks(false);
+  setTaskItems([]);
+}, [roadmapId, setTaskItems]);
+
+const handleScheduleSession = async () => {
+  try {
+    setIsSchedulingSession(true);
+
+    const scheduledAt = new Date(
+      `${sessionDate}T${sessionTime}`
+    ).toISOString();
+
+    const payload = {
+      title: sessionTitle,
+      scheduledAt,
+      meetingLink,
+    };
+
+    if (editingSession) {
+      await classroomService.updateSession(
+        Number(editingSession.id),
+        payload
+      );
+    } else {
+await classroomService.createSession(
+  classroomProgramId,
+  payload
+);    }
+
+    const refreshedSessions =
+      await classroomService.getSessions(classroomProgramId);
+
+    setSessions(refreshedSessions.data.map(mapSession));
+
+    setSessionTitle('');
+    setSessionDate('');
+    setSessionTime('');
+    setMeetingLink('');
+
+    setEditingSession(null);
+
+    setShowNewSessionModal(false);
+
+  } catch (error) {
+    console.error(
+      editingSession
+        ? 'Failed to update session:'
+        : 'Failed to create session:',
+      error
+    );
+  } finally {
+    setIsSchedulingSession(false);
+  }
+};
+
+const handleCancelSession = async (sessionId: string) => {
+try {
+await classroomService.cancelSession(Number(sessionId));
+
+
+const refreshedSessions =
+  await classroomService.getSessions(classroomProgramId);
+
+setSessions(refreshedSessions.data.map(mapSession));
+
+setShowSessionDetailsModal(false);
+
+
+} catch (error) {
+console.error('Failed to cancel session:', error);
+}
+};
+
+
+
+
 
   const tabs = isMentor
     ? [
@@ -363,30 +1103,131 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
         { id: 'tasks' as const, label: 'Tasks' },
       ];
 
-  const mentorTaskPhasesView = mentorTaskPhases.map((phase) => ({
-    ...phase,
-    tasks: [...phase.tasks, ...(mentorTasksState.addedMentorTasksByPhase[phase.id] ?? [])],
-  }));
 
-  const mentorRegistryRows: MentorRegistryRow[] = mentorTaskPhasesView.flatMap((phase) =>
-    phase.tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      phase: phase.title,
-      submissions: task.submissions,
-      avgScore: task.avgScore,
-      statusTone: task.avgScore >= 85 ? 'done' : 'neutral',
-      statusLabel: task.avgScore >= 85 ? 'Done' : 'Still running',
-    }))
-  );
+
+ 
 
   const isAllStudentsSelected =
     studentsState.mentorStudents.length > 0 && studentsState.selectedStudentIds.length === studentsState.mentorStudents.length;
 
-  const handleOpenMentorSubmissions = (_taskId: string, _filter?: 'all') => {
-    mentorTasksState.setSelectedMentorTaskId(_taskId);
-    mentorTasksState.setMentorSubmissionsFilter('all');
-    modals.setShowMentorSubmissionsModal(true);
+
+
+
+const handleOpenMentorSubmissions =
+  async (
+    taskId: string,
+    _filter?: "all"
+  ) => {
+
+    try {
+
+      mentorTasksState.setSelectedMentorTaskId(
+        taskId
+      );
+
+      mentorTasksState.setMentorSubmissionsFilter(
+        "all"
+      );
+
+      const response =
+        await mentorTaskService.getProgramSubmissions(
+          classroomProgramId,
+          Number(taskId)
+        );
+
+      console.log(
+        "MENTOR SUBMISSIONS:",
+        response
+      );
+
+      console.log(
+  "TASK ID:",
+  taskId
+);
+
+      const submissions =
+        Array.isArray(response.data)
+          ? response.data
+          : [];
+
+      const filteredSubmissions =
+  submissions.filter(
+    (submission: any) =>
+
+      String(
+        submission.taskId
+      ) === taskId
+  );
+
+const visibleSubmissions =
+  filteredSubmissions.filter(
+    (submission: any) =>
+      submission.status !== "Draft"
+  );
+
+setMentorFullSubmissions(
+  visibleSubmissions
+);
+
+const mappedSubmissions:
+MentorSubmissionSummary[] =
+
+  visibleSubmissions.map(
+    (
+      submission:
+      BackendSubmissionResponse
+    ) => ({
+
+      id: String(
+        submission.submissionId
+      ),
+
+      studentName:
+        submission.menteeName,
+
+      studentAvatar:
+        submission.menteeProfilePicture ||
+
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          submission.menteeName
+        )}`,
+
+      submittedAt:
+        submission.submittedAt,
+
+      fileCount:
+        submission.links?.length || 0,
+
+reviewStatus:
+  submission.status === "Reviewed"
+
+    ? "reviewed"
+
+    : submission.status === "Submitted"
+
+    ? "pending"
+
+    : "draft",
+
+    })
+  );
+
+      setMentorSubmissionsForActiveTask(
+        mappedSubmissions
+      );
+
+      modals.setShowMentorSubmissionsModal(
+        true
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load mentor submissions",
+        error
+      );
+
+    }
   };
 
   const handleToggleMentorPhase = (phaseId: string) => {
@@ -440,27 +1281,144 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
     modals.setShowSubmitModal(true);
   };
 
-  const handleConfirmTaskSubmission = (_submissionLinks: any[], _submissionNotes: string) => {
-    const selectedTask = tasksState.taskItems.find((t) => t.id === tasksState.selectedSubmitTaskId);
-    if (selectedTask) {
-      const submittedOn = UTILS.formatSubmissionDate();
-      tasksState.setTaskItems((prev) =>
-        prev.map((task) =>
-          task.id === selectedTask.id
-            ? {
-                ...task,
-                status: 'submitted',
-                badge: 'Under Review',
-                badgeTone: 'success' as const,
-                submissionDate: submittedOn,
-              }
-            : task
-        )
+
+ 
+
+
+const handleConfirmTaskSubmission =
+  async (
+    submissionLinks: any[],
+    submissionNotes: string
+  ) => {
+
+    try {
+
+      const selectedTask =
+        tasksState.taskItems.find(
+          (t) =>
+            t.id ===
+            tasksState.selectedSubmitTaskId
+        );
+
+      if (!selectedTask) {
+        return;
+      }
+
+      const payload = {
+
+        title:
+          selectedTask.title,
+
+        notesForMentor:
+          submissionNotes,
+
+        publish: true,
+
+        links:
+          submissionLinks
+            .filter(
+              (link) =>
+                link.url?.trim()
+            )
+            .map((link) => ({
+
+              url:
+                link.url,
+
+              label:
+                link.title ||
+                "Project Link",
+
+            })),
+
+      };
+
+      if (
+        editingSubmissionId
+      ) {
+
+        await taskSubmissionService
+          .updateSubmission(
+            editingSubmissionId,
+            payload
+          );
+
+      } else {
+
+        await taskSubmissionService
+          .createSubmission(
+
+            Number(
+              selectedTask.id
+            ),
+
+            payload
+
+          );
+
+      }
+
+      const submittedOn =
+        UTILS.formatSubmissionDate();
+
+      tasksState.setTaskItems(
+        (prev) =>
+
+          prev.map((task) =>
+
+            task.id ===
+            selectedTask.id
+
+              ? {
+
+                  ...task,
+
+                  status:
+                    "submitted",
+
+                  badge:
+                    "Under Review",
+
+                  badgeTone:
+                    "success" as const,
+
+                  submissionDate:
+                    submittedOn,
+
+                  isRevisionRequest:
+                    false,
+
+                }
+
+              : task
+
+          )
+
       );
-      // Store submission links and notes if needed
-      tasksState.setSelectedSubmitTaskId('');
-      modals.setShowSubmitModal(false);
+
+      setEditingSubmissionId(
+        null
+      );
+
+      tasksState
+        .setSelectedSubmitTaskId(
+          ""
+        );
+
+      modals
+        .setShowSubmitModal(
+          false
+        );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to submit task",
+        error
+      );
+
     }
+
   };
 
   const handleOverviewSubmitTask = () => {
@@ -568,14 +1526,180 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
     setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
   }, []);
 
-  const handleViewSubmission = (taskId: string) => {
-    tasksState.setSelectedSubmissionTaskId(taskId);
-    modals.setShowSubmissionModal(true);
+const handleViewSubmission =
+  async (taskId: string) => {
+
+    try {
+
+      setIsLoadingSubmission(true);
+
+      const response =
+        await taskSubmissionService
+          .getMySubmission(
+            Number(taskId)
+          );
+
+      const submission =
+        response.data;
+
+      const apiBase =
+        (
+          import.meta.env
+            .VITE_API_URL
+          || "http://localhost:5069/api"
+        ) as string;
+
+      const backendOrigin =
+        apiBase
+          .replace(/\/+$/, "")
+          .replace(/\/api$/i, "");
+
+      setSelectedSubmission({
+
+        id:
+          String(
+            submission.submissionId
+          ),
+
+        taskTitle:
+          submission.taskTitle,
+
+        submittedDate:
+          submission.submittedAt,
+
+        notes:
+          submission.notesForMentor,
+
+        status:
+          submission.reviewed
+            ? "reviewed"
+            : "under_review",
+
+        links:
+          submission.links?.map(
+            (link: any) => ({
+
+              id:
+                String(link.id),
+
+              title:
+                link.label,
+
+              url:
+                link.url,
+
+            })
+          ) || [],
+
+        files:
+          submission.links?.map(
+            (link: any) => ({
+
+              id:
+                String(link.id),
+
+              name:
+                link.label,
+
+              size:
+                "Link",
+
+              type:
+                "LINK",
+
+              url:
+                link.url.startsWith(
+                  "http"
+                )
+                  ? link.url
+                  : `${backendOrigin}${link.url}`,
+
+            })
+          ) || [],
+
+      });
+
+      modals
+        .setShowSubmissionModal(
+          true
+        );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load submission",
+        error
+      );
+
+    } finally {
+
+      setIsLoadingSubmission(
+        false
+      );
+
+    }
+
   };
 
-  const handleViewFeedback = (taskId: string) => {
-    tasksState.setSelectedTaskDetailsId(taskId);
-    modals.setShowFeedbackModal(true);
+  const [
+  submissionEditMode,
+  setSubmissionEditMode
+] = useState<{
+  mode: "create" | "edit";
+  taskId: string;
+  submissionId?: number;
+} | null>(null);
+
+
+
+  const handleViewFeedback =
+  async (taskId: string) => {
+
+    try {
+
+      const response =
+        await taskSubmissionService
+          .getMySubmission(
+            Number(taskId)
+          );
+
+      const submission =
+        response.data;
+
+      setSelectedFeedback({
+
+        id:
+          String(
+            submission.submissionId
+          ),
+
+        taskTitle:
+          submission.taskTitle,
+
+        submittedDate:
+          submission.submittedAt,
+
+        grade:
+          submission.review?.grade,
+
+        feedback:
+          submission.review?.feedback,
+
+      });
+
+      modals.setShowFeedbackModal(
+        true
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to load feedback",
+        error
+      );
+
+    }
+
   };
 
   const handleViewTaskDetails = (taskId: string) => {
@@ -583,46 +1707,144 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
     setShowTaskDetailsModal(true);
   };
 
-  const handleOpenMentorReview = (submissionId: string) => {
-    const taskId = mentorTasksState.selectedMentorTaskId ?? '';
-    const submission = mentorSubmissionsByTask[taskId]?.find((entry) => entry.id === submissionId) ?? null;
-    setSelectedMentorSubmission(submission);
-    modals.setShowMentorSubmissionsModal(false);
-    if (submission) {
-      modals.setShowReviewTaskModal(true);
-    }
+
+  const handleOpenMentorReview = (
+  submissionId: string
+) => {
+
+  const submission =
+    mentorFullSubmissions.find(
+      (s) =>
+        String(s.submissionId) === submissionId
+    );
+
+  if (!submission) {
+    return;
+  }
+
+  const reviewSubmission:
+  MentorSubmissionReview = {
+
+    id: String(submission.submissionId),
+
+    studentName: submission.menteeName,
+
+    studentAvatar:
+      submission.menteeProfilePicture ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        submission.menteeName
+      )}`,
+
+    reviewStatus:
+      submission.status === "Reviewed"
+        ? "reviewed"
+        : "pending",
+
+    submittedAt:
+      submission.submittedAt,
+
+    submittedAtLabel:
+      new Date(
+        submission.submittedAt
+      ).toLocaleString(),
+
+    fileCount:
+      submission.links?.length || 0,
+
+    taskTitle:
+      submission.taskTitle,
+
+    summary:
+      submission.notesForMentor || "",
+
+    feedback:
+      submission.review?.feedback || "",
+
+    grade:
+      submission.review?.grade || 0,
+
+    attachments:
+      submission.links?.map(
+        (link, index) => ({
+
+          id:
+            `${submission.submissionId}-${index}`,
+
+          name:
+            link.label,
+
+          type:
+            "link" as const,
+
+          url:
+            link.url,
+
+          size:
+            "LINK",
+
+        })
+      ) || [],
   };
 
-  const handleSubmitMentorReview = (_grade: number, _feedback: string, _requestRevision: boolean) => {
-    const taskId = mentorTasksState.selectedMentorTaskId ?? '';
-    if (selectedMentorSubmission && taskId) {
-      setMentorSubmissionsByTask((current) => ({
-        ...current,
-        [taskId]: (current[taskId] ?? []).map((submission) =>
-          submission.id === selectedMentorSubmission.id
-            ? {
-                ...submission,
-                reviewStatus: 'reviewed',
-              }
-            : submission
-        ),
-      }));
-    }
+  setSelectedMentorSubmission(
+    reviewSubmission
+  );
+
+  modals.setShowMentorSubmissionsModal(
+    false
+  );
+
+  modals.setShowReviewTaskModal(
+    true
+  );
+
+};
+const handleSubmitMentorReview = async (
+  grade: number,
+  feedback: string,
+  requestRevision: boolean
+) => {
+
+  if (!selectedMentorSubmission) {
+    return;
+  }
+
+  try {
+
+    await mentorTaskService.reviewSubmission(
+      Number(selectedMentorSubmission.id),
+      {
+        grade,
+        feedback,
+        requestRevision,
+      }
+    );
 
     setSelectedMentorSubmission(null);
-    modals.setShowReviewTaskModal(false);
-  };
 
-  const mentorSubmissionsForActiveTask: MentorSubmissionSummary[] = (
-    mentorSubmissionsByTask[mentorTasksState.selectedMentorTaskId ?? ''] ?? []
-  ).map((submission) => ({
-    id: submission.id,
-    studentName: submission.studentName,
-    studentAvatar: submission.studentAvatar,
-    submittedAt: submission.submittedAt,
-    fileCount: submission.fileCount,
-    reviewStatus: submission.reviewStatus,
-  }));
+    modals.setShowReviewTaskModal(false);
+
+    // Refresh submissions from backend
+    setTimeout(async () => {
+
+      await handleOpenMentorSubmissions(
+        mentorTasksState.selectedMentorTaskId ?? ""
+      );
+
+      modals.setShowMentorSubmissionsModal(false);
+
+    }, 0);
+
+  } catch (error) {
+
+    console.error(
+      "Failed to submit review",
+      error
+    );
+
+  }
+
+};
 
   const handlePostDiscussion = (_content: string, _attachments?: File[]) => {
     // Handle posting discussion logic here
@@ -663,13 +1885,105 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
     studentsState.setPendingDeleteStudent(student);
   };
 
+   const handleViewRevisionFeedback = (
+  task: ClassroomTask
+) => {
+
+  setSelectedFeedback({
+
+    id: task.id,
+
+    taskTitle: task.title,
+
+    grade:
+      task.revisionGrade,
+
+    feedback:
+      task.revisionFeedback,
+
+  });
+
+  modals.setShowFeedbackModal(
+    true
+  );
+
+};
+
+const handleResubmitTask = async (
+  taskId: string
+) => {
+
+  try {
+
+    const response =
+      await taskSubmissionService
+        .getMySubmission(
+          Number(taskId)
+        );
+
+    const submission =
+      response.data;
+
+    setEditingSubmissionId(
+      submission.submissionId
+    );
+
+    setResubmitLinks(
+
+      submission.links?.map(
+        (
+          link: any,
+          index: number
+        ) => ({
+
+          id:
+            String(index + 1),
+
+          title:
+            link.label,
+
+          url:
+            link.url,
+
+        })
+      ) || []
+
+    );
+
+    setResubmitNotes(
+      submission.notesForMentor ||
+      ""
+    );
+
+    tasksState
+      .setSelectedSubmitTaskId(
+        taskId
+      );
+
+    modals
+      .setShowSubmitModal(
+        true
+      );
+
+  } catch (error) {
+
+    console.error(
+      "Failed to load submission for resubmit",
+      error
+    );
+
+  }
+
+};
+
+
   return (
     <Layout>
       <div className="space-y-6 pb-10">
         <section className="space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[28px] font-bold leading-tight text-[#1F2432]">The Digital Atelier</p>
+              <p className="text-[28px] font-bold leading-tight text-[#1F2432]">{classroomData?.title || "Classroom"}</p>
             </div>
           </div>
           <ClassroomTabsNav tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -689,8 +2003,70 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           />
         )}
 
-        {activeTab === 'schedule' && <ClassroomScheduleSection sessions={CONSTANTS.sessions} />}
+{activeTab === 'schedule' && (
 
+<ClassroomScheduleSection
+  sessions={sessionsLoading ? [] : sessions}
+  activePhase={classroomData?.description}
+  isMentor={isMentor}
+  onScheduleSession={() => {
+    setEditingSession(null);
+
+    setSessionTitle('');
+    setSessionDate('');
+    setSessionTime('');
+    setMeetingLink('');
+
+    setShowNewSessionModal(true);
+  }}
+  onViewDetails={(session) => {
+    setSelectedSession(session);
+    setShowSessionDetailsModal(true);
+  }}
+  onEditSession={(session) => {
+    setEditingSession(session);
+
+    setSessionTitle(session.title);
+
+    setMeetingLink(session.meetingLink || '');
+
+    const parts = session.dateLabel.split('•');
+
+    if (parts.length === 2) {
+      const datePart = parts[0].trim();
+      const timePart = parts[1].trim();
+
+      const parsedDate = new Date(`${datePart} ${timePart}`);
+
+      if (!isNaN(parsedDate.getTime())) {
+        setSessionDate(
+          parsedDate.toISOString().split('T')[0]
+        );
+
+        setSessionTime(
+          parsedDate.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })
+        );
+      }
+    }
+
+    setShowNewSessionModal(true);
+  }}
+  onCancelSession={(session) => {
+    const confirmed = window.confirm(
+      `Cancel "${session.title}" session?`
+    );
+
+    if (confirmed) {
+      handleCancelSession(session.id);
+    }
+  }}
+/>
+
+)}
         {activeTab === 'tasks' &&
           (isMentor ? (
             <ClassroomMentorTasksSection
@@ -705,61 +2081,35 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           ) : (
             <div className="space-y-8">
               <MenteeTasksSection
-                title="my tasks"
-                subtitle="Track progress across the current learning phase"
-                taskItems={tasksState.taskItems}
-                onSubmitTask={handleSubmitTask}
-                onViewSubmission={handleViewSubmission}
-                onViewFeedback={handleViewFeedback}
-                onViewTaskDetails={handleViewTaskDetails}
-              />
-              <MenteeTasksSection
-                title="My roadmap tasks"
-                subtitle="Track progress across the current learning phase"
-                taskItems={tasksState.taskItems}
-                onSubmitTask={handleSubmitTask}
-                onViewSubmission={handleViewSubmission}
-                onViewFeedback={handleViewFeedback}
-                onViewTaskDetails={handleViewTaskDetails}
-              />
+  title="my tasks"
+  subtitle="Track progress across the current learning phase"
+  taskItems={tasksState.taskItems}
+  onSubmitTask={handleSubmitTask}
+  onViewSubmission={handleViewSubmission}
+  onViewFeedback={handleViewFeedback}
+  onViewTaskDetails={handleViewTaskDetails}
+  onViewRevisionFeedback={handleViewRevisionFeedback}
+  onResubmitTask={handleResubmitTask}
+/>
+             <MenteeTasksSection
+  title="My roadmap tasks"
+  subtitle="Track progress across the current learning phase"
+  taskItems={tasksState.taskItems}
+  onSubmitTask={handleSubmitTask}
+  onViewSubmission={handleViewSubmission}
+  onViewFeedback={handleViewFeedback}
+  onViewTaskDetails={handleViewTaskDetails}
+  onViewRevisionFeedback={handleViewRevisionFeedback}
+  onResubmitTask={handleResubmitTask}
+/>
             </div>
           ))}
 
         {activeTab === 'roadmap' && (
-          <ClassroomRoadmapSection
-            isMentor={isMentor}
-            mentorRoadmapProgram={CONSTANTS.mentorRoadmapProgram}
-            mentorRoadmapPhases={CONSTANTS.mentorRoadmapPhasesData}
-            expandedMentorRoadmapPhaseIds={expandedMentorRoadmapPhaseIds}
-            expandedMentorRoadmapModuleIds={expandedMentorRoadmapModuleIds}
-            toggleMentorRoadmapPhase={handleToggleMentorRoadmapPhase}
-            toggleMentorRoadmapModule={handleToggleMentorRoadmapModule}
-            collapseAllMentorRoadmapSections={roadmapState.collapseAllMentorRoadmapSections}
-            openAddMaterialsModal={() => {}}
-            openEditRoadmapItemModal={() => {}}
-            openEditAssignmentTaskModal={() => {}}
-            deleteMentorRoadmapItem={() => {}}
-            openNewTaskModal={() => {}}
-            getRoadmapTaskPhase={UTILS.getRoadmapTaskPhase}
-            isNewModuleComposerOpen={() => false}
-            toggleNewModuleComposer={() => {}}
-            newModuleComposerByPhase={roadmapState.newModuleComposerByPhase}
-            updateNewModuleComposerField={() => {}}
-            updateNewModuleComposerItem={() => {}}
-            removeNewModuleComposerItem={() => {}}
-            openComposerAddMaterialsModal={() => {}}
-            checkedMaterialIds={roadmapState.checkedMaterialIds}
-            checkedTaskIds={roadmapState.checkedTaskIds}
-            toggleMaterialCheck={handleToggleMaterialCheck}
-            toggleTaskCheck={handleToggleTaskCheck}
-            roadmapPhases={CONSTANTS.roadmapPhases}
-            phaseThemeClasses={CONSTANTS.phaseThemeClasses}
-            getTaskProgressPercent={UTILS.getTaskProgressPercent}
-            expandedPhaseIds={roadmapState.expandedPhaseIds}
-            expandedModuleIds={roadmapState.expandedModuleIds}
-            togglePhase={roadmapState.togglePhase}
-            toggleModule={roadmapState.toggleModule}
-          />
+         <ClassroomRoadmapSection
+  roadmapId={roadmapId}
+  isMentor={isMentor}
+/>
         )}
 
         {activeTab === 'students' && isMentor && (
@@ -790,54 +2140,60 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           onPublish={handlePublishNewMentorTask}
         />
 
-        <SubmitTaskModal
-          isOpen={modals.showSubmitModal}
-          onClose={() => modals.setShowSubmitModal(false)}
-          onSubmit={handleConfirmTaskSubmission}
-          taskTitle={
-            tasksState.taskItems.find((t) => t.id === tasksState.selectedSubmitTaskId)?.title
-          }
-        />
+<SubmitTaskModal
+  isOpen={modals.showSubmitModal}
+  onClose={() =>
+    modals.setShowSubmitModal(false)
+  }
+  onSubmit={
+    handleConfirmTaskSubmission
+  }
+  taskTitle={
+    tasksState.taskItems.find(
+      (t) =>
+        t.id ===
+        tasksState.selectedSubmitTaskId
+    )?.title
+  }
+  initialLinks={
+    resubmitLinks
+  }
+  initialNotes={
+    resubmitNotes
+  }
+/>
 
-        <ViewSubmissionModal
-          isOpen={modals.showSubmissionModal}
-          onClose={() => modals.setShowSubmissionModal(false)}
-          submission={
-            tasksState.selectedSubmissionTaskId
-              ? {
-                  id: tasksState.selectedSubmissionTaskId,
-                  taskTitle: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedSubmissionTaskId
-                  )?.title,
-                  studentName: user ? `${user.firstName} ${user.lastName}` : 'Student',
-                  submittedDate: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedSubmissionTaskId
-                  )?.submissionDate,
-                  links: [],
-                  notes: '',
-                  status: 'submitted',
-                }
-              : null
-          }
-        />
+<ViewSubmissionModal
+  isOpen={
+    modals.showSubmissionModal
+  }
+  onClose={() =>
+    modals
+      .setShowSubmissionModal(
+        false
+      )
+  }
+  submission={
+    selectedSubmission
+  }
+/>
 
-        <ViewFeedbackModal
-          isOpen={modals.showFeedbackModal}
-          onClose={() => modals.setShowFeedbackModal(false)}
-          feedback={
-            tasksState.selectedTaskDetailsId
-              ? {
-                  id: tasksState.selectedTaskDetailsId,
-                  taskTitle: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedTaskDetailsId
-                  )?.title,
-                  mentorName: 'Your Mentor',
-                  rating: 4,
-                  feedback: 'Great work! Keep improving on these areas...',
-                }
-              : null
-          }
-        />
+
+<ViewFeedbackModal
+  isOpen={modals.showFeedbackModal}
+  onClose={() => {
+
+    setSelectedFeedback(
+      null
+    );
+
+    modals.setShowFeedbackModal(
+      false
+    );
+
+  }}
+  feedback={selectedFeedback}
+/>
 
         <MentorReviewSubmissionModal
           isOpen={modals.showReviewTaskModal}
@@ -853,6 +2209,7 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           classroomName="The Digital Atelier"
         />
 
+       
         <MentorSubmissionsModal
           isOpen={modals.showMentorSubmissionsModal}
           onClose={() => modals.setShowMentorSubmissionsModal(false)}
@@ -869,36 +2226,49 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           isOpen={showTaskDetailsModal}
           onClose={() => setShowTaskDetailsModal(false)}
           task={
-            tasksState.selectedTaskDetailsId
-              ? ({
-                  id: tasksState.selectedTaskDetailsId,
-                  title: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedTaskDetailsId
-                  )?.title,
-                  category: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedTaskDetailsId
-                  )?.category,
-                  dueDate: 'OCT 24',
-                  description: tasksState.taskItems.find(
-                    (t) => t.id === tasksState.selectedTaskDetailsId
-                  )?.description,
-                  resources: [
-                    {
-                      id: 'resource-1',
-                      name: 'Task Template.pdf',
-                      type: 'pdf' as const,
-                      size: '2.4 MB',
-                    },
-                    {
-                      id: 'resource-2',
-                      name: 'Reference Guide',
-                      type: 'link' as const,
-                      url: 'https://example.com',
-                    },
-                  ],
-                } as TaskDetails)
-              : null
-          }
+  tasksState.selectedTaskDetailsId
+    ? ({
+        id:
+          tasksState.selectedTaskDetailsId,
+
+        title:
+          tasksState.taskItems.find(
+            (t) =>
+              t.id ===
+              tasksState.selectedTaskDetailsId
+          )?.title,
+
+        category:
+          tasksState.taskItems.find(
+            (t) =>
+              t.id ===
+              tasksState.selectedTaskDetailsId
+          )?.category,
+
+        dueDate:
+          tasksState.taskItems.find(
+            (t) =>
+              t.id ===
+              tasksState.selectedTaskDetailsId
+          )?.deadline,
+
+        description:
+          tasksState.taskItems.find(
+            (t) =>
+              t.id ===
+              tasksState.selectedTaskDetailsId
+          )?.description,
+
+        resources:
+          tasksState.taskItems.find(
+            (t) =>
+              t.id ===
+              tasksState.selectedTaskDetailsId
+          )?.resources,
+
+      } as TaskDetails)
+    : null
+}
           onSubmitTask={() => {
             if (tasksState.selectedTaskDetailsId) {
               handleSubmitTask(tasksState.selectedTaskDetailsId);
@@ -914,7 +2284,36 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
           onUpdatePost={handleUpdatePostFromModal}
           editDraft={addPostEditDraft}
         />
+
+        
       </div>
+
+ <MentorNewSessionModal
+      isOpen={showNewSessionModal}
+      onClose={() => setShowNewSessionModal(false)}
+      sessionTitle={sessionTitle}
+      onSessionTitleChange={setSessionTitle}
+      sessionDate={sessionDate}
+      onSessionDateChange={setSessionDate}
+      sessionTime={sessionTime}
+      onSessionTimeChange={setSessionTime}
+      meetingLink={meetingLink}
+      onMeetingLinkChange={setMeetingLink}
+onSchedule={handleScheduleSession}
+  isLoading={isSchedulingSession}
+    isEditMode={!!editingSession}
+
+
+    />
+<SessionDetailsModal
+isOpen={showSessionDetailsModal}
+onClose={() => setShowSessionDetailsModal(false)}
+session={selectedSession}
+isMentor={isMentor}
+onCancelSession={handleCancelSession}
+/>
+
+      
     </Layout>
   );
 };

@@ -9,6 +9,7 @@ import {
   publishRoadmap as publishRoadmapRequest,
   updateRoadmap,
   extractErrorMessage,
+  getRoadmapView,
 } from "../services/roadmapService";
 
 import type {
@@ -41,6 +42,12 @@ interface BasicInfoState {
   targetLevelFrom?: number | null;
   targetLevelTo?: number | null;
   status: string;
+mentorName?: string;
+
+profilePictureUrl?: string;
+
+mentorProfileId?: string;
+
 }
 
 type BasicInfoErrorKey =
@@ -177,23 +184,59 @@ function mapMaterialType(value: unknown): MaterialType {
   return "article"; // 1, "article", or unknown → article
 }
 
+function mapRoadmapStatus(
+  status?: number | string | null
+) {
+
+  // backend enum
+  if (status === 2) {
+    return "Published";
+  }
+
+  return "Draft";
+}
+
+
 function fromDetails(details: RoadmapDetailsDto): Pick<RoadmapBuilderState, "roadmapId" | "basicInfo" | "phases" | "mode" | "currentStep"> {
   return {
     roadmapId: details.roadmapId,
     mode: "edit",
     currentStep: 1,
-    basicInfo: {
-      title: details.title ?? "",
-      description: details.description ?? "",
-      duration: details.duration,
-      skillDomainId: details.skillDomainId,
-      skillDomainName: "",
-      subDomainId: details.subDomainId,
-      subDomainName: "",
-      targetLevelFrom: details.targetLevelFrom ?? null,
-      targetLevelTo: details.targetLevelTo ?? null,
-      status: details.status ?? "Draft",
-    },
+basicInfo: {
+  title: details.title ?? "",
+  description: details.description ?? "",
+  duration: details.duration,
+
+  skillDomainId:
+    details.skillDomainId,
+
+  skillDomainName: "",
+
+  subDomainId:
+    details.subDomainId,
+
+  subDomainName: "",
+
+  targetLevelFrom:
+    details.targetLevelFrom ?? null,
+
+  targetLevelTo:
+    details.targetLevelTo ?? null,
+
+  mentorName:
+    details.mentorName ?? "",
+
+  profilePictureUrl:
+    details.profilePictureUrl ?? "",
+
+  mentorProfileId:
+    details.mentorProfileId,
+
+  status:
+    mapRoadmapStatus(
+      details.status
+    ),
+},
     phases: (details.phases ?? []).map((phase, phaseIndex) => ({
       _localId: `phase-${phase.phaseId ?? phase.id ?? phaseIndex}`,
       phaseId: phase.phaseId ?? phase.id,
@@ -342,7 +385,7 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
   loadForView: async (roadmapId: number) => {
     set({ isLoadingForEdit: true, error: null });
     try {
-      const details = await getRoadmapDetails(roadmapId);
+      const details = await getRoadmapView(roadmapId);
       set({ ...fromDetails(details), mode: "view", currentStep: 2, collapsedPhaseIds: [], collapsedTopicIds: [] });
     } catch (error) {
       set({ error: extractErrorMessage(error) });
@@ -412,10 +455,15 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
           subDomainId: state.basicInfo.subDomainId ?? 0,
           targetLevelFrom: state.basicInfo.targetLevelFrom ?? null,
           targetLevelTo: state.basicInfo.targetLevelTo ?? null,
+          technologyIds: [],
         };
 
         const roadmapId = await createRoadmapBasicInfo(payload);
-        set({ roadmapId, currentStep: 2 });
+set({
+  roadmapId,
+  currentStep: 2,
+  mode: "edit",
+});
       } else {
         set({ currentStep: 2 });
       }
@@ -449,17 +497,35 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
       return false;
     }
 
-    set({ isSaving: true, error: null });
-    try {
-      await updateRoadmap(latest.roadmapId, toSavePayload(latest) as any);
-        set({ isDirty: false });
-      return true;
-    } catch (error) {
-      set({ error: extractErrorMessage(error) });
-      return false;
-    } finally {
-      set({ isSaving: false });
-    }
+   set({ isSaving: true, error: null });
+
+try {
+
+  console.log(
+    "SAVE PAYLOAD",
+    JSON.stringify(toSavePayload(latest), null, 2)
+  );
+
+  await updateRoadmap(
+    latest.roadmapId,
+    toSavePayload(latest) as any
+  );
+
+  set({ isDirty: false });
+
+  return true;
+
+} catch (error) {
+
+  set({ error: extractErrorMessage(error) });
+
+  return false;
+
+} finally {
+
+  set({ isSaving: false });
+
+}
   },
 
   publishRoadmap: async () => {
@@ -468,6 +534,8 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
       set({ error: publishIssues.join("\n") });
       return false;
     }
+
+
 
     const draftSaved = await get().saveDraft();
     if (!draftSaved) return false;
@@ -707,21 +775,28 @@ export const useRoadmapBuilderStore = create<RoadmapBuilderState>((set, get) => 
   },
 
   deleteTask: async (phaseLocalId, topicLocalId, taskLocalId) => {
-    set((state) => ({
-      phases: state.phases.map((phase) =>
-        phase._localId === phaseLocalId
-          ? {
-              ...phase,
-              topics: phase.topics.map((topic) =>
-                topic._localId === topicLocalId
-                  ? { ...topic, tasks: topic.tasks.filter((task) => task._localId !== taskLocalId) }
-                  : topic
-              ),
-            }
-          : phase
-      ),
-    }));
-  },
+  set((state) => ({
+    phases: state.phases.map((phase) =>
+      phase._localId === phaseLocalId
+        ? {
+            ...phase,
+            topics: phase.topics.map((topic) =>
+              topic._localId === topicLocalId
+                ? {
+                    ...topic,
+                    tasks: topic.tasks.filter(
+                      (task) => task._localId !== taskLocalId
+                    ),
+                  }
+                : topic
+            ),
+          }
+        : phase
+    ),
+
+    isDirty: true,
+  }));
+},
 
   collapseAll: () => {
     const state = get();

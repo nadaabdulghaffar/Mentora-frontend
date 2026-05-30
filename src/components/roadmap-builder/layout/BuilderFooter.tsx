@@ -8,6 +8,10 @@ export default function BuilderFooter() {
 
   const mode = useRoadmapBuilderStore((state) => state.mode);
 
+  const roadmapStatus = useRoadmapBuilderStore(
+    (state) => state.basicInfo.status
+  );
+
   const currentStep = useRoadmapBuilderStore(
     (state) => state.currentStep
   );
@@ -65,19 +69,20 @@ export default function BuilderFooter() {
     navigate("/roadmap");
   };
 
- const handleSaveChanges = async () => {
-  return await saveDraft();
-};
+  const handleSaveChanges = async () => {
+    return await saveDraft();
+  };
 
   /** Step 1 "Next" */
   const handleNext = async () => {
-    if (mode === "edit") {
-      setCurrentStep(2);
-      return;
-    }
 
+  const ok =
     await saveBasicInfo();
-  };
+
+  if (!ok) return;
+
+  setCurrentStep(2);
+};
 
   /** "Save Draft" */
   const handleSaveDraft = async () => {
@@ -159,40 +164,45 @@ export default function BuilderFooter() {
             {/* RIGHT SIDE */}
             <div className="flex items-center gap-3">
               {/* Cancel */}
-            <button
-              id="builder-edit-cancel"
-              onClick={() => {
-                if (isDirty) {
-                  const ok = window.confirm('You have unsaved changes. Cancel and discard them?');
-                  if (!ok) return;
-                }
-                handleCancelEdit();
-              }}
-              disabled={anyBusy}
-              className="
-                h-11 px-6 rounded-2xl
-                border border-[#D0D5DD]
-                text-[#475467]
-                text-sm font-semibold
-                hover:bg-[#F2F4F7]
-                transition
-                disabled:opacity-50 disabled:cursor-not-allowed
-              "
-            >
-              Cancel
-            </button>
+              <button
+                id="builder-edit-cancel"
+                onClick={() => {
+                  if (isDirty) {
+                    const ok = window.confirm(
+                      "You have unsaved changes. Cancel and discard them?"
+                    );
+
+                    if (!ok) return;
+                  }
+
+                  handleCancelEdit();
+                }}
+                disabled={anyBusy}
+                className="
+                  h-11 px-6 rounded-2xl
+                  border border-[#D0D5DD]
+                  text-[#475467]
+                  text-sm font-semibold
+                  hover:bg-[#F2F4F7]
+                  transition
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                "
+              >
+                Cancel
+              </button>
 
               {/* Save Changes */}
               <button
                 id="builder-edit-save"
                 disabled={anyBusy}
-onClick={async () => {
-  const ok = await handleSaveChanges();
+                onClick={async () => {
+                  const ok =
+                    await handleSaveChanges();
 
-  if (ok) {
-    navigate("/roadmap");
-  }
-}}
+                  if (ok) {
+                    navigate("/roadmap");
+                  }
+                }}
                 className="
                   h-11 px-6 rounded-2xl
                   border-2 border-primary
@@ -207,6 +217,27 @@ onClick={async () => {
                   ? "Saving…"
                   : "Save Changes"}
               </button>
+
+              {/* Publish */}
+              {roadmapStatus !== "Published" && (
+                <button
+                  id="builder-edit-publish"
+                  onClick={handlePublish}
+                  disabled={anyBusy}
+                  className="
+                    h-11 px-6 rounded-2xl
+                    bg-primary text-white
+                    text-sm font-semibold
+                    hover:opacity-90
+                    transition
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                  "
+                >
+                  {isPublishing
+                    ? "Publishing…"
+                    : "Publish"}
+                </button>
+              )}
 
               {/* Step 1 only → Next */}
               {currentStep === 1 && (

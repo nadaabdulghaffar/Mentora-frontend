@@ -15,11 +15,13 @@ import type {
   LookupItem,
   MaterialType,
   RoadmapDetailsDto,
+  
 } from "../types/roadmap";
 
 import {
   MATERIAL_TYPE_MAP as MAT_MAP,
 } from "../types/roadmap";
+import api from "./api";
 
 /* =========================================
    ERROR HANDLER
@@ -213,10 +215,13 @@ export const updateRoadmap =
     roadmapId: number,
     payload: UpdateRoadmapPayload
   ): Promise<void> => {
-    await apiClient.put(
-      `/Roadmap/${roadmapId}`,
-      payload
-    );
+   const response =
+  await apiClient.put<ApiResponse<boolean>>(
+    `/Roadmap/${roadmapId}`,
+    payload
+  );
+
+unwrapRoadmapEnvelope(response.data);
   };
 
 /* =========================================
@@ -408,3 +413,14 @@ export const uploadTaskAttachment =
     const data = unwrapRoadmapEnvelope(response.data);
     return data.fileUrl;
   };
+
+  export const getRoadmapView =
+  async (roadmapId: number) => {
+
+    const response =
+      await apiClient.get(
+        `/roadmap/view/${roadmapId}`
+      );
+
+    return response.data.data;
+};

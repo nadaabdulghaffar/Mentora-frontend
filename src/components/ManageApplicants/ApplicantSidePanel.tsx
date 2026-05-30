@@ -1,5 +1,8 @@
-
-import { X, CheckCircle, XCircle, Link2 } from "lucide-react";
+import {
+  X,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 
 export default function ApplicantSidePanel({
   applicant,
@@ -8,18 +11,38 @@ export default function ApplicantSidePanel({
   onAccept,
   onReject,
 }: any) {
+
   if (!applicant) return null;
 
-  const levelStyles = {
-    Senior: "bg-blue-100 text-blue-600",
-    "Mid-Level": "bg-purple-100 text-purple-600",
-    Junior: "bg-green-100 text-green-600",
+  const levelStyles: any = {
+    Senior:
+      "bg-blue-100 text-blue-600",
+
+    "Mid-Level":
+      "bg-purple-100 text-purple-600",
+
+    Mid:
+      "bg-purple-100 text-purple-600",
+
+    Junior:
+      "bg-green-100 text-green-600",
+
+    Beginner:
+      "bg-green-100 text-green-600",
   };
 
-  const statusStyles = {
-    Accepted: "bg-green-100 text-green-700",
-    Pending: "bg-yellow-100 text-yellow-700",
-    Rejected: "bg-red-100 text-red-600",
+  const statusStyles: any = {
+    Accepted:
+      "bg-green-100 text-green-700",
+
+    Pending:
+      "bg-yellow-100 text-yellow-700",
+
+    Rejected:
+      "bg-red-100 text-red-600",
+
+    Cancelled:
+      "bg-gray-100 text-gray-500",
   };
 
   return (
@@ -28,166 +51,378 @@ export default function ApplicantSidePanel({
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/20 z-40"
+          className="
+            fixed inset-0
+            bg-black/20 z-40
+          "
         />
       )}
 
       {/* PANEL */}
       <div
-        className={`fixed top-0 right-0 h-full w-[420px] bg-white border-l shadow-xl z-50 transform transition duration-300 ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`
+          fixed top-0 right-0
+          h-full w-[420px]
+          bg-white border-l
+          shadow-xl z-50
+          transform transition duration-300
+          overflow-hidden
+          flex flex-col
+          ${
+            isOpen
+              ? "translate-x-0"
+              : "translate-x-full"
+          }
+        `}
       >
+
         {/* CLOSE BUTTON */}
         <div className="flex justify-end p-4">
+
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 transition"
+            className="
+              text-gray-400
+              hover:text-gray-700
+              transition
+            "
           >
             <X size={22} />
           </button>
+
         </div>
 
-        {/* CONTENT */}
-        <div className="px-6 pb-6 overflow-y-auto h-full space-y-6">
+        {/* SCROLLABLE CONTENT */}
+        <div
+          className="
+            flex-1 overflow-y-auto
+    px-6 pt-4 pb-8
+            space-y-6
+            
+          "
+        >
 
           {/* PROFILE */}
           <div className="text-center">
+
             <img
-              src={applicant.avatar}
-              className="w-24 h-24 rounded-full mx-auto border-4 border-gray-100"
+              src={
+                applicant.menteeProfilePicture ||
+                "https://ui-avatars.com/api/?name=Applicant"
+              }
+              className="
+                w-24 h-24 rounded-full
+                mx-auto border-4
+                border-gray-100
+                object-cover
+              "
             />
 
-            <h2 className="mt-4 text-[22px] font-semibold text-[#1F2432]">
-              {applicant.name}
+            <h2 className="
+              mt-4 text-[22px]
+              font-semibold text-[#1F2432]
+              break-words
+            ">
+
+              {applicant.menteeName}
+
             </h2>
 
-            <p className="text-[15px] text-primary font-medium">
-              UX Design 2024
+            <p className="
+              text-[15px]
+              text-primary font-medium
+              break-words
+            ">
+
+              {applicant.programName}
+
             </p>
 
             {/* BADGES */}
-            <div className="flex justify-center gap-3 mt-3">
+            <div className="
+              flex justify-center
+              gap-3 mt-3 flex-wrap
+            ">
+
               {/* LEVEL */}
               <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  levelStyles[applicant.level as keyof typeof levelStyles] ||
-                  "bg-gray-100 text-gray-600"
-                }`}
+                className={`
+                  px-3 py-1 rounded-full
+                  text-xs font-medium
+                  ${
+                    levelStyles[
+                      applicant.level
+                    ] ||
+                    "bg-gray-100 text-gray-600"
+                  }
+                `}
               >
+
                 {applicant.level}
+
               </span>
 
               {/* STATUS */}
               <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  statusStyles[applicant.status as keyof typeof statusStyles] ||
-                  "bg-gray-100 text-gray-600"
-                }`}
+                className={`
+                  px-3 py-1 rounded-full
+                  text-xs font-medium
+                  ${
+                    statusStyles[
+                      applicant.status
+                    ] ||
+                    "bg-gray-100 text-gray-600"
+                  }
+                `}
               >
+
                 {applicant.status}
+
               </span>
+
             </div>
 
-            <button className="mt-3 text-primary text-sm font-medium">
-              View Full Profile →
-            </button>
           </div>
 
           {/* INFO */}
           <div>
-            <h4 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+
+            <h4 className="
+              text-xs font-semibold
+              text-gray-400 uppercase
+              mb-3
+            ">
               Applicant Info
             </h4>
 
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Education</span>
-                <span className="font-medium">
-                  {applicant.education || "N/A"}
+            <div className="
+              space-y-4 text-sm
+            ">
+
+              {/* APPLIED DATE */}
+              <div className="
+                flex justify-between
+                gap-4
+              ">
+
+                <span className="text-gray-500">
+                  Applied Date
                 </span>
+
+                <span className="
+                  font-medium text-right
+                ">
+
+                  {new Date(
+                    applicant.appliedAt
+                  ).toLocaleDateString()}
+
+                </span>
+
               </div>
 
-              <div>
-                <p className="text-gray-500 mb-1">Bio</p>
-                <p className="text-gray-600 leading-relaxed">
-                  {applicant.bio || "No bio"}
-                </p>
+              {/* EDUCATION */}
+              <div className="
+                flex justify-between
+                gap-4
+              ">
+
+                <span className="text-gray-500">
+                  Education
+                </span>
+
+                <span className="
+                  font-medium text-right
+                  break-words
+                ">
+
+                  {applicant.education ||
+                    "Not provided"}
+
+                </span>
+
               </div>
+
             </div>
 
-            {/* LINKS */}
-            <div className="flex gap-4 mt-4 text-primary text-sm">
-              <span className="flex items-center gap-1 cursor-pointer">
-                <Link2 size={14} /> LinkedIn
-              </span>
-              <span className="flex items-center gap-1 cursor-pointer">
-                <Link2 size={14} /> Portfolio
-              </span>
-            </div>
           </div>
 
-          <hr />
+          {/* BIO */}
+          {applicant.bio && (
 
-          {/* ANSWERS */}
-          {applicant.answers && (
             <div>
-              <h4 className="font-semibold text-[15px] mb-3">
-                Application Answers
+
+              <h4 className="
+                text-xs font-semibold
+                text-gray-400 uppercase
+                mb-3
+              ">
+                Bio
               </h4>
 
-              {applicant.answers.map((a: any, i: number) => (
-                <div key={i}>
-                  <p className="font-medium text-[14px] mb-2">
-                    {a.question}
-                  </p>
+              <div className="
+                bg-gray-50 p-4
+                rounded-2xl
+                text-sm text-gray-600
+                leading-7 break-words
+              ">
 
-                  <div className="bg-gray-50 p-4 rounded-xl text-sm text-gray-600 leading-relaxed">
-                    {a.answer}
-                  </div>
-                </div>
-              ))}
+                {applicant.bio}
+
+              </div>
+
             </div>
           )}
 
-          {/* ACTIONS */}
-          <div className="pt-4 space-y-3">
+          {/* ANSWERS */}
+          {applicant.answers?.length > 0 && (
 
-            {/* ACCEPT */}
-            <button
-              disabled={applicant.status === "Accepted"}
-              onClick={() => onAccept(applicant.id)}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition
-                ${
-                  applicant.status === "Accepted"
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-[#1FA38A] text-white hover:opacity-90"
-                }
-              `}
-            >
-              <CheckCircle size={18} />
-              Accept Application
-            </button>
+            <div>
 
-            {/* REJECT */}
-            <button
-              disabled={applicant.status === "Rejected"}
-              onClick={() => onReject(applicant.id)}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium transition border
-                ${
-                  applicant.status === "Rejected"
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "text-gray-600 hover:bg-gray-50"
-                }
-              `}
-            >
-              <XCircle size={18} />
-              Reject Application
-            </button>
+              <h4 className="
+                text-xs font-semibold
+                text-gray-400 uppercase
+                mb-4
+              ">
+                Application Answers
+              </h4>
 
-          </div>
+              <div className="space-y-4">
+
+                {applicant.answers.map(
+                  (
+                    answer: any,
+                    index: number
+                  ) => (
+
+                    <div
+                      key={index}
+                      className="
+                        border rounded-2xl
+                        p-4 bg-gray-50
+                      "
+                    >
+
+                      <p className="
+                        text-sm font-semibold
+                        text-[#1F2432]
+                        mb-2
+                        break-words
+                      ">
+
+                        {answer.questionText}
+
+                      </p>
+
+                      <p className="
+                        text-sm text-gray-600
+                        leading-7 break-words
+                      ">
+
+                        {answer.answerText}
+
+                      </p>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+
+            </div>
+          )}
 
         </div>
+
+        {/* STICKY ACTIONS */}
+        <div
+          className="
+            border-t bg-white
+            px-6 py-4
+            space-y-3
+            sticky bottom-0
+          "
+        >
+
+          {/* ACCEPT */}
+          <button
+            disabled={
+              applicant.status ===
+              "Accepted"
+            }
+            onClick={() =>
+              onAccept(
+                applicant.applicationId
+              )
+            }
+            className={`
+              w-full flex items-center
+              justify-center gap-2
+              py-3 rounded-xl
+              font-medium transition
+              ${
+                applicant.status ===
+                "Accepted"
+                  ? `
+                    bg-gray-200
+                    text-gray-400
+                    cursor-not-allowed
+                  `
+                  : `
+                    bg-[#1FA38A]
+                    text-white
+                    hover:opacity-90
+                  `
+              }
+            `}
+          >
+
+            <CheckCircle size={18} />
+
+            Accept Application
+
+          </button>
+
+          {/* REJECT */}
+          <button
+            disabled={
+              applicant.status ===
+              "Rejected"
+            }
+            onClick={() =>
+              onReject(
+                applicant.applicationId
+              )
+            }
+            className={`
+              w-full flex items-center
+              justify-center gap-2
+              py-3 rounded-xl
+              font-medium transition border
+              ${
+                applicant.status ===
+                "Rejected"
+                  ? `
+                    bg-gray-100
+                    text-gray-400
+                    cursor-not-allowed
+                  `
+                  : `
+                    text-gray-600
+                    hover:bg-gray-50
+                  `
+              }
+            `}
+          >
+
+            <XCircle size={18} />
+
+            Reject Application
+
+          </button>
+
+        </div>
+
       </div>
     </>
   );

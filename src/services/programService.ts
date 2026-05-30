@@ -1,5 +1,5 @@
-import axios from "axios";
 import api from "../config/api";
+import apiClient from "./api";
 import lookupAPI from "./lookupService";
 
 /** Backend `ProgramPostStatus`: Draft = 1, Published = 2 */
@@ -37,7 +37,7 @@ export interface CreateProgramApiInput {
   educationLevel: number;
 
   capacity: number;
-  duration: string;
+duration: string | number;
   availability: string;
 
   technologies: ProgramTechnologyRequirement[];
@@ -47,6 +47,9 @@ export interface CreateProgramApiInput {
   roadmapId?: number | null;
 
   questions: ProgramQuestionPayload[];
+
+  programImageUrl?: string;
+deadline?: string | null;
 }
 
 export interface CreateProgramApiResponse {
@@ -419,6 +422,7 @@ export const createProgram = async (
       data.duration.trim()
         ? data.duration.trim()
         : "",
+
     availability:
       data.availability &&
       data.availability.trim()
@@ -432,8 +436,17 @@ export const createProgram = async (
     ),
 
     // Use filtered valid questions
-    questions:
-      validQuestions,
+questions:
+  validQuestions,
+
+...(data.programImageUrl && {
+  programImageUrl:
+    data.programImageUrl,
+}),
+
+...(data.deadline && {
+  deadline: data.deadline,
+}),
   };
 
   // Only include roadmapId if it's valid
@@ -449,35 +462,23 @@ export const createProgram = async (
   }
 
  console.log(
-  "PAYLOAD SENT TO AXIOS:",
+  "PAYLOAD SENT TO api:",
   payload
 );
 
 const response =
-  await axios.post(
-    "http://localhost:5069/api/ProgramMentor/Create_Program",
-    payload,
-    {
-      headers: {
-        "Content-Type":
-          "application/json",
-
-        Authorization: `Bearer ${localStorage.getItem(
-          "accessToken"
-        )}`,
-      },
-    }
-  );
+ await api.post(
+  "/ProgramMentor/Create_Program",
+  payload
+);
 
   return response.data;
 };
 
 export const fetchProgramById = async (programId: number) => {
-  const resp = await axios.get(`http://localhost:5069/api/ProgramMentor/${programId}/GetById`, {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-  });
+  const resp = await api.get(
+  `/ProgramMentor/${programId}/GetById`
+);
 
   return resp.data;
 };
@@ -517,16 +518,295 @@ export const updateProgram = async (programId: number, data: CreateProgramApiInp
     payload.roadmapId = data.roadmapId;
   }
 
-  const response = await axios.patch(
-    `http://localhost:5069/api/ProgramMentor/${programId}/update`,
-    payload,
+  const response = await api.patch(
+  `/ProgramMentor/${programId}/update`,
+  payload
+);
+
+  return response.data as CreateProgramApiResponse;
+};
+
+export async function uploadProgramImage(file: File) {
+  const formData = new FormData();
+
+  formData.append("file", file);
+
+  const response = await api.post(
+    "/File/upload-program-image",
+    formData,
     {
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+        "Content-Type": "multipart/form-data",
       },
     }
   );
 
-  return response.data as CreateProgramApiResponse;
+  return response.data;
+}
+
+export const getMyPublishedPrograms = async () => {
+  const response = await api.get(
+    "/ProgramMentor/AllpublishedPrograms"
+  );
+
+  return response.data;
+};
+
+export interface ProgramViewDto {
+  programId: number;
+
+  title: string;
+
+  description: string;
+
+  programImageUrl?: string;
+
+  targetLevel: string;
+
+  domainName: string;
+
+  subDomainName: string;
+
+  duration: string;
+
+  deadline: string;
+
+  menteesCount: number;
+
+  likesCount: number;
+
+  commentsCount: number;
+
+  shareUrl: string;
+
+  mentorProfileId: string;
+
+  mentorName: string;
+
+  profilePictureUrl?: string;
+
+  bio?: string;
+
+  isLiked: boolean;
+
+  isSaved: boolean;
+
+  isApplied: boolean;
+
+  roadmap?: {
+    roadmapId: number;
+    title: string;
+    phases?: Array<{
+      phaseId: number;
+      title: string;
+      description?: string;
+    }>;
+  };
+}
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  errors?: string[];
+}
+
+export const getProgramView = async (
+  programId: number
+): Promise<ProgramViewDto> => {
+  const response = await api.get<ApiResponse<ProgramViewDto>>(
+    `/ProgramMentee/${programId}/view`
+  );
+
+  return response.data.data;
+};
+
+export const toggleProgramLike = async (
+  programId: number
+) => {
+  const response = await api.post(
+    `/ProgramMentee/${programId}/like`
+  );
+
+  return response.data;
+};
+
+export const toggleProgramSave = async (
+  programId: number
+) => {
+  const response = await api.post(
+    `/ProgramMentee/${programId}/save`
+  );
+
+  return response.data;
+};
+
+
+export interface ProgramQuestionDto {
+  questionId: number;
+  questionText: string;
+}
+
+export const getProgramQuestions = async (
+  programId: number
+): Promise<ProgramQuestionDto[]> => {
+  const response = await api.get(
+    `/ProgramMentee/${programId}/questions`
+  );
+
+  return response.data.data;
+};
+
+export const applyToProgram = async (
+  programId: number,
+  payload: {
+   answers: {
+  questionId: number;
+  questionAnswer: string;
+}[];
+    additionalComment?: string;
+  }
+) => {
+  const response = await api.post(
+    `/ProgramMentee/${programId}/apply`,
+    payload
+  );
+
+  return response.data;
+};
+
+export const withdrawApplication =
+  async (programId: number) => {
+
+    const response = await api.delete(
+      `/ProgramMentee/${programId}/withdraw-application`
+    );
+
+    return response.data;
+};
+
+export const getApplicantsByProgram =
+  async (
+    programId: number,
+    pageNumber = 1,
+    pageSize = 10,
+    status?: string,
+    search?: string
+  ) => {
+
+    const response = await api.get(
+      `/Applicants/by-program`,
+      {
+        params: {
+          programId,
+          pageNumber,
+          pageSize,
+          status,
+          search,
+        },
+      }
+    );
+
+    return response.data;
+};
+
+export const acceptApplicant =
+  async (applicationId: number) => {
+
+    const response = await api.patch(
+      `/Applicants/${applicationId}/accept`
+    );
+
+    return response.data;
+};
+
+export const rejectApplicant =
+  async (applicationId: number) => {
+
+    const response = await api.patch(
+      `/Applicants/${applicationId}/reject`
+    );
+
+    return response.data;
+};
+
+export const setApplicantPending =
+  async (applicationId: number) => {
+
+    const response = await api.patch(
+      `/Applicants/${applicationId}/pending`
+    );
+
+    return response.data;
+};
+
+export const exportApplicants =
+  async (programId: number) => {
+
+    const response = await api.get(
+      `/Applicants/by-program`,
+      {
+        params: {
+          programId,
+          isExport: true,
+        },
+
+        responseType: "blob",
+      }
+    );
+
+    return response.data;
+};
+
+export const sendResults =
+  async (programId: number) => {
+
+    const response = await api.post(
+      `/Applicants/program/${programId}/notify-all`
+    );
+
+    return response.data;
+};
+
+export const getProgramComments =
+  async (programId: number) => {
+
+    const response =
+      await api.get(
+        `/Comment?programId=${programId}`
+      );
+
+    return response.data.data;
+};
+
+
+export const addProgramComment =
+  async (
+    programId: number,
+    commentText: string
+  ) => {
+
+    const response =
+      await api.post(
+        `/Comment?programId=${programId}`,
+        commentText,
+        {
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+
+    return response.data.data;
+};
+
+export const getMyApplications = async (
+  pageNumber = 1,
+  pageSize = 20
+) => {
+const response = await api.get(
+      `/Applicants/my-applications?pageNumber=${pageNumber}&pageSize=${pageSize}`
+  );
+
+  return response.data;
 };

@@ -36,41 +36,98 @@ export function validateContentForSave(
         topicTitleSeen.add(key);
       }
 
-      const taskTitleSeen = new Set<string>();
-      for (const task of topic.tasks) {
-        if (!isNonEmptyText(task.title)) {
-          issues.push(`Task under “${topic.title}” needs a title.`);
-        } else {
-          const key = normalizeText(task.title).toLowerCase();
-          if (taskTitleSeen.has(key)) {
-            issues.push(
-              `Duplicate task titles are not allowed within “${topic.title}”.`
-            );
-          }
-          taskTitleSeen.add(key);
-        }
+const taskTitleSeen = new Set<string>();
 
-        if (!isNonEmptyText(task.description)) {
-          issues.push(`Task “${task.title || 'Untitled'}” in “${topic.title}” needs a description.`);
-        }
+for (const task of topic.tasks) {
 
-        if (task.deadline) {
-          const deadline = new Date(task.deadline);
-          if (Number.isNaN(deadline.getTime())) {
-            issues.push(`Task “${task.title || 'Untitled'}” has an invalid deadline.`);
-          } else if (deadline <= new Date()) {
-            issues.push(`Task “${task.title || 'Untitled'}” deadline must be in the future.`);
-          }
-        }
+  if (!isNonEmptyText(task.title)) {
 
-        if (!task.attachmentUrl?.trim()) {
-          issues.push(`Task "${task.title || 'Untitled'}" in "${topic.title}" requires an attachment URL.`);
-        } else if (!isValidUrl(task.attachmentUrl.trim())) {
-          issues.push(
-            `Task "${task.title || 'Untitled'}" in "${topic.title}" requires a valid http(s) URL attachment.`
-          );
-        }
-      }
+    issues.push(
+      `Task under “${topic.title}” needs a title.`
+    );
+
+  } else {
+
+    const key =
+      normalizeText(task.title)
+        .toLowerCase();
+
+    if (taskTitleSeen.has(key)) {
+
+      issues.push(
+        `Duplicate task titles are not allowed within “${topic.title}”.`
+      );
+    }
+
+    taskTitleSeen.add(key);
+  }
+
+  if (
+    !isNonEmptyText(
+      task.description
+    )
+  ) {
+
+    issues.push(
+      `Task “${
+        task.title || "Untitled"
+      }” in “${
+        topic.title
+      }” needs a description.`
+    );
+  }
+
+  if (task.deadline) {
+
+    const deadline =
+      new Date(task.deadline);
+
+    if (
+      Number.isNaN(
+        deadline.getTime()
+      )
+    ) {
+
+      issues.push(
+        `Task “${
+          task.title || "Untitled"
+        }” has an invalid deadline.`
+      );
+
+    } else if (
+      deadline <= new Date()
+    ) {
+
+      issues.push(
+        `Task “${
+          task.title || "Untitled"
+        }” deadline must be in the future.`
+      );
+    }
+  }
+
+  /**
+   * attachment optional
+   * upload endpoint may return:
+   * - relative path
+   * - full url
+   */
+
+  if (
+    task.attachmentUrl &&
+    typeof task.attachmentUrl !==
+      "string"
+  ) {
+
+    issues.push(
+      `Task "${
+        task.title || "Untitled"
+      }" in "${
+        topic.title
+      }" has an invalid attachment.`
+    );
+  }
+}
 
       const matTitleSeen = new Set<string>();
       for (const mat of topic.materials) {

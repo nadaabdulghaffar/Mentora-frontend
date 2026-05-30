@@ -193,17 +193,17 @@ function App() {
         }
       />
       <Route
-        path="/classroom"
-        element={
-          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
-            {authAPI.getCurrentUser()?.role?.toLowerCase() === 'mentor' ? (
-              <MentorClassroomPage />
-            ) : (
-              <MenteeClassroomPage />
-            )}
-          </ProtectedRoute>
-        }
-      />
+  path="/classroom/:programId"
+  element={
+    <ProtectedRoute roles={['mentor', 'mentee']}>
+      {authAPI.getCurrentUser()?.role?.toLowerCase() === 'mentor' ? (
+        <MentorClassroomPage />
+      ) : (
+        <MenteeClassroomPage />
+      )}
+    </ProtectedRoute>
+  }
+/>
       <Route
         path="/community"
         element={

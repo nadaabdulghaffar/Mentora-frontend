@@ -63,6 +63,8 @@ export interface CreateRoadmapBasicInfoRequest {
   subDomainId: number;
   targetLevelFrom?: number | null;
   targetLevelTo?: number | null;
+  technologyIds: number[];
+
 }
 
 export interface CreatePhaseRequest {
@@ -155,15 +157,31 @@ export interface RoadmapPhaseDto {
 
 export interface RoadmapDetailsDto {
   roadmapId: number;
+
   title: string;
+
   description: string;
+
   duration: number;
+
   skillDomainId: number;
+
   subDomainId: number;
+
   targetLevelFrom?: number | null;
+
   targetLevelTo?: number | null;
-  status?: string | null;
+
+  status?: string | number | null;
+
   technologyIds?: number[];
+
+  mentorProfileId?: string;
+
+  mentorName?: string;
+
+  profilePictureUrl?: string | null;
+
   phases: RoadmapPhaseDto[];
 }
 

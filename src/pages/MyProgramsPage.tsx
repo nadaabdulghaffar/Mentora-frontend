@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../shared/components/Layout";
 import ProgramCard from "../components/ProgramCard";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
+
+import {
+  getMyPublishedPrograms,
+  getMyApplications,
+} from "../services/programService";
+
+
 
 type MyProgramItem = {
   id: string;
@@ -17,52 +24,12 @@ type MyProgramItem = {
   progress?: number;
 };
 
-const mentorProgramsMock: MyProgramItem[] = [
-  {
-    id: "m-1",
-    title: "UX Research Fundamentals",
-    description: "Master the art of user research with industry experts from top tech companies.",
-    tag: "DESIGN",
-    phases: "8 Phases",
-    progress: 72,
-  },
-  {
-    id: "m-2",
-    title: "Business Strategy Fundamentals",
-    description: "Master the art of business strategy with industry experts from top tech companies.",
-    tag: "BUSINESS",
-    phases: "8 Phases",
-    progress: 38,
-  },
-];
-
-const menteeProgramsMock: MyProgramItem[] = [
-  {
-    id: "t-1",
-    title: "UX Research Fundamentals",
-    description: "Master the art of user research with industry experts from top tech companies.",
-    tag: "DESIGN",
-    phases: "8 Phases",
-    mentorName: "Mona Zaki",
-    mentorAvatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    progress: 88,
-  },
-  {
-    id: "t-2",
-    title: "Business Strategy Fundamentals",
-    description: "Master the art of business strategy with industry experts from top tech companies.",
-    tag: "BUSINESS",
-    phases: "8 Phases",
-    mentorName: "Ahmed Samir",
-    mentorAvatar: "https://randomuser.me/api/portraits/men/32.jpg",
-    progress: 24,
-  },
-];
 
 const MyProgramsPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [programs, setPrograms] = useState<MyProgramItem[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -75,14 +42,11 @@ const MyProgramsPage = () => {
         return;
       }
 
-      const localUser = authAPI.getCurrentUser();
-      if (localUser) {
-        if (isMounted) {
-          setUser(localUser);
-          setLoading(false);
-        }
-        return;
-      }
+const localUser = authAPI.getCurrentUser();
+
+if (localUser && isMounted) {
+  setUser(localUser);
+}
 
       try {
         const response = await authAPI.getMe();
@@ -90,6 +54,95 @@ const MyProgramsPage = () => {
           localStorage.setItem("user", JSON.stringify(response.data));
           if (isMounted) {
             setUser(response.data);
+            const role =
+  String(response.data.role).toLowerCase();
+  console.log("ROLE =", role);
+console.log("USER =", response.data);
+
+if (role === "mentor") {
+  const programsRes =
+    await getMyPublishedPrograms();
+
+  if (
+    programsRes.success &&
+    programsRes.data
+  ) {
+    const mapped =
+      programsRes.data.items.map(
+        (p: any) => ({
+          id: String(p.programId),
+
+          title: p.title,
+
+          description:
+            p.description,
+
+          tag:
+            p.domainName?.toUpperCase?.() ??
+            "PROGRAM",
+
+          phases: "8 Phases",
+
+          image: p.programImageUrl
+            ? `http://localhost:5069${p.programImageUrl}`
+            : undefined,
+
+          progress: 0,
+        })
+      );
+
+    if (isMounted) {
+      setPrograms(mapped);
+    }
+  }
+} else {
+  const appsRes =
+    await getMyApplications();
+    console.log("APPLICATIONS RESPONSE", appsRes);
+
+  if (
+    appsRes.success &&
+    appsRes.data
+  ) {
+    const accepted =
+      appsRes.data.items.filter(
+        (a: any) =>
+          a.status === "Accepted"
+      );
+
+    const mapped =
+      accepted.map((a: any) => ({
+        id: String(a.applicationId),
+
+        title: a.programTitle,
+
+        description:
+          a.programDescription,
+
+        tag:
+          a.mentorDomain?.toUpperCase?.() ??
+          "PROGRAM",
+
+        phases: "8 Phases",
+
+        image: a.programImageUrl
+          ? `http://localhost:5069${a.programImageUrl}`
+          : undefined,
+
+        mentorName:
+          a.mentorName,
+
+        mentorAvatar:
+          a.mentorProfilePicture,
+
+        progress: 0,
+      }));
+
+    if (isMounted) {
+      setPrograms(mapped);
+    }
+  }
+}
             setLoading(false);
           }
           return;
@@ -117,12 +170,8 @@ const MyProgramsPage = () => {
   const subtitle =
     "Monitor your mentorship requests and program enrollments here. Manage your path to mastery all in one place.";
 
-  // TODO: Replace mock with backend endpoint when available.
-  // Mentor expected: GET /api/programs/my-created
-  // Mentee expected: GET /api/programs/my-accepted
-  const programs = useMemo(() => {
-    return isMentor ? mentorProgramsMock : menteeProgramsMock;
-  }, [isMentor]);
+ 
+
 
   if (loading) {
     return (
@@ -175,12 +224,11 @@ const MyProgramsPage = () => {
                 primaryButtonText="Join classroom"
                 className="w-full max-w-[340px] md:max-w-[360px]"
                 onPrimaryClick={() => {
-                  navigate('/classroom', {
-                    state: {
-                      programId: program.id,
-                      role,
-                    },
-                  });
+                navigate(`/classroom/${program.id}`, {
+  state: {
+    role,
+  },
+});
                 }}
               />
             ))}

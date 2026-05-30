@@ -106,7 +106,6 @@ export default function ProgramRequirementsStep() {
             <option value={5}>Graduate</option>
           </select>
           <p className={hintStyle}>
-            Matches your mentees' academic year (university track). Stored as <span className="font-medium">EducationStatus</span> on the server.
           </p>
           {getIn(errors, "educationLevel") && <p className={errorStyle}>{String(getIn(errors, "educationLevel"))}</p>}
         </div>
@@ -125,7 +124,6 @@ export default function ProgramRequirementsStep() {
             <option value={4}>Senior</option>
           </select>
           <p className={hintStyle}>
-            Lowest experience band you expect from applicants. Stored as <span className="font-medium">CurrentLevel</span>.
           </p>
           {getIn(errors, "targetLevel") && <p className={errorStyle}>{String(getIn(errors, "targetLevel"))}</p>}
         </div>
@@ -134,7 +132,6 @@ export default function ProgramRequirementsStep() {
       <div>
         <label className={labelStyle}>Technologies &amp; required experience</label>
         <p className={`${hintStyle} mb-2`}>
-          Options come from your selected sub-domain. Check a technology, then set the minimum <span className="font-medium">ExperienceLevel</span> you require. Publishing needs at least one complete row.
         </p>
 
         {techLoading && <p className="text-xs text-[#64748B] mb-2">Loading technologies…</p>}
@@ -240,20 +237,34 @@ export default function ProgramRequirementsStep() {
           {getIn(errors, "capacity") && <p className={errorStyle}>{String(getIn(errors, "capacity"))}</p>}
         </div>
 
-        <div>
-          <label className={labelStyle}>Application deadline</label>
-          <input
-            type="date"
-            value={values.deadline ?? ""}
-            onChange={(e) => setFieldValue("deadline", e.target.value)}
-            className={inputStyle}
-          />
-        </div>
+       <div>
+  <label className={labelStyle}>
+Application deadline
+  </label>
+
+  <input
+    type="date"
+    value={values.deadline ?? ""}
+    onChange={(e) =>
+      setFieldValue("deadline", e.target.value)
+    }
+    className={inputStyle}
+  />
+
+  {getIn(errors, "deadline") && (
+    <p className={errorStyle}>
+      {String(getIn(errors, "deadline"))}
+    </p>
+  )}
+</div>
+
+
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelStyle}>Program duration</label>
+          <label className={labelStyle}>  Program duration (Optional)
+</label>
           <select
             value={values.duration}
             onChange={(e) => setFieldValue("duration", e.target.value)}
@@ -266,12 +277,13 @@ export default function ProgramRequirementsStep() {
             <option value="3 Months">3 Months</option>
             <option value="6 Months">6 Months</option>
           </select>
-          <p className={hintStyle}>Required when you <span className="font-medium">publish</span>; optional for drafts.</p>
           {getIn(errors, "duration") && <p className={errorStyle}>{String(getIn(errors, "duration"))}</p>}
         </div>
 
         <div>
-          <label className={labelStyle}>Your availability</label>
+          <label className={labelStyle}>
+  Your availability (Optional)
+          </label>
           <select
             value={values.availability}
             onChange={(e) => setFieldValue("availability", e.target.value)}
@@ -282,13 +294,11 @@ export default function ProgramRequirementsStep() {
             <option value="Weekends">Weekends</option>
             <option value="Flexible">Flexible</option>
           </select>
-          <p className={hintStyle}>Required when you <span className="font-medium">publish</span>; optional for drafts.</p>
           {getIn(errors, "availability") && <p className={errorStyle}>{String(getIn(errors, "availability"))}</p>}
         </div>
       </div>
 
       <div className="rounded-xl bg-[#F8F9FC] px-4 py-3 text-sm text-[#64748B]">
-        Application deadline is stored on this device only until the backend supports it on create.
       </div>
     </div>
   );

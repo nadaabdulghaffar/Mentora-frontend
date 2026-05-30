@@ -7,31 +7,24 @@ import type { LocalPhase } from "../../types/roadmap";
 export function validatePublishStructure(
   phases: LocalPhase[]
 ): string[] {
+
   const issues: string[] = [];
 
   if (!phases.length) {
-    issues.push("Add at least one phase before publishing.");
+    issues.push(
+      "Add at least one phase before publishing."
+    );
+
     return issues;
   }
 
   for (const phase of phases) {
+
     if (!phase.topics.length) {
+
       issues.push(
         `Phase “${phase.title || "Untitled"}” needs at least one topic.`
       );
-      continue;
-    }
-    for (const topic of phase.topics) {
-      if (!topic.tasks.length) {
-        issues.push(
-          `Topic “${topic.title || "Untitled"}” needs a task before publishing.`
-        );
-      }
-      if (!topic.materials.length) {
-        issues.push(
-          `Topic “${topic.title || "Untitled"}” needs at least one material.`
-        );
-      }
     }
   }
 

@@ -9,105 +9,283 @@ import ApplicantsTable from "../components/ManageApplicants/ApplicantsTable";
 import ApplicationsPagination from "../components/ManageApplicants/ApplicationsPagination";
 import ApplicantSidePanel from "../components/ManageApplicants/ApplicantSidePanel";
 import type { Applicant } from "../components/ManageApplicants/types";
+import SendResultsModal
+from "../components/ManageApplicants/SendResultsModal";
 
-type ApplicantRecord = Applicant & {
-  education: string;
-  bio: string;
-  answers: { question: string; answer: string }[];
-};
+import { useParams } from "react-router-dom";
 
-const applicantsMock: ApplicantRecord[] = Array.from({ length: 25 }, (_, index) => ({
-  id: String(index + 1),
-  name: `Applicant ${index + 1}`,
-  avatar: `https://i.pravatar.cc/100?img=${index + 10}`,
-  appliedDate: "Oct 10, 2023",
-  level: ["Junior", "Mid-Level", "Senior"][index % 3] as Applicant["level"],
-  program: "UX Program",
-  status: ["Accepted", "Pending", "Rejected"][index % 3] as Applicant["status"],
-  education: "BFA Digital Design",
-  bio: "Passionate about UX and accessibility.",
-  answers: [
-    {
-      question: "Why do you want to join this mentorship?",
-      answer: "I want to grow in UX and learn from mentors.",
-    },
-  ],
-}));
+import type {
+  ApplicantListItemDto,
+  ProgramApplicantsResponseDto,
+} from "../components/ManageApplicants/types";
+
+
+import {
+  getApplicantsByProgram,
+    acceptApplicant,
+  rejectApplicant,
+  setApplicantPending,
+    exportApplicants,
+      sendResults,
+
+} from "../services/programService";
+
+
 
 export default function ApplicationsDetailsPage() {
   const [search, setSearch] = useState("");
+  const { id } = useParams();
+
+const [applicants, setApplicants] =
+  useState<ApplicantListItemDto[]>([]);
+
+const [loading, setLoading] =
+  useState(false);
+
+const [applicantsData, setApplicantsData] =
+  useState<ProgramApplicantsResponseDto | null>(
+    null
+  );
+
   const [levelFilter, setLevelFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
   const [rowsPerPage, setRowsPerPage] = useState(4);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedApplicant, setSelectedApplicant] = useState<ApplicantRecord | null>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [statusState, setStatusState] = useState<Record<string, Applicant["status"]>>(
-    Object.fromEntries(applicantsMock.map((applicant) => [applicant.id, applicant.status])) as Record<
-      string,
-      Applicant["status"]
-    >
+const [selectedApplicant, setSelectedApplicant] =
+  useState<ApplicantListItemDto | null>(
+    null
   );
+    const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
-  const filteredApplicants = applicantsMock.filter((applicant) => {
-    const currentStatus = statusState[applicant.id];
+  const [showSendModal, setShowSendModal] =
+  useState(false);
 
-    return (
-      applicant.name.toLowerCase().includes(search.toLowerCase()) &&
-      (levelFilter === "All" || applicant.level === levelFilter) &&
-      (statusFilter === "All" || currentStatus === statusFilter)
-    );
-  });
+const [sendingResults, setSendingResults] =
+  useState(false);
 
-  const sortedApplicants = [...filteredApplicants].sort((a, b) => {
-    const firstDate = new Date(a.appliedDate).getTime();
-    const secondDate = new Date(b.appliedDate).getTime();
-    return sortOrder === "ASC" ? firstDate - secondDate : secondDate - firstDate;
-  });
+ 
 
-  const totalPages = Math.max(1, Math.ceil(sortedApplicants.length / rowsPerPage));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const startIndex = (safeCurrentPage - 1) * rowsPerPage;
-  const paginatedApplicants = sortedApplicants.slice(startIndex, startIndex + rowsPerPage);
+ 
+
+
+  useEffect(() => {
+
+  const fetchApplicants =
+    async () => {
+
+      try {
+
+        setLoading(true);
+
+        const response =
+          await getApplicantsByProgram(
+            Number(id),
+            currentPage,
+            rowsPerPage,
+            statusFilter === "All"
+              ? undefined
+              : statusFilter,
+            search
+          );
+
+        setApplicants(
+          response.data.items
+        );
+
+        setApplicantsData(
+          response.data
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+      } finally {
+
+        setLoading(false);
+      }
+    };
+
+  if (id) {
+    fetchApplicants();
+  }
+
+}, [
+  id,
+  currentPage,
+  rowsPerPage,
+  statusFilter,
+  search,
+]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [rowsPerPage, search, levelFilter, statusFilter, sortOrder]);
 
-  const handleRowClick = (applicant: ApplicantRecord) => {
-    setSelectedApplicant({
-      ...applicant,
-      status: statusState[applicant.id],
-    });
-    setIsPanelOpen(true);
-  };
 
-  const handleStatusChange = (id: string, nextStatus: Applicant["status"]) => {
-    setStatusState((prev) => ({
-      ...prev,
-      [id]: nextStatus,
-    }));
+const handleRowClick = (
+  applicant: ApplicantListItemDto
+) => {
+    console.log(applicant);
 
-    setSelectedApplicant((prev) =>
-      prev && prev.id === id
-        ? {
-            ...prev,
-            status: nextStatus,
-          }
-        : prev
-    );
-  };
+
+  setSelectedApplicant(applicant);
+
+  setIsPanelOpen(true);
+};
+
+
+const handleExport =
+  async () => {
+
+    try {
+
+      const blob =
+        await exportApplicants(
+          Number(id)
+        );
+
+      const url =
+        window.URL.createObjectURL(
+          new Blob([blob])
+        );
+
+      const link =
+        document.createElement("a");
+
+      link.href = url;
+
+      link.setAttribute(
+        "download",
+        "Applicants.xlsx"
+      );
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      link.remove();
+
+    } catch (error) {
+
+      console.error(error);
+    }
+};
+
+const handleSendResults =
+  async () => {
+
+    try {
+
+      setSendingResults(true);
+
+      await sendResults(
+        Number(id)
+      );
+
+      setShowSendModal(false);
+
+      console.log(
+        "Results sent successfully"
+      );
+
+    } catch (error) {
+
+      console.error(error);
+
+    } finally {
+
+      setSendingResults(false);
+    }
+};
+
+
+const handleStatusChange =
+  async (
+    applicationId: number,
+    nextStatus: string
+  ) => {
+
+    try {
+
+      // update table
+      setApplicants((prev) =>
+        prev.map((app) =>
+          app.applicationId ===
+          applicationId
+            ? {
+                ...app,
+                status: nextStatus,
+              }
+            : app
+        )
+      );
+
+      // update side panel
+      setSelectedApplicant((prev: any) =>
+        prev &&
+        prev.applicationId ===
+          applicationId
+          ? {
+              ...prev,
+              status: nextStatus,
+            }
+          : prev
+      );
+
+      if (nextStatus === "Accepted") {
+
+        await acceptApplicant(
+          applicationId
+        );
+
+      } else if (
+        nextStatus === "Rejected"
+      ) {
+
+        await rejectApplicant(
+          applicationId
+        );
+
+      } else if (
+        nextStatus === "Pending"
+      ) {
+
+        await setApplicantPending(
+          applicationId
+        );
+      }
+
+    } catch (error) {
+
+      console.error(error);
+    }
+};
 
   return (
     <Layout>
       <div className="space-y-6">
-        <ApplicationsHeader
-          title="My Applications"
-          description="Review and manage all applications submitted to your programs."
-        />
+<ApplicationsHeader
+  title="My Applications"
+  description="
+    Review and manage all
+    applications submitted
+    to your programs.
+  "
 
+  onExport={handleExport}
+
+onSendResults={() =>
+  setShowSendModal(true)
+}
+
+/>
         <ApplicationsTabs statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
 
         <div className="flex flex-wrap items-center gap-4">
@@ -140,30 +318,57 @@ export default function ApplicationsDetailsPage() {
         </div>
 
         <ApplicantsTable
-          data={paginatedApplicants}
-          statusState={statusState}
-          setStatusState={setStatusState}
+data={applicants}
+
           openDropdown={openDropdown}
           setOpenDropdown={setOpenDropdown}
           onRowClick={handleRowClick}
-          onChangeStatus={handleStatusChange}
-        />
+onChangeStatus={handleStatusChange}        />
 
         <ApplicationsPagination
-          currentPage={safeCurrentPage}
-          totalPages={totalPages}
-          totalItems={sortedApplicants.length}
-          pageSize={rowsPerPage}
-          onPageChange={setCurrentPage}
-        />
+  currentPage={
+    applicantsData?.currentPage || 1
+  }
+  totalPages={
+    applicantsData?.totalPages || 1
+  }
+  totalItems={
+    applicantsData?.totalCount || 0
+  }
+  pageSize={rowsPerPage}
+  onPageChange={setCurrentPage}
+/>
+<ApplicantSidePanel
+  applicant={selectedApplicant}
+  isOpen={isPanelOpen}
+  onClose={() =>
+    setIsPanelOpen(false)
+  }
 
-        <ApplicantSidePanel
-          applicant={selectedApplicant}
-          isOpen={isPanelOpen}
-          onClose={() => setIsPanelOpen(false)}
-          onAccept={(id: string) => handleStatusChange(id, "Accepted")}
-          onReject={(id: string) => handleStatusChange(id, "Rejected")}
-        />
+  onAccept={(id: number) =>
+    handleStatusChange(
+      id,
+      "Accepted"
+    )
+  }
+
+  onReject={(id: number) =>
+    handleStatusChange(
+      id,
+      "Rejected"
+    )
+  }
+/>
+
+<SendResultsModal
+  open={showSendModal}
+  loading={sendingResults}
+  onClose={() =>
+    setShowSendModal(false)
+  }
+  onConfirm={handleSendResults}
+/>
+
       </div>
     </Layout>
   );

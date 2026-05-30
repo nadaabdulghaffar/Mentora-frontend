@@ -6,6 +6,9 @@ import ExtraProgramCard from "../components/ExtraProgramCard";
 import CreateProgramModal from "../components/create-program/CreateProgramModal";
 import { fetchProgramById } from "../services/programService";
 import type { CreateProgramFormData } from "../components/create-program/types";
+import {
+  getMyPublishedPrograms,
+} from "../services/programService";
 
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
@@ -20,60 +23,48 @@ type MyApplicationItem = {
   status: "Open" | "Closed" | "Accepted" | "Under Review" | "Rejected";
 };
 
-const mentorApplicationsMock: MyApplicationItem[] = [
-  {
-    id: "1",
-    title: "Frontend React Bootcamp",
-    description:
-      "Teach students modern React, component architecture, hooks, routing and deployment workflows.",
-    applicantsCount: 26,
-    deadline: "30 Apr 2026",
-    status: "Open",
-    image:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "2",
-    title: "UI/UX Research Program",
-    description:
-      "Guide mentees through research methods, usability testing, wireframing and portfolio case studies.",
-    applicantsCount: 14,
-    deadline: "10 May 2026",
-    status: "Closed",
-    image:
-      "https://images.unsplash.com/photo-1558655146-9f40138edfeb?q=80&w=1200&auto=format&fit=crop",
-  },
-];
 
-const menteeApplicationsMock: MyApplicationItem[] = [
-  {
-    id: "1",
-    title: "Frontend React Bootcamp",
-    description:
-      "Learn modern React, component architecture, hooks, routing and deployment workflows.",
-    status: "Accepted",
-    image:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "2",
-    title: "UI/UX Research Program",
-    description:
-      "Master research methods, usability testing, wireframing and portfolio case studies.",
-    status: "Under Review",
-    image:
-      "https://images.unsplash.com/photo-1558655146-9f40138edfeb?q=80&w=1200&auto=format&fit=crop",
-  },
-  {
-    id: "3",
-    title: "Backend Foundations",
-    description:
-      "Build strong backend fundamentals with APIs, databases and clean architecture.",
-    status: "Rejected",
-    image:
-      "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=1200&auto=format&fit=crop",
-  },
-];
+
+
+const getProgramStatus = (
+  deadline?: string
+): "Open" | "Closed" => {
+  if (!deadline) {
+    return "Open";
+  }
+
+  const today = new Date();
+  const deadlineDate =
+    new Date(deadline);
+
+  today.setHours(0, 0, 0, 0);
+  deadlineDate.setHours(
+    0,
+    0,
+    0,
+    0
+  );
+
+  return deadlineDate >= today
+    ? "Open"
+    : "Closed";
+};
+
+const formatDeadline = (
+  deadline?: string
+) => {
+  if (
+    !deadline ||
+    deadline.startsWith("0001-01-01")
+  ) {
+    return "No deadline";
+  }
+
+  return new Date(
+    deadline
+  ).toLocaleDateString();
+};
+
 
 const ManageApplicantsPage = () => {
   const navigate = useNavigate();
@@ -99,13 +90,55 @@ const ManageApplicantsPage = () => {
         const res =
           await authAPI.getMe();
 
-        if (
-          res.success &&
-          res.data &&
-          mounted
-        ) {
-          setUser(res.data);
-        }
+       if (
+  res.success &&
+  res.data &&
+  mounted
+) {
+  setUser(res.data);
+
+  if (
+    String(res.data.role).toLowerCase() ===
+    "mentor"
+  ) {
+    const programsRes =
+      await getMyPublishedPrograms();
+console.log(programsRes);
+    if (
+      programsRes.success &&
+      programsRes.data
+    ) {
+const mapped =
+  programsRes.data.items.map((p: any) => ({
+    id: String(p.programId),
+
+    title: p.title,
+
+    description: p.description,
+
+    image: p.programImageUrl
+  ? `http://localhost:5069${p.programImageUrl}`
+  : undefined,
+
+    applicantsCount: 0,
+
+    deadline:
+      p.deadline ?? undefined,
+
+    status: getProgramStatus(
+      p.deadline
+    ),
+  }));
+
+      setMentorApplications(
+        mapped
+        
+      );
+      
+    }
+  }
+}
+        
       } catch (error) {
         console.error(error);
       } finally {
@@ -131,11 +164,11 @@ const ManageApplicantsPage = () => {
   const userRole = String(user?.role || "").toLowerCase();
   const isMentee = userRole === "mentee";
 
-  const [mentorApplications] =
-    useState<MyApplicationItem[]>(mentorApplicationsMock);
+const [mentorApplications, setMentorApplications] =
+  useState<MyApplicationItem[]>([]);
 
   const [menteeApplications, setMenteeApplications] =
-    useState<MyApplicationItem[]>(menteeApplicationsMock);
+useState<MyApplicationItem[]>([]);
 
   const applications = isMentee ? menteeApplications : mentorApplications;
 
@@ -270,7 +303,7 @@ const ManageApplicantsPage = () => {
                   }
                   image={item.image}
                   applicantsCount={item.applicantsCount}
-                  deadline={item.deadline}
+deadline={formatDeadline(item.deadline)}
                   status={item.status}
                   className="w-full"
                   primaryButtonText={

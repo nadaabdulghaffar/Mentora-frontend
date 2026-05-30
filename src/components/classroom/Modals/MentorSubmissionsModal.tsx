@@ -7,7 +7,10 @@ export type MentorSubmissionSummary = {
   studentAvatar: string;
   submittedAt: string;
   fileCount: number;
-  reviewStatus: 'reviewed' | 'pending';
+reviewStatus:
+  | 'reviewed'
+  | 'pending'
+  | 'draft';
 };
 
 type MentorSubmissionsModalProps = {

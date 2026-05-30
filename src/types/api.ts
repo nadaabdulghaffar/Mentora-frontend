@@ -133,3 +133,13 @@ export interface FileUploadResponse {
   fileSize: number;
   contentType: string;
 }
+
+export interface MentorProgramItem {
+  programId: number;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  applicantsCount?: number;
+  deadline?: string;
+  status: string;
+}

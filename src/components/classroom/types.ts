@@ -177,3 +177,42 @@ export type UseExpandableListReturn = {
   collapseAll: () => void;
   expandAll: (itemIds: string[]) => void;
 };
+
+
+
+export interface BackendSubmissionLink {
+  id: number;
+  label: string;
+  url: string;
+}
+
+export interface BackendSubmissionReview {
+  grade?: number;
+  feedback?: string;
+  reviewedAt?: string;
+  isRevisionRequest?: boolean;
+}
+
+export interface BackendSubmissionResponse {
+  submissionId: number;
+
+  taskId: number;
+
+  taskTitle: string;
+
+  menteeName: string;
+
+  menteeProfilePicture?: string;
+
+  submittedAt: string;
+
+  createdAt: string;
+
+  notesForMentor?: string;
+
+  status: string;
+
+  links: BackendSubmissionLink[];
+
+  review?: BackendSubmissionReview;
+}

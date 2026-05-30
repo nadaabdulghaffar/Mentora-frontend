@@ -17,20 +17,52 @@ export type StoredSubmissionLink = {
 
 export type ClassroomTask = {
   id: string;
-  title: string;
-  category: string;
-  description: string;
-  status: TaskStatus;
-  badge: string;
-  badgeTone: 'danger' | 'success' | 'neutral';
-  submissionDate?: string;
-  submissionLinks?: StoredSubmissionLink[];
-  mentorNotes?: string;
-  summary?: string;
-  deliverables?: string[];
-  attachedResources?: TaskAttachedResource[];
-};
 
+  title: string;
+
+  description: string;
+
+  category: string;
+
+  status:
+    | "todo"
+    | "submitted"
+    | "reviewed";
+
+  badge: string;
+
+  badgeTone:
+    | "success"
+    | "danger"
+    | "neutral";
+
+  submissionDate?: string;
+
+  deadline?: string;
+
+  submissionId?: number;
+
+  isRevisionRequest?: boolean;
+
+  revisionFeedback?: string;
+
+  revisionGrade?: number;
+
+  resources?: {
+    id: string;
+
+    name: string;
+
+    type:
+      | "pdf"
+      | "document"
+      | "link";
+
+    size?: string;
+
+    url?: string;
+  }[];
+};
 // Session types
 export type SessionItem = {
   id: string;
