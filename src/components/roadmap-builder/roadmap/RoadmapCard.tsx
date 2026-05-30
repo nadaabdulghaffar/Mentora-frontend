@@ -177,6 +177,8 @@ export default function RoadmapCard({
           leading-[30px]
           font-bold
           text-[#1F2432]
+          break-words
+          whitespace-normal
         "
       >
         {roadmap.title}
@@ -189,7 +191,9 @@ export default function RoadmapCard({
           text-[15px]
           leading-7
           text-[#667085]
-          min-h-[84px]
+          min-h-[48px]
+          break-words
+          whitespace-normal
         "
       >
         {shortDescription}

@@ -64,43 +64,7 @@ export function MentorOverviewContent({ profile, isOwner, onEditBio, onEditEduca
         </ul>
       </div>
 
-      {!isOwner && (
-        <>
-          <div className="mb-8">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-bold text-[#1F2533]">Suggested Programs for You</h2>
-              <button
-                type="button"
-                onClick={() => navigate('/suggested-programs')}
-                className="flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary/80"
-              >
-                View all
-                <ArrowRight size={16} />
-              </button>
-            </div>
-            <div className="mt-4 rounded-2xl border border-[#E8EBF2] bg-gradient-to-br from-[#F3F4F7] to-white p-6 text-center">
-              <p className="text-sm text-[#6B7289]">Programs curated based on this mentor's expertise and your interests</p>
-            </div>
-          </div>
-
-          <div className="mb-8">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-bold text-[#1F2533]">Recommended Mentors</h2>
-              <button
-                type="button"
-                onClick={() => navigate('/recommended-mentors')}
-                className="flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary/80"
-              >
-                View all
-                <ArrowRight size={16} />
-              </button>
-            </div>
-            <div className="mt-4 rounded-2xl border border-[#E8EBF2] bg-gradient-to-br from-[#F3F4F7] to-white p-6 text-center">
-              <p className="text-sm text-[#6B7289]">Mentors similar to this profile who might be a great fit for you</p>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Suggested Programs and Recommended Mentors removed from public view */}
     </div>
   );
 }

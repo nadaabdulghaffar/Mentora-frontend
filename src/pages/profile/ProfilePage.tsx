@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../../shared/components/Layout';
 import authAPI from '../../services/authService';
 import type { AuthUser } from '../../types/api';
-import type { ProfileEntity } from './types';
-import { getProfileForRoute, isPublicProfileView, PROFILE_DEMO_ROUTES } from './profileService';
+import type { EducationEntry, ProfileEntity } from './types';
+import { getProfileForRoute, PROFILE_DEMO_ROUTES, refreshOwnProfile, saveEducationEntries, updateOwnProfile } from './profileService';
 import {
   ProfileBanner,
   ProfileTabs,
@@ -25,42 +25,94 @@ type MenteeTab = 'overview' | 'activity';
 const ProfilePage = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const [viewer, setViewer] = useState<AuthUser | null>(() => authAPI.getCurrentUser());
+  const [viewer, setViewer] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<ProfileEntity | null>(null);
   const [mentorTab, setMentorTab] = useState<MentorTab>('overview');
   const [menteeTab, setMenteeTab] = useState<MenteeTab>('overview');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editEducationOpen, setEditEducationOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void authAPI.getMe().then((res) => {
-      if (!cancelled && res.success && res.data) setViewer(res.data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-  useEffect(() => {
-    if (!viewer) {
+    try {
+      const me = await authAPI.getMe();
+
+      if (!me.success || !me.data) {
+        throw new Error(me.message || 'Unable to load the signed-in user profile.');
+      }
+
+      setViewer(me.data);
+
+      const resolvedProfile = await getProfileForRoute(me.data, userId);
+      setProfile(resolvedProfile);
+
+      if (!resolvedProfile) {
+        setError('Profile not found.');
+      }
+    } catch (loadError) {
+      setViewer(null);
       setProfile(null);
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load profile.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!profile) {
       return;
     }
-    setProfile(getProfileForRoute(viewer, userId));
+
     setMentorTab('overview');
     setMenteeTab('overview');
-  }, [viewer, userId]);
+  }, [profile?.userId]);
 
   const isOwner = useMemo(
     () => !!(viewer && (!userId || userId === viewer.userId)),
     [viewer, userId]
   );
+  const isPublicProfile = !isOwner;
 
   const applyProfilePatch = useCallback((patch: Partial<ProfileEntity>) => {
     setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
+
+  const handleSaveProfile = useCallback(
+    async (updates: { bio?: string; countryCode?: string; profilePictureUrl?: string; linkedInUrl?: string; pastExperience?: string; }) => {
+      if (!viewer) {
+        return;
+      }
+
+      await updateOwnProfile(viewer, updates);
+      const refreshed = await refreshOwnProfile();
+      if (refreshed) {
+        setProfile(refreshed);
+      }
+    },
+    [viewer]
+  );
+
+  const handleSaveEducation = useCallback(
+    async (educationEntries: EducationEntry[]) => {
+      const success = await saveEducationEntries(educationEntries);
+      if (success) {
+        const refreshed = await refreshOwnProfile();
+        if (refreshed) {
+          setProfile(refreshed);
+        }
+      }
+    },
+    []
+  );
 
   const handleTabChange = useCallback(
     (tab: MentorTab | MenteeTab) => {
@@ -74,16 +126,25 @@ const ProfilePage = () => {
     [profile]
   );
 
-  if (!viewer) {
-    return null;
-  }
-
-  if (!profile) {
+  if (loading) {
     return (
       <Layout>
         <div className="mx-auto max-w-lg rounded-3xl border border-[#E8EBF2] bg-white p-10 text-center shadow-sm">
-          <h1 className="text-xl font-bold text-[#1F2533]">Profile not found</h1>
-          <p className="mt-2 text-sm text-[#6B7289]">This user does not exist or is not visible.</p>
+          <h1 className="text-xl font-bold text-[#1F2533]">Loading profile</h1>
+          <p className="mt-2 text-sm text-[#6B7289]">Fetching the latest profile data from the backend.</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!viewer || !profile) {
+    return (
+      <Layout>
+        <div className="mx-auto max-w-lg rounded-3xl border border-[#E8EBF2] bg-white p-10 text-center shadow-sm">
+          <h1 className="text-xl font-bold text-[#1F2533]">{error ? 'Profile error' : 'Profile not found'}</h1>
+          <p className="mt-2 text-sm text-[#6B7289]">
+            {error || 'This user does not exist or is not visible.'}
+          </p>
           <p className="mt-4 text-xs text-[#9CA3B8]">
             Try demo public URLs:{' '}
             <button
@@ -126,11 +187,12 @@ const ProfilePage = () => {
           isOwner={isOwner}
           onEdit={() => setEditProfileOpen(true)}
           onSettings={() => setSettingsOpen(true)}
-          onShare={() => undefined}
           onFollow={() => undefined}
           onMessage={() => navigate('/messages')}
           onReport={() => undefined}
         />
+
+        {/* Public-profile notice removed per request */}
 
         <ProfileTabs role={profile.role} active={activeTab} onChange={handleTabChange} />
 
@@ -175,33 +237,32 @@ const ProfilePage = () => {
           {null}
         </div>
 
-        {isPublicProfileView(viewer, userId) ? (
-          <p className="text-center text-xs text-[#9CA3B8]">
-            Public view — wire these actions to your API when ready.
-          </p>
-        ) : null}
       </div>
 
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        initialEmail={profile.email}
-        onSave={({ email }) => applyProfilePatch({ email })}
-      />
+      {isOwner ? (
+        <>
+          <SettingsModal
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            initialEmail={profile.email}
+            onSave={({ email }) => applyProfilePatch({ email })}
+          />
 
-      <EditProfileModal
-        isOpen={editProfileOpen}
-        onClose={() => setEditProfileOpen(false)}
-        profile={profile}
-        onSave={(updates) => applyProfilePatch(updates)}
-      />
+          <EditProfileModal
+            isOpen={editProfileOpen}
+            onClose={() => setEditProfileOpen(false)}
+            profile={profile}
+            onSave={handleSaveProfile}
+          />
 
-      <EditEducationModal
-        isOpen={editEducationOpen}
-        onClose={() => setEditEducationOpen(false)}
-        education={profile.education}
-        onSave={(education) => applyProfilePatch({ education })}
-      />
+          <EditEducationModal
+            isOpen={editEducationOpen}
+            onClose={() => setEditEducationOpen(false)}
+            education={profile.education}
+            onSave={handleSaveEducation}
+          />
+        </>
+      ) : null}
     </Layout>
   );
 };

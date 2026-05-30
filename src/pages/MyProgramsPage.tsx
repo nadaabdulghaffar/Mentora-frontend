@@ -67,7 +67,8 @@ if (role === "mentor") {
     programsRes.success &&
     programsRes.data
   ) {
-    const mapped =
+          const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
+          const mapped =
       programsRes.data.items.map(
         (p: any) => ({
           id: String(p.programId),
@@ -84,7 +85,7 @@ if (role === "mentor") {
           phases: "8 Phases",
 
           image: p.programImageUrl
-            ? `http://localhost:5069${p.programImageUrl}`
+            ? (p.programImageUrl.startsWith('http') ? p.programImageUrl : `${apiRoot}${p.programImageUrl.startsWith('/') ? p.programImageUrl : '/' + p.programImageUrl}`)
             : undefined,
 
           progress: 0,
@@ -110,6 +111,7 @@ if (role === "mentor") {
           a.status === "Accepted"
       );
 
+    const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
     const mapped =
       accepted.map((a: any) => ({
         id: String(a.applicationId),
@@ -126,7 +128,7 @@ if (role === "mentor") {
         phases: "8 Phases",
 
         image: a.programImageUrl
-          ? `http://localhost:5069${a.programImageUrl}`
+          ? (a.programImageUrl.startsWith('http') ? a.programImageUrl : `${apiRoot}${a.programImageUrl.startsWith('/') ? a.programImageUrl : '/' + a.programImageUrl}`)
           : undefined,
 
         mentorName:

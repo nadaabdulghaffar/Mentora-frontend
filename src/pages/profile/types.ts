@@ -89,6 +89,7 @@ export interface ProfileEntity {
   displayName: string;
   headline: string;
   location: string;
+  countryCode?: string;
   email: string;
   avatarUrl: string;
   bio: string;

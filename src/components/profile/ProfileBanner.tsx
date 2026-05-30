@@ -7,7 +7,6 @@ export interface ProfileBannerProps {
   isOwner: boolean;
   onEdit?: () => void;
   onSettings?: () => void;
-  onShare?: () => void;
   onFollow?: () => void;
   onMessage?: () => void;
   onReport?: () => void;
@@ -18,7 +17,6 @@ export function ProfileBanner({
   isOwner,
   onEdit,
   onSettings,
-  onShare,
   onFollow,
   onMessage,
   onReport,
@@ -62,14 +60,18 @@ export function ProfileBanner({
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-white/85">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin size={16} className="shrink-0 opacity-90" />
-                {profile.location}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Mail size={16} className="shrink-0 opacity-90" />
-                {profile.email}
-              </span>
+              {profile.location ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin size={16} className="shrink-0 opacity-90" />
+                  {profile.location}
+                </span>
+              ) : null}
+              {profile.email ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Mail size={16} className="shrink-0 opacity-90" />
+                  {profile.email}
+                </span>
+              ) : null}
             </div>
             {profile.socialLinks.length > 0 ? (
               <div className="flex flex-wrap gap-4 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4">
