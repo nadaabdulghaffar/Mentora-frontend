@@ -3,42 +3,43 @@
  * Modal for displaying thread details with comments
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, Share2, Bookmark, MessageCircle, Link, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { X, Heart,  MessageCircle,  MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Modal } from '../Modal';
 import { CommentThread } from './CommentThread';
-import type { CommunityThread, ThreadComment } from '../../pages/community/types';
+import type { ThreadComment } from '../../pages/community/types';
 import { formatTimestamp } from '../../pages/community/utils/threadUtils';
 
 import {
-  getPostComments,
-} from "../../services/communityService";
+  classroomFeedService,
+  
+} from "../../services/classroomFeedService";
 
+interface ClassroomThread {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  content: string;
+  timestamp: string;
 
-interface ThreadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  thread: CommunityThread;
-  onCommentSubmit?: (content: string) => void;
-  onCommentReply?: (parentCommentId: string, content: string) => void;
-  onCommentLike?: (commentId: string) => void;
-  onCommentDelete?: (commentId: string) => void;
-  onCommentEdit?: (commentId: string, content: string) => void;
-  onThreadLike?: () => void;
-  onThreadShare?: () => void;
-  onThreadSave?: () => void;
-  /** Opens the same create/edit post modal (parent) prefilled with this thread */
-  onThreadEditRequest?: (thread: CommunityThread) => void;
-  onThreadDelete?: (threadId: string) => void;
-  isLoadingComment?: boolean;
-  currentUserId?: string;
-  currentUserRole?: 'admin' | 'moderator' | 'member';
+  likes: number;
+  likedByMe?: boolean;
+
+  commentCount?: number;
+
+  canEdit?: boolean;
+  canDelete?: boolean;
+
+  comments?: ThreadComment[];
+
+  authorRole?: string;
 }
 
 function modalOwnerCanEdit(
   uid: string | undefined,
-  t: CommunityThread,
+  t: ClassroomThread,
   hasHandler: boolean
 ): boolean {
   if (!uid || t.authorId !== uid || !hasHandler) return false;
@@ -47,7 +48,7 @@ function modalOwnerCanEdit(
 
 function modalOwnerCanDelete(
   uid: string | undefined,
-  t: CommunityThread,
+  t: ClassroomThread,
   hasHandler: boolean
 ): boolean {
   if (!uid || t.authorId !== uid || !hasHandler) return false;
@@ -63,25 +64,77 @@ function modalOwnerCanDelete(
  * - Comment input for adding new comments
  * - Like, share, and save actions
  * - Edit and delete capabilities based on permissions
+ * 
  */
-export const ThreadModal: React.FC<ThreadModalProps> = ({
-  isOpen,
+
+interface ThreadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+
+  thread: ClassroomThread;
+
+  onCommentSubmit?: (
+    content: string
+  ) => void;
+
+  onCommentReply?: (
+    parentCommentId: string,
+    content: string
+  ) => void;
+
+
+
+  onCommentDelete?: (
+    commentId: string
+  ) => void;
+
+  onCommentEdit?: (
+    commentId: string,
+    content: string
+  ) => void;
+
+  onThreadLike?: (
+    postId: string
+  ) => void;
+
+  onThreadEditRequest?: (
+    thread: ClassroomThread
+  ) => void;
+
+  onThreadDelete?: (
+    threadId: string
+  ) => void;
+
+  isLoadingComment?: boolean;
+
+  currentUserId?: string;
+
+  programId: number;
+
+  currentUserRole?:
+    | "admin"
+    | "moderator"
+    | "member";
+}
+
+
+export const ClassroomThreadModal: React.FC<ThreadModalProps> = ({
+      isOpen,
   onClose,
   thread,
   onCommentSubmit,
   onCommentReply,
-  onCommentLike,
   onCommentDelete,
   onCommentEdit,
   onThreadLike,
-  onThreadShare,
-  onThreadSave,
   onThreadEditRequest,
   onThreadDelete,
   isLoadingComment = false,
   currentUserId = 'current-user',
-  currentUserRole = 'member',
-}) => {
+  programId ,
+  
+}
+) => {
   const [commentInput, setCommentInput] = useState('');
 
 const [localComments, setLocalComments] =
@@ -89,7 +142,6 @@ const [localComments, setLocalComments] =
     thread.comments || []
   );
 
-  const [shareOpen, setShareOpen] = useState(false);
 
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
   const [threadMenuCoords, setThreadMenuCoords] = useState<{ top: number; left: number } | null>(null);
@@ -105,88 +157,21 @@ const [localComments, setLocalComments] =
   const showThreadDelete = modalOwnerCanDelete(currentUserId, thread, Boolean(onThreadDelete));
   const showThreadOwnerMenu = showThreadEdit || showThreadDelete;
 
-  const shareLink = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const path = thread.communityId ? `/community/${thread.communityId}` : window.location.pathname;
-    return `${window.location.origin}${path}?thread=${thread.id}`;
-  }, [thread.communityId, thread.id]);
-
- 
-
-
 useEffect(() => {
-  const fetchComments =
-    async () => {
-      try {
-        const comments =
-          await getPostComments(
-            thread.id
-          );
-
-        const mappedComments =
-          comments.map(
-            (comment) => ({
-              id:
-                comment.communityCommentId,
-
-              authorId:
-                comment.authorId,
-
-              authorName:
-                comment.authorName,
-
-              authorAvatar:
-                comment.authorProfilePicture ||
-                "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
-
-              content:
-                comment.content,
-
-              timestamp:
-                comment.createdAt,
-
-              likes: 0,
-
-              isLiked:
-                false,
-
-              replies: [],
-
-              canEdit:
-                comment.authorId ===
-                currentUserId,
-
-              canDelete:
-                comment.authorId ===
-                currentUserId,
-            })
-          );
-
-        setLocalComments(
-          mappedComments
-        );
-      } catch (error) {
-        console.error(
-          "Failed to fetch comments",
-          error
-        );
-      }
-    };
 
   if (isOpen) {
-    fetchComments();
+
+    loadComments();
+
   }
+
 }, [
   isOpen,
   thread.id,
-  currentUserId,
+  currentUserId
 ]);
 
 
-
-  useEffect(() => {
-    if (!isOpen) setShareOpen(false);
-  }, [isOpen, thread.id]);
 
   useEffect(() => {
     if (!isOpen) closeThreadMenu();
@@ -229,102 +214,180 @@ useEffect(() => {
     setThreadMenuOpen(true);
   };
 
-  const handleCommentSubmit = () => {
-    const trimmed = commentInput.trim();
-    if (!trimmed) return;
+ const loadComments = async () => {
 
-    const newComment: ThreadComment = {
-      id: `comment-${Date.now()}`,
-      authorId: currentUserId,
-      authorName: 'You',
-      authorAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser',
-      authorRole: currentUserRole,
-      content: trimmed,
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-      replies: [],
-      canDelete: true,
-      canEdit: true,
-    };
+  try {
 
-  
-setLocalComments(
-  (prev) => [
-    newComment,
-    ...prev,
-  ]
-);
+    const response =
+      await classroomFeedService
+        .getComments(
+          programId,
+          Number(thread.id)
+        );
 
+    const mappedComments =
+      response.data.map(
+        (comment: any) => ({
+          id: String(
+            comment.commentId
+          ),
 
-onCommentSubmit?.(
-  trimmed
-);
+          authorId:
+            comment.author.userId,
 
-setCommentInput(
-  ''
-);
+          authorName:
+            comment.author.fullName,
+
+          authorAvatar:
+            comment.author.profilePictureUrl ||
+
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              comment.author.fullName
+            )}`,
+
+          content:
+            comment.content,
+
+          timestamp:
+            comment.createdAt,
+
+          likes:
+            comment.likesCount,
+
+          likedByMe:
+            comment.likedByMe,
+
+          replies: [],
+
+          canEdit:
+            comment.author.userId ===
+            currentUserId,
+
+          canDelete:
+            comment.author.userId ===
+            currentUserId,
+        })
+      );
+
+    setLocalComments(
+      mappedComments
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Failed to fetch comments",
+      error
+    );
+
+  }
 };
 
+const handleCommentSubmit =
+  async () => {
 
-const handleLocalDelete =
-  (commentId: string) => {
-    setLocalComments(
-      (prev) =>
-        prev.filter(
-          (c) =>
-            c.id !==
-            commentId
-        )
-    );
+    const trimmed =
+      commentInput.trim();
 
-    onCommentDelete?.(
-      commentId
-    );
+    if (!trimmed) return;
+
+    try {
+
+      await classroomFeedService
+        .createComment(
+          programId,
+          Number(thread.id),
+          trimmed,
+          null
+        );
+
+ await loadComments();
+
+setCommentInput("");
+
+      // نفس mapping الموجود في useEffect
+
+      setCommentInput("");
+
+    } catch (error) {
+
+      console.error(
+        "Failed to create comment",
+        error
+      );
+
+    }
   };
 
+
+
+
+
 const handleLocalEdit =
-  (
+  async (
     commentId: string,
     content: string
   ) => {
-    setLocalComments(
-      (prev) =>
-        prev.map((c) =>
-          c.id === commentId
-            ? {
-                ...c,
-                content,
-              }
-            : c
-        )
-    );
 
-    onCommentEdit?.(
-      commentId,
-      content
-    );
-  };
-
-
-
-
-  const handleCopyShareLink = async () => {
-    if (!shareLink) return;
     try {
-      await navigator.clipboard.writeText(shareLink);
-      setShareOpen(false);
-    } catch {
-      // Clipboard denied — keep dialog open
+
+      await classroomFeedService
+        .updateComment(
+          programId,
+          Number(commentId),
+          content
+        );
+
+      await loadComments();
+
+    } catch (error) {
+
+      console.error(
+        "Failed to edit comment",
+        error
+      );
+
     }
   };
 
-  const handleDeleteThread = () => {
-    closeThreadMenu();
-    if (typeof window !== 'undefined' && !window.confirm('Delete this post? This cannot be undone.')) {
-      return;
+
+
+
+ 
+const handleLocalDelete =
+  async (
+    commentId: string
+  ) => {
+
+    try {
+
+      await classroomFeedService
+        .deleteComment(
+          programId,
+          Number(commentId)
+        );
+
+      await loadComments();
+
+    } catch (error) {
+
+      console.error(
+        "Failed to delete comment",
+        error
+      );
+
     }
-    onThreadDelete?.(thread.id);
+  };
+
+  const handleDeleteThread =
+  () => {
+
+    closeThreadMenu();
+
+    onThreadDelete?.(
+      thread.id
+    );
+
   };
 
   const threadOwnerMenuPortal =
@@ -367,57 +430,10 @@ const handleLocalEdit =
       document.body
     );
 
-  const shareDialog =
-    shareOpen &&
-    typeof document !== 'undefined' &&
-    createPortal(
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
-        role="presentation"
-        onClick={() => setShareOpen(false)}
-      >
-        <div
-          role="dialog"
-          aria-labelledby="thread-share-title"
-          className="w-full max-w-md rounded-2xl border border-white/15 bg-white p-4 text-slate-900 shadow-2xl shadow-black/20"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p id="thread-share-title" className="text-sm font-semibold text-[#1F2533]">
-            Share post
-          </p>
-          <p className="mt-1 text-xs text-[#6B7289]">Copy this post link and send it to anyone.</p>
-          <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#D8DCE8] bg-[#F8F9FD] px-3 py-2">
-            <Link size={16} className="shrink-0 text-primary" aria-hidden />
-            <input
-              readOnly
-              value={shareLink}
-              className="min-w-0 flex-1 bg-transparent text-xs text-[#1F2533] outline-none"
-            />
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShareOpen(false)}
-              className="rounded-xl border border-[#D8DCE8] px-4 py-2 text-sm font-semibold text-[#6B7289] transition hover:bg-[#F8F9FD]"
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              onClick={handleCopyShareLink}
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-dark"
-            >
-              Copy Link
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
+  
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
-      {shareDialog}
       {threadOwnerMenuPortal}
       <div className="w-full max-w-full max-h-[90vh] overflow-y-auto">
         <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
@@ -466,72 +482,54 @@ const handleLocalEdit =
             </div>
           </div>
 
-          {/* Thread Title and Content */}
-          <>
-            {thread.title && (
-              <h2 className="mb-3 text-xl font-bold text-gray-900">{thread.title}</h2>
-            )}
-            <p className="whitespace-pre-wrap text-base text-gray-700 leading-relaxed">{thread.content}</p>
-          </>
-
-          {/* Category */}
-          {thread.category && (
-            <div className="mt-4">
-              <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                {thread.category}
-              </span>
-            </div>
-          )}
 
           {/* Compact Engagement Bar */}
-          <div className="mt-4 flex items-center justify-between border-t border-b border-gray-200 py-3 text-sm text-gray-600">
-            <div className="flex items-center gap-5">
-              <button
-                onClick={onThreadLike}
-                className={`flex items-center gap-1.5 transition ${
-                  thread.isLiked
-                    ? 'text-red-500'
-                    : 'text-gray-600 hover:text-red-500'
-                }`}
-              >
-                <Heart size={16} fill={thread.isLiked ? 'currentColor' : 'none'} />
-                <span>{thread.likes}</span>
-              </button>
-              <button
-                onClick={() => {
-                  const commentsSection = document.getElementById('thread-comments');
-                  commentsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className="flex items-center gap-1.5 text-gray-600 transition hover:text-blue-600"
-              >
-                <MessageCircle size={16} />
-                <span>{thread.commentCount}</span>
-              </button>
-              <button
-                onClick={onThreadSave}
-                className={`flex items-center gap-1.5 transition ${
-                  thread.isSaved
-                    ? 'text-blue-500'
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                <Bookmark size={16} fill={thread.isSaved ? 'currentColor' : 'none'} />
-                <span>Save</span>
-              </button>
-            </div>
+  <div className="mt-4 flex items-center justify-between border-t border-b border-gray-200 py-3 text-sm text-gray-600">
+  <div className="flex items-center gap-5">
 
-            <button
-              type="button"
-              onClick={() => {
-                setShareOpen(true);
-                onThreadShare?.();
-              }}
-              className="rounded-full p-1.5 text-gray-600 transition hover:bg-gray-100 hover:text-gray-800"
-              aria-label="Share thread"
-            >
-              <Share2 size={18} />
-            </button>
-          </div>
+    <button
+      onClick={() =>
+        onThreadLike?.(
+          thread.id
+        )
+      }
+      className={`flex items-center gap-1.5 transition ${
+        thread.likedByMe
+          ? 'text-red-500'
+          : 'text-gray-600 hover:text-red-500'
+      }`}
+    >
+      <Heart
+        size={16}
+        fill={
+          thread.likedByMe
+            ? 'currentColor'
+            : 'none'
+        }
+      />
+      <span>{thread.likes}</span>
+    </button>
+
+    <button
+      onClick={() => {
+        const commentsSection =
+          document.getElementById(
+            'thread-comments'
+          );
+
+        commentsSection?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }}
+      className="flex items-center gap-1.5 text-gray-600 transition hover:text-blue-600"
+    >
+      <MessageCircle size={16} />
+      <span>{thread.commentCount}</span>
+    </button>
+
+  </div>
+</div>
         </div>
 
         <hr className="my-6" />
@@ -592,7 +590,6 @@ Comments ({localComments.length})
                 <CommentThread
                   key={comment.id}
                   comment={comment}
-                  onLike={onCommentLike}
                   onReply={onCommentReply}
                  onEdit={handleLocalEdit}
 onDelete={handleLocalDelete}
@@ -607,3 +604,5 @@ onDelete={handleLocalDelete}
     </Modal>
   );
 };
+
+export default ClassroomThreadModal;

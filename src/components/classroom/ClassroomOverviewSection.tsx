@@ -13,7 +13,19 @@ type ClassroomOverviewSectionProps = {
   /** Opens the same Add Post modal prefilled for editing */
   onRequestPostEdit?: (postId: string) => void;
   onPostDelete?: (postId: string) => void;
+  onToggleLikePost?: (
+    postId: string
+  ) => void;
+  onLoadComments?: (
+  postId: string
+) => Promise<void>;
+
+onOpenPostDetails?: (
+  post: FeedPostProps
+) => void;
+
 };
+
 
 const ClassroomOverviewSection = ({
   isMentor = false,
@@ -26,6 +38,9 @@ const ClassroomOverviewSection = ({
   onPostUpdate,
   onRequestPostEdit,
   onPostDelete,
+  onToggleLikePost,
+  onLoadComments,
+  onOpenPostDetails,
 }: ClassroomOverviewSectionProps) => {
   return (
     <section className="space-y-5">
@@ -155,11 +170,19 @@ const ClassroomOverviewSection = ({
             onPostUpdate={onPostUpdate}
             onRequestPostEdit={onRequestPostEdit}
             onPostDelete={onPostDelete}
-            onLike={() => console.log('like post:', post.id)}
-            onComment={() => console.log('comment post:', post.id)}
+onLike={() =>
+  onToggleLikePost?.(
+    post.id
+  )
+}            
+onComment={() =>
+  onOpenPostDetails?.(post)
+}
+
             onReply={(commentId) => console.log('reply to comment:', commentId)}
-            onViewAllComments={() => console.log('view comments for:', post.id)}
-          />
+onViewAllComments={() =>
+  onOpenPostDetails?.(post)
+}          />
         ))}
       </div>
     </section>

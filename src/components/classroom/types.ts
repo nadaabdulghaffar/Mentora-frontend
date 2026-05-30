@@ -202,6 +202,8 @@ export interface BackendSubmissionResponse {
 
   menteeName: string;
 
+  menteeProfileId: string;
+
   menteeProfilePicture?: string;
 
   submittedAt: string;

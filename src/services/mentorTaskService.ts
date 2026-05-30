@@ -28,6 +28,19 @@ export const mentorTaskService = {
   return response.data;
 },
 
+async deleteStudent(
+  programId: number,
+  studentId: string
+) {
+
+  const response =
+    await apiClient.delete(
+      `/classroom/program/${programId}/dashboard/students/${studentId}`
+    );
+
+  return response.data;
+},
+
 
   async reviewSubmission(
     submissionId: number,

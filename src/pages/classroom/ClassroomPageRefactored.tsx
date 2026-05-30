@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import authAPI from '../../services/authService';
 import { classroomService } from '../../services/classroomService';
 import Layout from '../../shared/components/Layout';
@@ -13,10 +13,14 @@ import TaskBadge from '../../components/classroom/TaskBadge.tsx';
 import type { FeedPostProps } from '../../components/Feed';
 import MentorNewSessionModal from '../../components/classroom/Modals/MentorNewSessionModal';
 import SessionDetailsModal from '../../components/classroom/Modals/SessionDetailsModal';
-
+import DeleteStudentModal from '../../components/classroom/Modals/DeleteStudentModal';
+import { classroomFeedService } from "../../services/classroomFeedService";
 import type {
   SubmissionLink
 } from "../../components/classroom/Modals/SubmitTaskModal";
+
+import ClassroomThreadModal 
+from "../../components/community/ClassroomThreadModal";
 
 import { getProgramView  }
 from "../../services/programService";
@@ -27,6 +31,7 @@ from "../../store/roadmapBuilderStore";
 
 import { mentorTaskService }
 from "../../services/mentorTaskService";
+import { messagingService } from "../../services/messagingService";
 
 
 
@@ -314,6 +319,7 @@ const MenteeTasksSection = ({
 
 const ClassroomPage = ({}: Record<string, never> = {}) => {
   const { programId } = useParams();
+  const navigate = useNavigate();
   const classroomProgramId =
   Number(programId);
 
@@ -330,13 +336,39 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
   const [roadmapId, setRoadmapId] =
   useState<number | null>(null);
 
+  const [
+  dashboardData,
+  setDashboardData
+] = useState<any>(null);
+
+const [
+  isDashboardLoading,
+  setIsDashboardLoading
+] = useState(false);
+
   const [haveLoadedRoadmapTasks, setHaveLoadedRoadmapTasks] = useState(false);
 
   const mentorTasksState = useMentorTasksState();
   const studentsState = useStudentsState(CONSTANTS.initialMentorStudents);
+
+  const {
+  setMentorStudents
+} = studentsState;
+
   const roadmapState = useRoadmapState(CONSTANTS.roadmapPhases);
   const modals = useClassroomModals();
-  const [feedPosts, setFeedPosts] = useState<FeedPostProps[]>(CONSTANTS.classroomFeedPosts);
+const [feedPosts, setFeedPosts] =
+useState<FeedPostProps[]>(
+  []
+);
+
+
+
+
+
+
+  const [isFeedLoading, setIsFeedLoading] =
+  useState(false);
 
   const [sessions, setSessions] = useState([]);
 const [sessionsLoading, setSessionsLoading] = useState(true);
@@ -362,6 +394,7 @@ const [
 >([]);
 
 
+
 const [
   resubmitLinks,
   setResubmitLinks
@@ -374,6 +407,15 @@ const [
   setResubmitNotes
 ] = useState('');
 
+const [
+  isDeletingStudent,
+  setIsDeletingStudent
+] = useState(false);
+
+const [
+  messagingStudentId,
+  setMessagingStudentId
+] = useState<string | null>(null);
 
 const [
   selectedSubmission,
@@ -409,6 +451,171 @@ const [
 >([]);
 
 
+const fetchComments = useCallback(
+  async (postId: string) => {
+
+    try {
+
+      const response =
+        await classroomFeedService.getComments(
+          classroomProgramId,
+          Number(postId)
+        );
+
+      const mappedComments =
+        response.data.map(
+          (comment: any) => ({
+
+            id:
+              String(comment.commentId),
+
+            authorId:
+              comment.author.userId,
+
+            authorName:
+              comment.author.fullName,
+
+            authorAvatar:
+              comment.author.profilePictureUrl ||
+
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                comment.author.fullName
+              )}`,
+
+            content:
+              comment.content,
+
+            timestamp:
+              new Date(
+                comment.createdAt
+              ).toLocaleString(),
+
+            likes:
+              comment.likesCount,
+
+            likedByMe:
+              comment.likedByMe,
+
+            canEdit:
+              comment.author.userId ===
+              user?.userId,
+
+            canDelete:
+              comment.author.userId ===
+              user?.userId,
+
+            replies: [],
+          })
+        );
+
+      setFeedPosts(
+        prev =>
+          prev.map(post =>
+            post.id === postId
+              ? {
+                  ...post,
+                  comments:
+                    mappedComments,
+                }
+              : post
+          )
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to fetch comments",
+        error
+      );
+
+    }
+
+  },
+  [
+    classroomProgramId,
+    user?.userId
+  ]
+);
+
+const [
+  selectedFeedPost,
+  setSelectedFeedPost
+] = useState<FeedPostProps | null>(
+  null
+);
+
+const [
+  showThreadModal,
+  setShowThreadModal
+] = useState(false);
+
+const fetchFeed = useCallback(
+  async () => {
+
+    try {
+
+      setIsFeedLoading(true);
+
+      const response =
+        await classroomFeedService.getFeed(
+          classroomProgramId
+        );
+
+      const mappedPosts =
+        response.data.posts.map(
+          (post: any) => ({
+            id: String(post.postId),
+            authorId: post.author.userId,
+            authorName: post.author.fullName,
+            authorAvatar:
+              post.author.profilePictureUrl ||
+
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                post.author.fullName
+              )}`,
+            content: post.content,
+            timestamp: new Date(
+              post.createdAt
+            ).toLocaleString(),
+            attachments: [],
+            likes: post.likesCount,
+            likedByMe: post.likedByMe,
+            commentCount:
+    post.commentsCount ?? 0,
+
+  shareCount: 0,
+            comments: [],
+            variant: "classroom",
+            canEdit:
+              post.author.userId ===
+              user?.userId,
+            canDelete:
+              post.author.userId ===
+              user?.userId,
+          })
+        );
+
+      setFeedPosts(mappedPosts);
+
+    } catch (error) {
+
+      console.error(
+        "Failed to fetch feed",
+        error
+      );
+
+    } finally {
+
+      setIsFeedLoading(false);
+
+    }
+
+  },
+  [
+    classroomProgramId,
+    user?.userId
+  ]
+);
 
 
   const mentorRoadmapPhaseIds = CONSTANTS.mentorRoadmapPhasesData.map((phase) => phase.id);
@@ -499,9 +706,117 @@ useState<MentorRegistryRow[]>([]);
       }
     };
 
+    const fetchDashboard = async () => {
+
+  try {
+
+    setIsDashboardLoading(
+      true
+    );
+
+    const response =
+      await classroomService
+        .getClassroomDashboard(
+          classroomProgramId
+        );
+
+    console.log(
+      "DASHBOARD RESPONSE:",
+      response
+    );
+
+    if (
+      response.success
+    ) {
+
+      setDashboardData(
+        response.data
+      );
+      const mappedStudents =
+  response.data.students.map(
+    (student: any) => ({
+
+      id:
+        student.studentId,
+
+      name:
+        student.fullName,
+
+      email:
+        student.lastCompletedItemTitle ||
+        "No Activity Yet",
+
+      statusLabel:
+        student.tasksWaitingForReview > 0
+
+          ? "Needs Feedback"
+
+          : student.isAtRisk
+
+          ? "Idle Student"
+
+          : "Module Active",
+
+      statusTone:
+        student.tasksWaitingForReview > 0
+
+          ? "feedback"
+
+          : student.isAtRisk
+
+          ? "idle"
+
+          : "active",
+
+      moduleLabel:
+        student.lastCompletedItemTitle ||
+        "No Activity",
+
+      progress:
+        student.overallCompletionPercent,
+
+      completedTasks:
+        student.completedTasks,
+
+      totalTasks:
+        student.totalTasks,
+
+      lastActive:
+        student.lastCompletedAt,
+
+    })
+  );
+
+setMentorStudents(
+  mappedStudents
+);
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Failed to fetch dashboard",
+      error
+    );
+
+  } finally {
+
+    setIsDashboardLoading(
+      false
+    );
+
+  }
+
+};
+
     fetchSessions();
     fetchClassroom();
-  }, [classroomProgramId]);
+    fetchFeed();
+    fetchDashboard();
+  }, [classroomProgramId,
+     fetchFeed
+  ]);
 
 useEffect(() => {
 
@@ -1015,6 +1330,28 @@ useEffect(() => {
   setTaskItems([]);
 }, [roadmapId, setTaskItems]);
 
+
+const handleOpenPostDetails =
+  useCallback(
+    (post: FeedPostProps) => {
+
+      console.log(
+        "OPEN POST",
+        post
+      );
+
+      setSelectedFeedPost(
+        post
+      );
+
+      setShowThreadModal(
+        true
+      );
+
+    },
+    []
+  );
+
 const handleScheduleSession = async () => {
   try {
     setIsSchedulingSession(true);
@@ -1065,6 +1402,8 @@ await classroomService.createSession(
     setIsSchedulingSession(false);
   }
 };
+
+
 
 const handleCancelSession = async (sessionId: string) => {
 try {
@@ -1230,6 +1569,96 @@ reviewStatus:
     }
   };
 
+  const handleOpenMentorSubmissionsForStudent =
+  async (
+    studentId: string
+  ) => {
+
+    try {
+
+      const response =
+        await mentorTaskService
+          .getProgramSubmissions(
+            classroomProgramId
+          );
+
+      const submissions =
+        Array.isArray(
+          response.data
+        )
+          ? response.data
+          : [];
+
+      const studentSubmissions =
+        submissions.filter(
+          (submission: any) =>
+
+            submission
+              .menteeProfileId ===
+            studentId &&
+
+            submission.status ===
+              "Submitted"
+        );
+
+      setMentorFullSubmissions(
+        studentSubmissions
+      );
+
+      const mappedSubmissions =
+        studentSubmissions.map(
+          (
+            submission: any
+          ) => ({
+
+            id: String(
+              submission.submissionId
+            ),
+
+            studentName:
+              submission.menteeName,
+
+            studentAvatar:
+              submission.menteeProfilePicture ||
+
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                submission.menteeName
+              )}`,
+
+            submittedAt:
+              submission.submittedAt,
+
+            fileCount:
+              submission.links
+                ?.length || 0,
+
+            reviewStatus:
+              "pending",
+
+          })
+        );
+
+      setMentorSubmissionsForActiveTask(
+        mappedSubmissions
+      );
+
+      modals.setShowMentorSubmissionsModal(
+        true
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "Failed to load student submissions",
+        error
+      );
+
+    }
+
+  };
+
   const handleToggleMentorPhase = (phaseId: string) => {
     setExpandedMentorPhaseIds((current) =>
       current.includes(phaseId) ? current.filter((id) => id !== phaseId) : [...current, phaseId]
@@ -1276,13 +1705,91 @@ reviewStatus:
     mentorTasksState.setNewTaskResources(rows.map((r) => ({ ...r, isOpen: true })));
   };
 
+const handleConfirmDeleteStudent =
+  async () => {
+
+    const student =
+      studentsState
+        .pendingDeleteStudent;
+
+    if (!student) return;
+
+    try {
+
+      setIsDeletingStudent(
+        true
+      );
+
+      await classroomService
+        .deleteStudent(
+          classroomProgramId,
+          student.id
+        );
+
+      studentsState
+        .deleteStudentById(
+          student.id
+        );
+
+      studentsState
+        .setPendingDeleteStudent(
+          null
+        );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "Failed to delete student",
+        error
+      );
+
+    } finally {
+
+      setIsDeletingStudent(
+        false
+      );
+
+    }
+
+  };
+
   const handleSubmitTask = (taskId: string) => {
     tasksState.setSelectedSubmitTaskId(taskId);
     modals.setShowSubmitModal(true);
   };
 
 
- 
+ const handleDeleteStudent =
+  async (
+    studentId: string
+  ) => {
+
+    try {
+
+      await classroomService
+        .deleteStudent(
+          classroomProgramId,
+          studentId
+        );
+
+      studentsState.deleteStudentById(
+        studentId
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        "Failed to delete student",
+        error
+      );
+
+    }
+
+  };
 
 
 const handleConfirmTaskSubmission =
@@ -1445,41 +1952,40 @@ const handleConfirmTaskSubmission =
   }, [modals]);
 
   const handleCreatePost = useCallback(
-    ({
-      content,
-      attachments,
-    }: {
-      content: string;
-      attachments: AddPostAttachment[];
-    }) => {
-      const fullName = user ? `${user.firstName} ${user.lastName}`.trim() : 'You';
-      const avatarSeed = encodeURIComponent(fullName || 'You');
+  async ({
+    content,
+  }: {
+    content: string;
+    attachments: AddPostAttachment[];
+  }) => {
 
-      const nextPost: FeedPostProps = {
-        id: `feed-${Date.now()}`,
-        authorId: user?.userId ?? 'current-user',
-        authorName: fullName || 'You',
-        authorAvatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${avatarSeed}`,
-        content,
-        timestamp: 'Just now',
-        attachments: attachments.map((attachment) => ({
-          id: attachment.id,
-          type: attachment.type,
-          url: attachment.url,
-          name: attachment.name,
-        })),
-        likes: 0,
-        comments: [],
-        variant: 'classroom',
-        canEdit: true,
-        canDelete: true,
-      };
+    try {
 
-      setFeedPosts((current) => [nextPost, ...current]);
+      await classroomFeedService.createPost(
+        classroomProgramId,
+        content
+      );
+
+      await fetchFeed();
+
       closeAddPostModal();
-    },
-    [user, closeAddPostModal]
-  );
+
+    } catch (error) {
+
+      console.error(
+        "Failed to create post",
+        error
+      );
+
+    }
+
+  },
+  [
+    classroomProgramId,
+    fetchFeed,
+    closeAddPostModal,
+  ]
+);
 
   const handleRequestPostEdit = useCallback(
     (postId: string) => {
@@ -1500,31 +2006,136 @@ const handleConfirmTaskSubmission =
     [feedPosts, modals]
   );
 
-  const handleUpdatePostFromModal = useCallback(
-    (postId: string, payload: { content: string; attachments: AddPostAttachment[] }) => {
-      setFeedPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                content: payload.content,
-                attachments: payload.attachments.map((a) => ({
-                  id: a.id,
-                  type: a.type,
-                  url: a.url,
-                  name: a.name,
-                })),
-              }
-            : p
-        )
+const handleToggleLikePost =
+  useCallback(
+    async (
+      postId: string
+    ) => {
+
+      setSelectedFeedPost(
+        (prev) => {
+
+          if (
+            !prev ||
+            prev.id !== postId
+          ) {
+            return prev;
+          }
+
+          const nextLiked =
+            !prev.likedByMe;
+
+          return {
+
+            ...prev,
+
+            likedByMe:
+              nextLiked,
+
+            likes:
+              nextLiked
+                ? prev.likes + 1
+                : Math.max(
+                    0,
+                    prev.likes - 1
+                  ),
+          };
+        }
       );
+
+      try {
+
+        await classroomFeedService
+          .toggleLikePost(
+            classroomProgramId,
+            Number(postId)
+          );
+
+        await fetchFeed();
+
+      } catch (error) {
+
+        console.error(
+          "Failed to toggle like",
+          error
+        );
+
+      }
+
     },
-    []
+    [
+      classroomProgramId,
+      fetchFeed
+    ]
   );
 
-  const handleDeleteFeedPost = useCallback((postId: string) => {
-    setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
-  }, []);
+const handleUpdatePostFromModal = useCallback(
+  async (
+    postId: string,
+    payload: {
+      content: string;
+      attachments: AddPostAttachment[];
+    }
+  ) => {
+
+    try {
+
+      await classroomFeedService.updatePost(
+        classroomProgramId,
+        Number(postId),
+        payload.content
+      );
+
+      await fetchFeed();
+
+      closeAddPostModal();
+
+    } catch (error) {
+
+      console.error(
+        "Failed to update post",
+        error
+      );
+
+    }
+
+  },
+  [
+    classroomProgramId,
+    fetchFeed,
+    closeAddPostModal,
+  ]
+);
+
+const handleDeleteFeedPost = useCallback(
+  async (
+    postId: string
+  ) => {
+
+    try {
+
+      await classroomFeedService.deletePost(
+        classroomProgramId,
+        Number(postId)
+      );
+
+      await fetchFeed();
+
+    } catch (error) {
+
+      console.error(
+        "Failed to delete post",
+        error
+      );
+
+    }
+
+  },
+  [
+    classroomProgramId,
+    fetchFeed
+  ]
+);
 
 const handleViewSubmission =
   async (taskId: string) => {
@@ -1885,6 +2496,29 @@ const handleSubmitMentorReview = async (
     studentsState.setPendingDeleteStudent(student);
   };
 
+  const handleMessageStudent = async (studentId: string) => {
+    try {
+      setMessagingStudentId(studentId);
+
+      const conversation =
+        await messagingService.createOrGetConversation(studentId);
+
+      navigate(
+        `/messages?conversationId=${conversation.conversationId}`,
+        {
+          state: {
+            conversationId: conversation.conversationId,
+            otherUserId: studentId,
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Failed to open conversation", error);
+    } finally {
+      setMessagingStudentId(null);
+    }
+  };
+
    const handleViewRevisionFeedback = (
   task: ClassroomTask
 ) => {
@@ -2000,6 +2634,15 @@ const handleResubmitTask = async (
             currentUserId={user?.userId ?? 'current-user'}
             onRequestPostEdit={handleRequestPostEdit}
             onPostDelete={handleDeleteFeedPost}
+            onLoadComments={fetchComments}
+            onOpenPostDetails={
+  handleOpenPostDetails
+}
+
+
+            onToggleLikePost={
+    handleToggleLikePost
+  }
           />
         )}
 
@@ -2111,19 +2754,37 @@ const handleResubmitTask = async (
   isMentor={isMentor}
 />
         )}
+{activeTab === 'students' && isMentor && (
+  <ClassroomStudentsSection
+    mentorStudents={studentsState.mentorStudents}
 
-        {activeTab === 'students' && isMentor && (
-          <ClassroomStudentsSection
-            mentorStudents={studentsState.mentorStudents}
-            selectedStudentIds={studentsState.selectedStudentIds}
-            isAllStudentsSelected={isAllStudentsSelected}
-            onToggleSelectAllStudents={studentsState.toggleSelectAllStudents}
-            onToggleStudentSelection={studentsState.toggleStudentSelection}
-            onDeleteSelectedStudents={handleDeleteSelectedStudents}
-            onOpenMentorSubmissionsForStudent={() => {}}
-            onRequestDeleteStudent={handleRequestDeleteStudent}
-          />
-        )}
+    dashboardStats={{
+      studentsWaitingForReview:
+        dashboardData?.studentsWaitingForReview ?? 0,
+
+      studentsAtRisk:
+        dashboardData?.studentsAtRisk ?? 0,
+
+      averageRoadmapCompletion:
+        dashboardData?.averageRoadmapCompletion ?? 0,
+
+      activeStudents:
+        dashboardData?.students?.length ?? 0,
+    }}
+
+    selectedStudentIds={studentsState.selectedStudentIds}
+    isAllStudentsSelected={isAllStudentsSelected}
+    onToggleSelectAllStudents={studentsState.toggleSelectAllStudents}
+    onToggleStudentSelection={studentsState.toggleStudentSelection}
+    onDeleteSelectedStudents={handleDeleteSelectedStudents}
+onOpenMentorSubmissionsForStudent={
+  handleOpenMentorSubmissionsForStudent
+}
+    onMessageStudent={handleMessageStudent}
+    messagingStudentId={messagingStudentId}
+    onRequestDeleteStudent={handleRequestDeleteStudent}
+  />
+)}
 
         {/* Modals */}
         <MentorNewTaskModal
@@ -2312,6 +2973,51 @@ session={selectedSession}
 isMentor={isMentor}
 onCancelSession={handleCancelSession}
 />
+
+<DeleteStudentModal
+  open={
+    !!studentsState.pendingDeleteStudent
+  }
+  loading={
+    isDeletingStudent
+  }
+  studentName={
+    studentsState
+      .pendingDeleteStudent
+      ?.name
+  }
+  onClose={() =>
+    studentsState
+      .setPendingDeleteStudent(
+        null
+      )
+  }
+  onConfirm={
+    handleConfirmDeleteStudent
+  }
+/>
+
+{showThreadModal &&
+  selectedFeedPost && (
+
+    <ClassroomThreadModal
+      isOpen={showThreadModal}
+      onClose={() =>
+        setShowThreadModal(false)
+      }
+      thread={selectedFeedPost}
+      currentUserId={
+        user?.userId
+      }
+      programId={
+        classroomProgramId
+      }
+      onThreadLike={
+  handleToggleLikePost
+}
+    />
+
+)}
 
       
     </Layout>

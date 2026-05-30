@@ -42,8 +42,11 @@ export interface FeedPostProps {
   timestamp: string;
   attachments?: PostAttachment[];
   likes: number;
+  likedByMe: boolean;
   comments: FeedComment[];
   variant: 'classroom' | 'community';
+
+
   /** Classroom: owner can edit/delete post when handlers are passed */
   currentUserId?: string;
   canEdit?: boolean;
@@ -58,6 +61,10 @@ export interface FeedPostProps {
   onSave?: () => void;
   onReply?: (commentId: string) => void;
   onViewAllComments?: () => void;
+
+    onLoadComments?: (
+  postId: string
+) => Promise<void>;
 }
 
 function updateFeedCommentContent(
@@ -571,6 +578,7 @@ const Feed: React.FC<FeedPostProps> = ({
   timestamp,
   attachments = [],
   likes,
+  likedByMe,
   comments,
   variant,
   currentUserId = 'current-user',
@@ -585,12 +593,33 @@ const Feed: React.FC<FeedPostProps> = ({
   onSave,
   onReply,
   onViewAllComments,
+  onLoadComments,
+
 }) => {
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(likes);
+const isLiked = likedByMe;
+const likeCount = likes;
   const [localComments, setLocalComments] = useState(comments);
   const [commentInput, setCommentInput] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
+  useEffect(() => {
+
+  if (
+    showAllComments &&
+    localComments.length === 0
+  ) {
+
+    onLoadComments?.(id);
+
+  }
+
+}, [
+  showAllComments,
+  localComments.length,
+  onLoadComments,
+  id
+]);
+
+
   const lastComment = localComments.length > 0 ? localComments[localComments.length - 1] : null;
   const hasMoreComments = localComments.length > 1;
 
@@ -600,6 +629,8 @@ const Feed: React.FC<FeedPostProps> = ({
   const postMenuPanelRef = useRef<HTMLDivElement>(null);
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostContent, setEditPostContent] = useState(content);
+
+  
 
   const closePostMenu = useCallback(() => {
     setPostMenuOpen(false);
@@ -623,6 +654,9 @@ const showPostDelete =
   canDelete !== false;
 
   const showPostOwnerMenu = (showPostEdit || showPostDelete) && !isEditingPost;
+
+
+  
 
   useEffect(() => {
     setLocalComments(comments);
@@ -665,12 +699,9 @@ const showPostDelete =
     setLocalComments((prev) => removeFeedComment(prev, commentId));
   }, []);
 
-  const handleLikeClick = () => {
-    const nextLiked = !isLiked;
-    setIsLiked(nextLiked);
-    setLikeCount((current) => (nextLiked ? current + 1 : Math.max(0, current - 1)));
-    onLike?.();
-  };
+const handleLikeClick = () => {
+  onLike?.();
+};
 
   const openPostMenu = () => {
     if (postMenuOpen) {

@@ -1,4 +1,5 @@
 import { AlertTriangle, Bell, FileDown, MessageSquare, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { isValidUserGuid } from '../../services/messagingService';
 
 type MentorStudentRow = {
   id: string;
@@ -15,23 +16,36 @@ type MentorStudentRow = {
 
 type ClassroomStudentsSectionProps = {
   mentorStudents: MentorStudentRow[];
+    dashboardStats: {
+    studentsWaitingForReview: number;
+    studentsAtRisk: number;
+    averageRoadmapCompletion: number;
+    activeStudents: number;
+  };
+  
   selectedStudentIds: string[];
   isAllStudentsSelected: boolean;
+  
   onToggleSelectAllStudents: () => void;
   onToggleStudentSelection: (studentId: string) => void;
   onDeleteSelectedStudents: () => void;
   onOpenMentorSubmissionsForStudent: (studentId: string) => void;
+  onMessageStudent: (studentId: string) => void;
+  messagingStudentId: string | null;
   onRequestDeleteStudent: (student: MentorStudentRow) => void;
 };
 
 export default function ClassroomStudentsSection({
   mentorStudents,
   selectedStudentIds,
+  dashboardStats,
   isAllStudentsSelected,
   onToggleSelectAllStudents,
   onToggleStudentSelection,
   onDeleteSelectedStudents,
   onOpenMentorSubmissionsForStudent,
+  onMessageStudent,
+  messagingStudentId,
   onRequestDeleteStudent,
 }: ClassroomStudentsSectionProps) {
   return (
@@ -61,7 +75,7 @@ export default function ClassroomStudentsSection({
             <Bell size={18} />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A7FA0]">Needs Feedback</p>
-          <p className="mt-2 text-4xl font-bold text-[#3E348D]">07</p>
+          <p className="mt-2 text-4xl font-bold text-[#3E348D]">{dashboardStats.studentsWaitingForReview}</p>
           <p className="text-sm text-[#6F7689]">Students waiting for review</p>
         </div>
 
@@ -70,7 +84,7 @@ export default function ClassroomStudentsSection({
             <AlertTriangle size={18} />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#A56767]">At Risk</p>
-          <p className="mt-2 text-4xl font-bold text-[#B23232]">03</p>
+          <p className="mt-2 text-4xl font-bold text-[#B23232]">{dashboardStats.studentsAtRisk}</p>
           <p className="text-sm text-[#6F7689]">Inactive for &gt; 48 hours</p>
         </div>
 
@@ -79,10 +93,14 @@ export default function ClassroomStudentsSection({
             <span className="text-base font-bold">%</span>
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8094]">Avg. Completion</p>
-          <p className="mt-2 text-4xl font-bold text-[#1F2432]">64%</p>
+          <p className="mt-2 text-4xl font-bold text-[#1F2432]">{dashboardStats.averageRoadmapCompletion}%</p>
           <div className="mt-3 h-2 rounded-full bg-[#E8ECF5]">
-            <div className="h-2 w-[64%] rounded-full bg-gradient-to-r from-[#28A58A] to-[#6FCDBA]" />
-          </div>
+<div
+  className="h-2 rounded-full bg-gradient-to-r from-[#28A58A] to-[#6FCDBA]"
+  style={{
+    width: `${dashboardStats.averageRoadmapCompletion}%`,
+  }}
+/>          </div>
         </div>
 
         <div className="rounded-2xl border border-[#E6E9F2] bg-white p-4">
@@ -90,7 +108,7 @@ export default function ClassroomStudentsSection({
             <Users size={18} />
           </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8094]">Active Students</p>
-          <p className="mt-2 text-4xl font-bold text-[#1F2432]">24</p>
+          <p className="mt-2 text-4xl font-bold text-[#1F2432]">{dashboardStats.activeStudents}</p>
           <p className="text-sm text-[#117C64]">+ 8% from last month</p>
         </div>
       </div>
@@ -167,7 +185,11 @@ export default function ClassroomStudentsSection({
                     </td>
                     <td className="px-3 py-4">
                       <p className="font-semibold text-[#1F2432]">{student.name}</p>
-                      <p className="text-xs text-[#8A91A5]">{student.email}</p>
+                      <p className="text-xs text-[#8A91A5]">
+  Last Activity:
+  {` `}
+  {student.email}
+</p>
                     </td>
                     <td className="px-3 py-4">
                       <span className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${statusToneClasses}`}>
@@ -191,10 +213,15 @@ export default function ClassroomStudentsSection({
                         )}
                         <button
                           type="button"
-                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D5CCFF] bg-white px-3 text-xs font-semibold text-[#503DB8] shadow-[0_1px_2px_rgba(91,69,190,0.12)] transition hover:bg-[#F7F4FF]"
+                          disabled={
+                            !isValidUserGuid(student.id) ||
+                            messagingStudentId === student.id
+                          }
+                          onClick={() => onMessageStudent(student.id)}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D5CCFF] bg-white px-3 text-xs font-semibold text-[#503DB8] shadow-[0_1px_2px_rgba(91,69,190,0.12)] transition hover:bg-[#F7F4FF] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <MessageSquare size={14} strokeWidth={2.2} />
-                          Message
+                          {messagingStudentId === student.id ? 'Opening...' : 'Message'}
                         </button>
                         <button
                           type="button"
