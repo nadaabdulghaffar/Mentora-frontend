@@ -341,6 +341,7 @@ const subDomains =
                   font-bold
                   tracking-[-1px]
                   text-[#1F2432]
+                  break-words whitespace-normal
                 "
               >
                 {basicInfo.title ||
@@ -351,10 +352,11 @@ const subDomains =
               <p
                 className="
                   mt-4
-                  max-w-[760px]
+                  max-w-prose lg:max-w-[70%]
                   text-[16px]
                   leading-8
                   text-[#667085]
+                  break-words whitespace-normal
                 "
               >
                 {basicInfo.description ||

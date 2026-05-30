@@ -1,11 +1,42 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import ProgramCard from "../ProgramCard";
-
-const PROGRAM_IMAGE =
-  "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=900&q=80";
+import { getMyPublishedPrograms } from "../../services/programService";
 
 const MentorMentorshipProgramsSection = () => {
   const navigate = useNavigate();
+  const [programs, setPrograms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await getMyPublishedPrograms();
+        // Expecting envelope with { success, data: { items: ProgramViewDto[] } }
+        const items = res?.data?.items ?? [];
+
+        if (mounted) {
+          setPrograms(items.slice(0, 6)); // show up to 6
+        }
+      } catch (err: any) {
+        console.error("Failed to load mentor programs", err);
+        if (mounted) setError("Failed to load programs");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-6 lg:p-8">
@@ -13,25 +44,46 @@ const MentorMentorshipProgramsSection = () => {
         <h3 className="text-base font-semibold text-[#1F2533] md:text-lg lg:text-xl">
           Your Programs
         </h3>
-        
+        <Link to="/my-programs" className="text-sm font-medium text-primary">
+          View all
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-        {[0, 1, 2].map((i) => (
-          <ProgramCard
-            key={i}
-            variant="progress"
-            image={PROGRAM_IMAGE}
-            tag="DESIGN"
-            title="UX Research Fundamentals"
-            description="Master the art of user research with industry experts from top tech companies."
-            progress={88}
-            primaryButtonText="Join class"
-            onPrimaryClick={() => navigate("/classroom")}
-            className="h-full"
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+        </div>
+      ) : error ? (
+        <div className="py-8 text-center text-sm text-red-600">{error}</div>
+      ) : programs.length === 0 ? (
+        <div className="py-8 text-center text-sm text-gray-600">No programs published yet</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+          {programs.map((p: any) => {
+            const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
+            const imageUrl = p.programImageUrl
+              ? p.programImageUrl.startsWith('http')
+                ? p.programImageUrl
+                : `${apiRoot}${p.programImageUrl.startsWith('/') ? p.programImageUrl : '/' + p.programImageUrl}`
+              : undefined;
+
+            return (
+              <ProgramCard
+                key={p.programId}
+                variant="progress"
+                image={imageUrl}
+                tag={p.domainName?.toUpperCase?.() ?? "PROGRAM"}
+                title={p.title}
+                description={p.description}
+                progress={0}
+                primaryButtonText="Join classroom"
+                onPrimaryClick={() => navigate(`/classroom/${p.programId}`)}
+                className="h-full"
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

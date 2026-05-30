@@ -8,8 +8,14 @@ import type {
   LearningStyle,
   Technology,
   EducationStatus,
-  ExperienceLevel,
 } from '../types/api';
+
+type ExperienceLevelOption = {
+  id: string;
+  name: string;
+  value: string;
+  label: string;
+};
 
 // خدمات الـ Lookups
 export const lookupAPI = {
@@ -95,10 +101,21 @@ export const lookupAPI = {
   },
 
   // الحصول على مستويات الخبرة
-  getExperienceLevels: async (): Promise<ApiResponse<ExperienceLevel[]>> => {
+  getExperienceLevels: async (): Promise<ApiResponse<ExperienceLevelOption[]>> => {
     const response = await apiClient.get('/lookup/experience-levels');
     if (Array.isArray(response.data)) {
-      return { success: true, data: response.data };
+      const normalized = response.data.map((level: any, index: number) => {
+        const name = String(level.name ?? level.label ?? level.value ?? level.id ?? level);
+        const value = String(level.value ?? level.id ?? name);
+        return {
+          id: String(level.id ?? value ?? index + 1),
+          name,
+          value,
+          label: name,
+        };
+      });
+
+      return { success: true, data: normalized };
     }
     return response.data;
   },

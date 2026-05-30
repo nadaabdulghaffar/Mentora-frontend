@@ -17,12 +17,15 @@ export interface ProgramCardProps {
   authorText?: string;
   authorIcon?: React.ReactNode;
   hideAuthorAvatar?: boolean;
+  hideHeaderImage?: boolean;
   primaryButtonText?: string;
   secondaryButtonText?: string;
   onPrimaryClick?: () => void;
   onSecondaryClick?: () => void;
   className?: string;
 }
+
+const DEFAULT_PROGRAM_IMAGE = 'https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=900&q=80';
 
 export const ProgramCard: React.FC<ProgramCardProps> = ({
   variant = 'simple-button',
@@ -36,6 +39,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
   authorText,
   authorIcon,
   hideAuthorAvatar = false,
+  hideHeaderImage = false,
   primaryButtonText = 'Apply',
   secondaryButtonText = 'Details',
   onPrimaryClick,
@@ -46,18 +50,19 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
   const isProgressVariant = variant === 'progress';
   const isSimpleButtonVariant = variant === 'simple-button';
   const shouldShowProgress = progress !== undefined;
+  const headerImage = image ?? DEFAULT_PROGRAM_IMAGE;
   const hasImageHeader =
-    variant === 'dual-buttons' ||
-    (isProgressVariant && Boolean(image)) ||
-    (isSimpleButtonVariant && Boolean(image));
+    !hideHeaderImage && (variant === 'dual-buttons' ||
+    (isProgressVariant && Boolean(headerImage)) ||
+    (isSimpleButtonVariant && Boolean(headerImage)));
   const headlineLarge = variant === 'dual-buttons' || (isProgressVariant && Boolean(image));
 
   return (
     <article className={`overflow-hidden rounded-2xl border border-[#D8DBE4] bg-white shadow-[0_2px_8px_rgba(22,29,47,0.06)] ${className}`}>
-      {hasImageHeader && image && (
-        <div className="h-32 w-full bg-[#CDC2F2] overflow-hidden">
+      {hasImageHeader && headerImage && (
+        <div className="h-40 w-full bg-[#CDC2F2] overflow-hidden sm:h-44">
           <img
-            src={image}
+            src={headerImage}
             alt={title}
             className="h-full w-full object-cover"
           />
@@ -113,7 +118,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
           </div>
         )}
 
-        {hasImageHeader && (author || authorText) && (
+        {(author || authorText) && (
           <div className="flex items-center gap-3 mt-3">
             {hideAuthorAvatar ? (
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F4F0FF] text-primary">

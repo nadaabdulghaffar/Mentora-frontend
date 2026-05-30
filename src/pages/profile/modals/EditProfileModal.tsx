@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera, ChevronDown, Link, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../../components/Modal';
 import { InputGroup, SelectField, SelectWithTags, TextAreaField, type Option } from '../../../components/MultiStepForm';
+import authAPI from '../../../services/authService';
 import lookupAPI from '../../../services/lookupService';
 import type { ProfileEntity, SocialLink } from '../types';
 import type { SubDomain, Technology } from '../../../types/api';
+import type { OwnProfileUpdatePayload } from '../profileService';
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: ProfileEntity;
-  onSave: (updates: Partial<ProfileEntity>) => void;
+  onSave: (updates: OwnProfileUpdatePayload) => void | Promise<void>;
 }
 
 type ToolSelection = {
@@ -24,6 +26,22 @@ const DEFAULT_EXPERIENCE_LEVELS: Option[] = [
   { label: 'Advanced', value: 'advanced' },
   { label: 'Expert', value: 'expert' },
 ];
+
+function toExperienceOption(level: unknown): Option {
+  if (typeof level === 'string' || typeof level === 'number') {
+    const text = String(level);
+    return { label: text, value: text.toLowerCase() };
+  }
+
+  if (level && typeof level === 'object') {
+    const raw = level as { label?: unknown; name?: unknown; value?: unknown; id?: unknown };
+    const label = String(raw.label ?? raw.name ?? raw.value ?? raw.id ?? 'Option');
+    const value = String(raw.value ?? raw.id ?? raw.label ?? raw.name ?? label);
+    return { label, value: value.toLowerCase() };
+  }
+
+  return { label: 'Option', value: 'option' };
+}
 
 function SectionHeader({
   title,
@@ -55,7 +73,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [headline, setHeadline] = useState(profile.headline);
-  const [location, setLocation] = useState(profile.location);
+  const [countryCode, setCountryCode] = useState(profile.countryCode ?? '');
   const [email, setEmail] = useState(profile.email);
   const [bio, setBio] = useState(profile.bio);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
@@ -72,6 +90,8 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
   const [technologyOptions, setTechnologyOptions] = useState<Technology[]>([]);
   const [experienceLevels, setExperienceLevels] = useState<Option[]>(DEFAULT_EXPERIENCE_LEVELS);
   const [loadingLookups, setLoadingLookups] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [toolError, setToolError] = useState('');
 
   const selectedToolNames = tools.map((tool) => tool.name);
@@ -84,7 +104,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
 
     setDisplayName(profile.displayName);
     setHeadline(profile.headline);
-    setLocation(profile.location);
+    setCountryCode(profile.countryCode ?? '');
     setEmail(profile.email);
     setBio(profile.bio);
     setAvatarUrl(profile.avatarUrl);
@@ -96,6 +116,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     setBasicInfoOpen(true);
     setExperienceOpen(true);
     setToolDropdownOpen(false);
+    setSaveError('');
     setToolError('');
 
     const loadLookups = async () => {
@@ -124,12 +145,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
         }
 
         if (experienceResponse.success && experienceResponse.data) {
-          setExperienceLevels(
-            experienceResponse.data.map((level) => ({
-              label: String(level),
-              value: String(level).toLowerCase(),
-            }))
-          );
+          setExperienceLevels(experienceResponse.data.map(toExperienceOption));
         }
       } catch (error) {
         setDomains([
@@ -222,7 +238,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     void loadTechnologies();
   }, [isOpen, relevantExpertise, subDomainOptions]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const incompleteTools = tools.filter((tool) => !tool.level);
     if (incompleteTools.length > 0) {
       setToolError('Please select a level for each selected tool');
@@ -230,20 +246,23 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
       return;
     }
 
-    onSave({
-      displayName,
-      headline,
-      location,
-      email,
-      bio,
-      avatarUrl,
-      socialLinks: links,
-      domainId,
-      yearsOfExperience,
-      relevantExpertise,
-      tools,
-    });
-    onClose();
+    setSaving(true);
+    setSaveError('');
+    try {
+      const linkedInUrl = links.find((link) => link.platform === 'linkedin' || link.label.toLowerCase().includes('linkedin'))?.url;
+
+      await onSave({
+        bio,
+        countryCode,
+        profilePictureUrl: avatarUrl,
+        linkedInUrl,
+      });
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Failed to save profile changes.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAddLink = () => {
@@ -272,14 +291,18 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarUrl(reader.result);
+    const input = event.target;
+
+    void (async () => {
+      try {
+        const response = await authAPI.uploadFile(file, 'profile-picture');
+        if (response.success && response.data?.fileUrl) {
+          setAvatarUrl(response.data.fileUrl);
+        }
+      } finally {
+        input.value = '';
       }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+    })();
   };
 
   const handleAddTool = (toolName: string) => {
@@ -390,11 +413,12 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                     </div>
                     <div className="sm:col-span-2">
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8B92A8]">
-                        Location
+                        Country Code
                       </label>
                       <input
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
+                        placeholder="EG"
                         className="w-full rounded-xl border border-[#D8DCE8] px-4 py-2.5 text-sm outline-none focus:border-primary"
                       />
                     </div>
@@ -431,9 +455,10 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                       </button>
                     </div>
                     <ul className="space-y-3">
+                        disabled={saving}
                       {links.map((link) => (
                         <li key={link.id} className="flex items-center gap-3 rounded-xl border border-[#E8EBF2] px-3 py-2">
-                          <Link className="shrink-0 text-[#0A66C2]" size={20} />
+                        {saving ? 'Saving...' : 'Save'}
                           <input
                             value={link.url}
                             onChange={(e) =>
@@ -604,7 +629,8 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
         )}
       </div>
 
-      <div className="flex justify-end gap-3 border-t border-[#ECEFF5] px-6 py-4">
+      <div className="flex items-center justify-end gap-3 border-t border-[#ECEFF5] px-6 py-4">
+        {saveError ? <p className="mr-auto text-sm text-red-600">{saveError}</p> : null}
         <button
           type="button"
           onClick={onClose}
@@ -615,9 +641,10 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
         <button
           type="button"
           onClick={handleSave}
-          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+          disabled={saving}
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-70"
         >
-          Save Changes
+          {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </Modal>

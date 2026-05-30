@@ -7,7 +7,7 @@ interface EditEducationModalProps {
   isOpen: boolean;
   onClose: () => void;
   education: EducationEntry[];
-  onSave: (entries: EducationEntry[]) => void;
+  onSave: (entries: EducationEntry[]) => void | Promise<void>;
 }
 
 const emptyEntry = (): EducationEntry => ({
@@ -28,8 +28,8 @@ export function EditEducationModal({ isOpen, onClose, education, onSave }: EditE
     }
   }, [isOpen, education]);
 
-  const handleSave = () => {
-    onSave(entries.filter((e) => e.degree.trim() || e.institution.trim()));
+  const handleSave = async () => {
+    await onSave(entries.filter((e) => e.degree.trim() || e.institution.trim()));
     onClose();
   };
 
