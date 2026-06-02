@@ -11,7 +11,7 @@ import {
 const answerHintStyle =
   "mt-1 text-xs text-[#64748B] leading-snug";
 
-export default function ProgramQuestionsStep() {
+export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMode?: boolean }) {
   const { values, setFieldValue, errors } = useFormikContext<CreateProgramFormData>();
 
   const subDomainId = values.subDomainId;
@@ -116,18 +116,25 @@ export default function ProgramQuestionsStep() {
       <div className="rounded-2xl border border-[#E6E8F0] bg-[#FBFBFD] p-4 md:p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base md:text-lg font-semibold text-primary">
-            Application Questions (Optional)
+            Application Questions {isEditMode && "(Read-only)"}
           </h3>
 
           <button
             type="button"
             onClick={addQuestion}
-            className="flex items-center gap-2 text-primary font-medium hover:underline"
+            disabled={isEditMode}
+            className={`flex items-center gap-2 text-primary font-medium hover:underline ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <PlusCircle size={18} />
             Add Question
           </button>
         </div>
+
+        {isEditMode && questions.length > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+            ⚠️ Questions cannot be edited after creation. To change questions, you can create a new program with the questions you need.
+          </div>
+        )}
 
         <p className="text-xs text-[#64748B] mb-4 leading-relaxed">
           Question types match the server: free text (
@@ -160,7 +167,8 @@ export default function ProgramQuestionsStep() {
                     <button
                       type="button"
                       onClick={() => setFieldValue("questions", questions.filter((_, i) => i !== index))}
-                      className="text-red-500 hover:text-red-600"
+                      disabled={isEditMode}
+                      className={`text-red-500 hover:text-red-600 ${isEditMode ? 'opacity-30 cursor-not-allowed' : ''}`}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -174,12 +182,14 @@ export default function ProgramQuestionsStep() {
                         id={`questions.${index}.questionText`}
                         value={questions?.[index]?.questionText ?? ""}
                         onChange={(e) => {
+                          if (isEditMode) return;
                           const newQs = [...questions];
                           newQs[index] = { ...newQs[index], questionText: e.target.value };
                           setFieldValue("questions", newQs);
                         }}
                         placeholder="Why do you want to join this program?"
-                        className="w-full h-12 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary"
+                        disabled={isEditMode}
+                        className={`w-full h-12 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary ${isEditMode ? 'bg-gray-100 text-gray-600' : ''}`}
                       />
                       {qErrors?.questionText && <p className="mt-1 text-xs text-red-500">{String(qErrors.questionText)}</p>}
                     </div>
@@ -190,11 +200,13 @@ export default function ProgramQuestionsStep() {
                       <select
                         value={questions?.[index]?.answerType ?? "Paragraph"}
                         onChange={(e) => {
+                          if (isEditMode) return;
                           const newQs = [...questions];
                           newQs[index] = { ...newQs[index], answerType: e.target.value };
                           setFieldValue("questions", newQs);
                         }}
-                        className="w-full h-12 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary"
+                        disabled={isEditMode}
+                        className={`w-full h-12 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary ${isEditMode ? 'bg-gray-100 text-gray-600' : ''}`}
                       >
                         <option value="Paragraph">Paragraph — free text</option>
                         <option value="MultipleChoice">Multiple choice (MCQ)</option>
@@ -218,13 +230,15 @@ export default function ProgramQuestionsStep() {
                         <button
                           type="button"
                           onClick={() => {
+                            if (isEditMode) return;
                             const opts = questions?.[index]?.options ?? [];
                             const newOpts = [...opts, ""];
                             const newQs = [...questions];
                             newQs[index] = { ...newQs[index], options: newOpts };
                             setFieldValue("questions", newQs);
                           }}
-                          className="text-xs font-medium text-primary hover:underline"
+                          disabled={isEditMode}
+                          className={`text-xs font-medium text-primary hover:underline ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           + Add option
                         </button>
@@ -235,6 +249,7 @@ export default function ProgramQuestionsStep() {
                           <input
                             value={questions?.[index]?.options?.[opt] ?? ""}
                             onChange={(e) => {
+                              if (isEditMode) return;
                               const opts = questions?.[index]?.options ?? [];
                               const newOpts = [...opts];
                               newOpts[opt] = e.target.value;
@@ -243,19 +258,22 @@ export default function ProgramQuestionsStep() {
                               setFieldValue("questions", newQs);
                             }}
                             placeholder={`Option ${opt + 1}`}
-                            className="flex-1 h-11 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary"
+                            disabled={isEditMode}
+                            className={`flex-1 h-11 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary ${isEditMode ? 'bg-gray-100 text-gray-600' : ''}`}
                           />
                           {opt > 2 && (
                             <button
                               type="button"
                               onClick={() => {
+                                if (isEditMode) return;
                                 const opts = questions?.[index]?.options ?? [];
                                 const newOpts = opts.filter((_, i) => i !== opt);
                                 const newQs = [...questions];
                                 newQs[index] = { ...newQs[index], options: newOpts };
                                 setFieldValue("questions", newQs);
                               }}
-                              className="text-red-500 hover:text-red-600 shrink-0"
+                              disabled={isEditMode}
+                              className={`text-red-500 hover:text-red-600 shrink-0 ${isEditMode ? 'opacity-30 cursor-not-allowed' : ''}`}
                             >
                               <Trash2 size={16} />
                             </button>

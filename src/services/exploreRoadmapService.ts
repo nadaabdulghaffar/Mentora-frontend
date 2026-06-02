@@ -6,6 +6,7 @@ export interface RoadmapExploreDto {
   description: string;
   skillDomainId: number;
   subDomainId: number;
+  duration?: number;
   phasesCount: number;
 }
 

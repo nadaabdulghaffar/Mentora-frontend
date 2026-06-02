@@ -33,7 +33,8 @@ import authAPI from './services/authService';
 import MentorClassroomPage from './pages/classroom/MentorClassroomPage';
 import MenteeClassroomPage from './pages/classroom/MenteeClassroomPage';
 import ProtectedRoute from "./components/ProtectedRoute";
-import OnboardingRoute from "./components/OnboardingRoute"; 
+import OnboardingRoute from "./components/OnboardingRoute";
+import NotificationsTestPage from "./pages/dev/NotificationsTestPage";
 
 
 function App() { 
@@ -224,6 +225,16 @@ function App() {
 
       {/* Dev-only route: preview community page without auth (remove before production) */}
       <Route path="/dev-community" element={<CommunityPage />} />
+      {import.meta.env.DEV && (
+        <Route
+          path="/dev-notifications"
+          element={
+            <ProtectedRoute roles={["mentor", "mentee"]}>
+              <NotificationsTestPage />
+            </ProtectedRoute>
+          }
+        />
+      )}
       <Route
         path="/community/:id"
         element={

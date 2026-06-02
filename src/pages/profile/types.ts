@@ -36,8 +36,26 @@ export interface ExperienceEntry {
 }
 
 export interface ExperienceToolEntry {
+  technologyId: number;
   name: string;
   level: string;
+}
+
+export interface ProfileSubDomain {
+  id: number;
+  name: string;
+}
+
+export interface ProfileTechnology {
+  technologyId: number;
+  technologyName: string;
+  experienceLevel: number;
+  experienceLevelName: string;
+}
+
+export interface ProfileExpertise {
+  technologyId: number;
+  technologyName: string;
 }
 
 export interface MentorStats {
@@ -91,15 +109,31 @@ export interface ProfileEntity {
   location: string;
   countryCode?: string;
   email: string;
+  /** Absolute URL for display (resolved from profilePicturePath). */
   avatarUrl: string;
+  /** Relative path persisted by the API, e.g. `/uploads/profile-pictures/...`. */
+  profilePicturePath?: string;
   bio: string;
   socialLinks: SocialLink[];
   education: EducationEntry[];
   experience: ExperienceEntry[];
   domainId?: string;
+  domainName?: string;
+  /** Mentee-only — enum name from API, e.g. "Freshman", "Graduate" */
+  educationStatus?: string;
+  /** Mentee-only — enum name from API, e.g. "Beginner", "Senior" */
+  currentLevel?: string;
+  /** Mentor-only — stored as years integer string from API */
   yearsOfExperience?: string;
+  /** @deprecated Use subDomains — kept for mock/demo compatibility */
   relevantExpertise?: string[];
+  /** @deprecated Use technologies or expertise */
   tools?: ExperienceToolEntry[];
+  subDomains: ProfileSubDomain[];
+  technologies: ProfileTechnology[];
+  expertise: ProfileExpertise[];
+  /** Mentor public profile — follower count */
+  followerCount?: number;
   /** Mentor-only */
   stats?: MentorStats;
   /** Activity tab */

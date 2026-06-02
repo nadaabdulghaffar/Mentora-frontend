@@ -193,6 +193,9 @@ export interface RoadmapListItem {
   skillDomainId?: number;
   domainId?: number;
   status?: string;
+  domainName?: string;
+  subDomainName?: string;
+  duration?: number;
 }
 
 export interface LocalMaterial {

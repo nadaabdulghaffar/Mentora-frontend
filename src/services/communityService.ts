@@ -21,14 +21,62 @@ const EXPLORE_COMMUNITIES_ENDPOINT =
   "/Explore/communities";
 
 export const extractErrorMessage = (
-  error: any
+  error: unknown
 ): string => {
-  return (
-    error?.response?.data?.message ||
-    error?.response?.data?.errors?.[0] ||
-    error?.message ||
-    "Something went wrong"
-  );
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error
+  ) {
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: string[] | Record<string, string[]>;
+          };
+        };
+      }
+    ).response;
+
+    const data = response?.data;
+
+    if (data?.message) {
+      return data.message;
+    }
+
+    if (Array.isArray(data?.errors) && data.errors[0]) {
+      return String(data.errors[0]);
+    }
+
+    if (
+      data?.errors &&
+      typeof data.errors === "object" &&
+      !Array.isArray(data.errors)
+    ) {
+      const firstField = Object.values(data.errors)[0];
+      if (Array.isArray(firstField) && firstField[0]) {
+        return String(firstField[0]);
+      }
+    }
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    const message = (error as { message: string }).message;
+
+    if (message === "Network Error") {
+      return "Network error. Check your connection and try again.";
+    }
+
+    return message;
+  }
+
+  return "Something went wrong. Please try again.";
 };
 
 export interface CreateCommunityPayload {
@@ -72,11 +120,20 @@ export interface CommunityResponse {
 export const createCommunity =
   async (
     payload: CreateCommunityPayload
-  ): Promise<CommunityResponse> => {
+  ): Promise<string> => {
     const response =
       await apiClient.post(
         CREATE_COMMUNITY_ENDPOINT,
-        payload
+        {
+          name: payload.name.trim(),
+          description:
+            payload.description?.trim() ||
+            undefined,
+          domainId: payload.domainId,
+          coverImageUrl:
+            payload.coverImageUrl ||
+            undefined,
+        }
       );
 
     if (
@@ -89,7 +146,7 @@ export const createCommunity =
       );
     }
 
-    return response.data.data;
+    return String(response.data.data);
   };
 
 export const getAllCommunities =
@@ -569,19 +626,138 @@ export const togglePostLike =
     return response.data.data;
   };
 
+  export const removeCommunityMember =
+  async (
+    communityId: string,
+    memberId: string
+  ): Promise<boolean> => {
+    const response =
+      await apiClient.delete(
+        `/communities/${communityId}/members/${memberId}`
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          "Failed to remove member"
+      );
+    }
+
+    return true;
+  };
+
+  export const updateMemberRole =
+  async (
+    communityId: string,
+    memberId: string,
+    role: number
+  ): Promise<boolean> => {
+    const response =
+      await apiClient.patch(
+        `/communities/${communityId}/members/${memberId}/role`,
+        role
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          "Failed to update member role"
+      );
+    }
+
+    return true;
+  };
+
+export const banCommunityMember =
+  async (
+    communityId: string,
+    memberId: string
+  ): Promise<boolean> => {
+    const response =
+      await apiClient.post(
+        `/communities/${communityId}/members/${memberId}/ban`
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          "Failed to ban member"
+      );
+    }
+
+    return true;
+  };
+
 
 export interface CommunityMemberResponse {
   userId: string;
 
-  firstName: string;
-
-  lastName: string;
+  userName: string;
 
   profilePictureUrl?: string;
 
-  role: string;
+  role: number | string;
+
+  joinedAt: string;
 }
 
+
+
+export const getCommunityOwners =
+  async (
+    communityId: string
+  ): Promise<
+    CommunityMemberResponse[]
+  > => {
+    const response =
+      await apiClient.get(
+        `/communities/${communityId}/owners`
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          "Failed to fetch owners"
+      );
+    }
+
+    return (
+      response.data.data || []
+    );
+  };
+
+export const getCommunityAdmins =
+  async (
+    communityId: string
+  ): Promise<
+    CommunityMemberResponse[]
+  > => {
+    const response =
+      await apiClient.get(
+        `/communities/${communityId}/admins`
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          "Failed to fetch admins"
+      );
+    }
+
+    return (
+      response.data.data || []
+    );
+  };
 
 export const getCommunityMembers =
   async (
@@ -630,5 +806,8 @@ leaveCommunity,
   updateComment,
   deleteComment,
   togglePostLike,
+  getCommunityOwners,
+  getCommunityAdmins,
   getCommunityMembers,
+  banCommunityMember,
 };

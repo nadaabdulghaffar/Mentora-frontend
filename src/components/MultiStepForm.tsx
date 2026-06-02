@@ -59,12 +59,14 @@ export const SelectField: React.FC<{
   value: string
   onChange: (v: string) => void
   options: Option[]
-}> = ({ id, value, onChange, options }) => (
+  disabled?: boolean
+}> = ({ id, value, onChange, options, disabled = false }) => (
   <select
     id={id}
     value={value}
     onChange={(e) => onChange(e.target.value)}
-    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-slateInk outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+    disabled={disabled}
+    className={`w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-slateInk outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
   >
     <option value="">Select an option</option>
     {options.map((opt) => (

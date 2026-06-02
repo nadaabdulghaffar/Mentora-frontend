@@ -24,69 +24,43 @@ import {
   CommunitySettingsSection,
   CommunityTab,
 } from './sections';
-import { useCommunityModal, useThreads, useCommunity } from './hooks';
+import { useCommunityModal, useThreads, useCommunity, useCommunityMembers } from './hooks';
 import { MOCK_COMMUNITY, MOCK_COMMUNITY_THREADS, MOCK_MEMBERS, MOCK_MEMBER_REQUESTS, COMMUNITY_CATEGORIES } from './constants';
-import { CommunityThread, ThreadComment, CreateThreadPayload } from './types';
+import type {
+  Community,
+  CommunityThread,
+  ThreadComment,
+  CreateThreadPayload,
+} from './types';
 
-
+import { Alert } from '../../components/Alert';
+import { CommunityRole } from '../../constants/communityRoles';
+import { ensureDomainsLoaded } from '../../utils/domainCache';
+import { toStorageCommunityImageUrl } from '../../utils/communityImageUrl';
 
 import {
   getCommunityById,
+  updateCommunity,
+  deleteCommunity,
+  joinCommunity,
+  leaveCommunity,
+  createCommunityPost,
+  updateCommunityPost,
+  deleteCommunityPost,
+  getCommunityPosts,
+  createComment,
+  updateComment,
+  deleteComment,
+  togglePostLike,
+  removeCommunityMember,
+  updateMemberRole,
+  banCommunityMember,
+  extractErrorMessage,
 } from '../../services/communityService';
 
 import {
   mapCommunityDetails,
 } from './mappers/communityDetails.mapper';
-
-import type {
-  Community,
-  CommunityMember,
-} from './types';
-
-
-import {
-  updateCommunity,
-} from '../../services/communityService';
-
-import {
-  deleteCommunity,
-} from '../../services/communityService';
-
-import {
-  joinCommunity,
-  leaveCommunity,
-} from '../../services/communityService';
-
-
-import {
-  createCommunityPost,
-} from '../../services/communityService';
-
-import { updateCommunityPost, } from '../../services/communityService';
-
-import {
-  deleteCommunityPost,
-} from '../../services/communityService';
-
-
-import {
-  getCommunityPosts,
-  
-createComment,
-updateComment,
-deleteComment,
-
-togglePostLike,
-getCommunityMembers,
-
-} from '../../services/communityService';
-
-
-import type {
-  CommunityThread,
-} from "./types";
-
-
 
 import authAPI from "../../services/authService";
 
@@ -162,17 +136,22 @@ const [
   string | null
 >(null);
 
+const [pageAlert, setPageAlert] = useState<{
+  type: 'success' | 'error';
+  message: string;
+} | null>(null);
 
-const [
-  backendMembers,
-  setBackendMembers,
-] = useState<
-  CommunityMember[]
->([]);
+  const {
+    owners: communityOwners,
+    admins: communityAdmins,
+    members: communityMembers,
+    totalCount: communityMemberCount,
+    isLoading: isLoadingMembers,
+    error: membersError,
+    refreshMembers,
+  } = useCommunityMembers(viewingCommunityId);
 
-
-  // if viewing by id, load that community (mock)
- const activeCommunity =
+  const activeCommunity =
   useMemo(() => {
     return (
       backendCommunity ||
@@ -197,6 +176,8 @@ const [
         setCommunityError(
           null
         );
+
+        await ensureDomainsLoaded();
 
         const response =
           await getCommunityById(
@@ -336,74 +317,6 @@ const mappedThreads =
 }, [
   viewingCommunityId,
 ]);
-
-
-
-useEffect(() => {
-  if (
-    !viewingCommunityId
-  ) {
-    return;
-  }
-
-  const fetchMembers =
-    async () => {
-      try {
-        const members =
-          await getCommunityMembers(
-            viewingCommunityId
-          );
-          
-console.log(
-  "MEMBERS RESPONSE",
-  members
-);
-
-
-      
-const mappedMembers =
-  members.map(
-    (
-      member
-    ): CommunityMember => ({
-      id:
-        member.userId,
-
-      name:
-        member.userName,
-
-      avatar:
-        member.profilePictureUrl ||
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
-
-      role:
-        member.role === 1
-          ? "Owner"
-          : member.role === 2
-          ? "Admin"
-          : "member",
-
-      joinedDate:
-        member.joinedAt,
-
-      bio: "",
-    })
-  );
-
-
-        setBackendMembers(
-          mappedMembers
-        );
-      } catch (error) {
-        console.error(
-          "Failed to fetch members",
-          error
-        );
-      }
-    };
-
-  fetchMembers();
-}, [viewingCommunityId]);
 
 
   // ============================================
@@ -816,20 +729,190 @@ const handleThreadDelete =
   );
 
   // Admin / member actions
-  const handleRemoveMember = useCallback((memberId: string) => {
-    community.removeMember(memberId);
-  }, [community]);
+ const handleRemoveMember =
+  useCallback(
+    async (
+      memberId: string
+    ) => {
+      if (
+        !viewingCommunityId
+      ) {
+        return;
+      }
 
-  const handleBanMember = useCallback((memberId: string) => {
-    // In mock: remove member and optionally add to banned list (not implemented)
-    community.removeMember(memberId);
-  }, [community]);
+      const targetMember = [
+        ...communityOwners,
+        ...communityAdmins,
+        ...communityMembers,
+      ].find((member) => member.id === memberId);
 
-  const handleChangeMemberRole = useCallback(
-    (memberId: string, newRole: 'Owner' | 'Admin' | 'member') => {
-      community.updateMemberRole(memberId, newRole);
+      if (targetMember?.role === 'Owner') {
+        setPageAlert({
+          type: 'error',
+          message: 'The community owner cannot be removed.',
+        });
+        return;
+      }
+
+      const confirmed = window.confirm(
+        'Remove this member from the community?'
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await removeCommunityMember(
+          viewingCommunityId,
+          memberId
+        );
+
+        setPageAlert({
+          type: 'success',
+          message: 'Member removed successfully.',
+        });
+        await refreshMembers();
+      } catch (error) {
+        setPageAlert({
+          type: 'error',
+          message: extractErrorMessage(error),
+        });
+      }
     },
-    [community]
+    [
+      viewingCommunityId,
+      communityOwners,
+      communityAdmins,
+      communityMembers,
+      refreshMembers,
+    ]
+  );
+
+
+const handleBanMember =
+  useCallback(
+    async (
+      memberId: string
+    ) => {
+      if (
+        !viewingCommunityId
+      ) {
+        return;
+      }
+
+      const targetMember = [
+        ...communityOwners,
+        ...communityAdmins,
+        ...communityMembers,
+      ].find((member) => member.id === memberId);
+
+      if (targetMember?.role === 'Owner') {
+        setPageAlert({
+          type: 'error',
+          message: 'The community owner cannot be banned.',
+        });
+        return;
+      }
+
+      const confirmed = window.confirm(
+        'Ban this member from the community? They will not be able to rejoin.'
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await banCommunityMember(
+          viewingCommunityId,
+          memberId
+        );
+
+        setPageAlert({
+          type: 'success',
+          message: 'Member banned successfully.',
+        });
+        await refreshMembers();
+      } catch (error) {
+        setPageAlert({
+          type: 'error',
+          message: extractErrorMessage(error),
+        });
+      }
+    },
+    [
+      viewingCommunityId,
+      communityOwners,
+      communityAdmins,
+      communityMembers,
+      refreshMembers,
+    ]
+  );
+
+
+  const handleChangeMemberRole =
+  useCallback(
+    async (
+      memberId: string,
+      newRole: 'Admin' | 'Member'
+    ) => {
+      if (
+        !viewingCommunityId
+      ) {
+        return;
+      }
+
+      const targetMember = [
+        ...communityOwners,
+        ...communityAdmins,
+        ...communityMembers,
+      ].find((member) => member.id === memberId);
+
+      if (targetMember?.role === 'Owner') {
+        setPageAlert({
+          type: 'error',
+          message: "The community owner's role cannot be changed.",
+        });
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Change this member's role to ${newRole}?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        await updateMemberRole(
+          viewingCommunityId,
+          memberId,
+          newRole === 'Admin'
+            ? CommunityRole.Admin
+            : CommunityRole.Member
+        );
+
+        setPageAlert({
+          type: 'success',
+          message: 'Member role updated successfully.',
+        });
+        await refreshMembers();
+      } catch (error) {
+        setPageAlert({
+          type: 'error',
+          message: extractErrorMessage(error),
+        });
+      }
+    },
+    [
+      viewingCommunityId,
+      communityOwners,
+      communityAdmins,
+      communityMembers,
+      refreshMembers,
+    ]
   );
 
   // ============================================
@@ -967,6 +1050,16 @@ const canManageCommunity =
   </div>
 )}
 
+{pageAlert && (
+  <div className="mb-4">
+    <Alert
+      type={pageAlert.type}
+      message={pageAlert.message}
+      onClose={() => setPageAlert(null)}
+    />
+  </div>
+)}
+
         <div className="grid gap-6 grid-cols-3">
           {/* Main Content - 2 columns */}
           <div className="col-span-2 space-y-6">
@@ -1065,28 +1158,34 @@ onLike={
 
             {activeTab === 'members' && (
               <CommunityMembersSection
-members={backendMembers}
-
-staffMembers={backendMembers.filter(
-  (m) =>
-    m.role === "Owner" ||
-    m.role === "Admin"
-)}
+                owners={communityOwners}
+                admins={communityAdmins}
+                members={communityMembers}
+                totalCount={communityMemberCount}
                 searchQuery={community.searchQuery}
                 onSearchChange={community.setSearchQuery}
-                onFollowMember={(memberId) => {
-                  // Follow logic
-                }}
-                onUnfollowMember={(memberId) => {
-                  // Unfollow logic
-                }}
-                onMessageMember={(memberId) => {
+                onMessageMember={() => {
                   // Message logic
                 }}
-                currentUserId={currentUserId}
-                onRemoveMember={handleRemoveMember}
-                onBanMember={handleBanMember}
-                onChangeMemberRole={handleChangeMemberRole}
+                onRemoveMember={
+                  canManageCommunity
+                    ? handleRemoveMember
+                    : undefined
+                }
+                onBanMember={
+                  canManageCommunity
+                    ? handleBanMember
+                    : undefined
+                }
+                onChangeMemberRole={
+                  isOwner
+                    ? handleChangeMemberRole
+                    : undefined
+                }
+                canChangeRoles={isOwner}
+                canModerate={canManageCommunity}
+                isLoading={isLoadingMembers}
+                error={membersError}
               />
             )}
 
@@ -1264,21 +1363,30 @@ canManageCommunity ? (
           }
 
           try {
+            const payload: {
+              name?: string;
+              description?: string;
+              coverImageUrl?: string;
+              domainId?: number;
+            } = {
+              name: settings.name,
+              description: settings.description,
+              domainId: settings.domainId,
+            };
+
+            const coverPath =
+              toStorageCommunityImageUrl(
+                settings.cover
+              );
+
+            if (coverPath) {
+              payload.coverImageUrl = coverPath;
+            }
+
             const updated =
               await updateCommunity(
                 viewingCommunityId,
-                {
-                  name:
-                    settings.name,
-
-                  description:
-                    settings.description,
-
-                  coverImageUrl:
-                    settings.cover,
-
-                  domainId: 1,
-                }
+                payload
               );
 
             const mapped =
@@ -1289,10 +1397,17 @@ canManageCommunity ? (
             setBackendCommunity(
               mapped
             );
+            community.updateCommunitySettings(
+              mapped
+            );
+            setPageAlert({
+              type: 'success',
+              message:
+                'Community updated successfully.',
+            });
           } catch (error) {
-            console.error(
-              "Failed to update community",
-              error
+            throw new Error(
+              extractErrorMessage(error)
             );
           }
         }}

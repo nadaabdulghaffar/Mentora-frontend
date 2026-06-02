@@ -21,6 +21,7 @@ import { ThreadModal } from '../../components/community/ThreadModal';
 import { CreatePostForm } from '../../components/community/CreatePostForm';
 
 import CreateCommunityModal from '../../components/create-community/CreateCommunityModal';
+import { Alert } from '../../components/Alert';
 
 import {
   useThreads,
@@ -34,6 +35,7 @@ import {
 import {
   mapCommunitiesResponse,
 } from './mappers/community.mapper';
+import { ensureDomainsLoaded } from '../../utils/domainCache';
 
 import type {
   Community,
@@ -73,43 +75,38 @@ const CommunitiesListPage: React.FC = () => {
     setIsLoadingCommunities,
   ] = useState(false);
 
+  const [pageAlert, setPageAlert] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  const loadMyCommunities = useCallback(async () => {
+    try {
+      setIsLoadingCommunities(true);
+
+      await ensureDomainsLoaded();
+
+      const response = await getMyCommunities();
+      const mapped = mapCommunitiesResponse(response);
+
+      setMyCommunities(mapped);
+    } catch (error) {
+      console.error(
+        'Failed to fetch communities',
+        error
+      );
+    } finally {
+      setIsLoadingCommunities(false);
+    }
+  }, []);
+
   /* =========================
      FETCH COMMUNITIES
   ========================= */
 
   useEffect(() => {
-    const fetchMyCommunities =
-      async () => {
-        try {
-          setIsLoadingCommunities(
-            true
-          );
-
-          const response =
-            await getMyCommunities();
-
-          const mapped =
-            mapCommunitiesResponse(
-              response
-            );
-
-          setMyCommunities(
-            mapped
-          );
-        } catch (error) {
-          console.error(
-            'Failed to fetch communities',
-            error
-          );
-        } finally {
-          setIsLoadingCommunities(
-            false
-          );
-        }
-      };
-
-    fetchMyCommunities();
-  }, []);
+    void loadMyCommunities();
+  }, [loadMyCommunities]);
 
   const handleThreadClick =
     useCallback(
@@ -397,6 +394,16 @@ const CommunitiesListPage: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-transparent">
+        {pageAlert && (
+          <div className="py-4">
+            <Alert
+              type={pageAlert.type}
+              message={pageAlert.message}
+              onClose={() => setPageAlert(null)}
+            />
+          </div>
+        )}
+
         <div className="py-6">
           <div className="flex items-center justify-between mb-6">
             <div className="w-full max-w-2xl mx-auto text-center">
@@ -687,6 +694,14 @@ const CommunitiesListPage: React.FC = () => {
             false
           )
         }
+        onSuccess={async (createdCommunity) => {
+          setPageAlert({
+            type: 'success',
+            message: 'Community created successfully.',
+          });
+          await loadMyCommunities();
+          navigate(`/community/${createdCommunity.id}`);
+        }}
       />
     </Layout>
   );

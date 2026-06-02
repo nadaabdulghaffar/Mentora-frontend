@@ -11,7 +11,7 @@ export interface CommunityMember {
   id: string;
   name: string;
   avatar: string;
-  role: 'Owner' | 'Admin' | 'member';
+  role: 'Owner' | 'Admin' | 'Member';
   joinedDate: string;
   bio?: string;
   isFollowing?: boolean;
@@ -37,7 +37,8 @@ export interface Community {
   description: string;
   avatar: string;
   cover: string;
-  domain: string; // Software Engineering, Data Science, etc.
+  domain: string;
+  domainId: number;
   memberCount: number;
   isPublic: boolean;
   createdDate: string;
@@ -53,7 +54,7 @@ canManage?: boolean;
 export interface CommunitySettings {
   name: string;
   description: string;
-  domain: string;
+  domainId: number;
   avatar: string;
   cover: string;
 }

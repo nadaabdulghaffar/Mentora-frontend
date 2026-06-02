@@ -6,28 +6,21 @@ import Layout from "../../shared/components/Layout";
 
 import RoadmapCard from "../../components/roadmap-builder/roadmap/RoadmapCard";
 
-import apiClient from "../../services/api";
 import {
   deleteRoadmap,
   extractErrorMessage,
+  getMyPublishedRoadmaps,
 } from "../../services/roadmapService";
 
 import { useRoadmapBuilderStore } from "../../store/roadmapBuilderStore";
 
-import type {
-  ApiResponse,
-  RoadmapListItem,
-} from "../../types/roadmap";
+import type { RoadmapListItem } from "../../types/roadmap";
 
-/** Matches `RoadmapExploreDto` JSON (camelCase). */
-interface ExploreRoadmapDto {
-  roadmapId: number;
-  title: string;
-  description: string;
-  skillDomainId: number;
-  subDomainId: number;
-  phasesCount: number;
-}
+import {
+  loadRoadmapDomainNameMaps,
+  normalizeRoadmapDetailsList,
+  roadmapDetailsToListItem,
+} from "../../utils/roadmapDisplayUtils";
 
 export default function MyRoadmapPage() {
   const navigate = useNavigate();
@@ -65,42 +58,14 @@ export default function MyRoadmapPage() {
     const fetchRoadmaps =
       async () => {
         try {
-          const response =
-            await apiClient.get<
-              ApiResponse<
-                ExploreRoadmapDto[]
-              >
-            >(
-              "/Explore/roadmaps"
-            );
-
-          const mappedRoadmaps =
-            response.data.data
-              .filter(
-                (item) =>
-                  Number.isFinite(
-                    item.roadmapId
-                  ) &&
-                  item.roadmapId > 0
-              )
-              .map((item) => ({
-                roadmapId: item.roadmapId,
-
-                title: item.title,
-
-                description: item.description,
-
-                phasesCount: item.phasesCount,
-
-                skillDomainId: item.skillDomainId,
-
-                domainId:
-                  ((Math.max(1, item.skillDomainId) - 1) % 4) + 1,
-              }));
-
-          setRoadmaps(
-            mappedRoadmaps
+          const rawList = await getMyPublishedRoadmaps();
+          const normalized = normalizeRoadmapDetailsList(rawList);
+          const maps = await loadRoadmapDomainNameMaps();
+          const mappedRoadmaps = normalized.map((item) =>
+            roadmapDetailsToListItem(item, maps)
           );
+
+          setRoadmaps(mappedRoadmaps);
         } catch (error) {
           console.error(
             error

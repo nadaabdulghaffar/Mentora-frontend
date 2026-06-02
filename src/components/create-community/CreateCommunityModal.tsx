@@ -1,6 +1,6 @@
 
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 import BaseModal from "../modals/BaseModal";
@@ -9,11 +9,21 @@ import CommunityFormFields from "./CommunityFormFields";
 import {
   createCommunity,
   extractErrorMessage,
+  getCommunityById,
 } from "../../services/communityService";
+import { uploadCommunityCoverImage } from "../../services/fileUploadService";
+import {
+  validateCreateCommunityForm,
+  type CommunityFieldErrors,
+} from "../../validators/community";
+import { ensureDomainsLoaded } from "../../utils/domainCache";
+import { mapCommunityDetails } from "../../pages/community/mappers/communityDetails.mapper";
+import type { Community } from "../../pages/community/types";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: (community: Community) => void;
 };
 
 type CommunityFormData = {
@@ -26,6 +36,7 @@ type CommunityFormData = {
 export default function CreateCommunityModal({
   isOpen,
   onClose,
+  onSuccess,
 }: Props) {
   const {
     register,
@@ -33,6 +44,9 @@ export default function CreateCommunityModal({
     setValue,
     handleSubmit,
     reset,
+    setError,
+    clearErrors,
+    formState: { errors },
   } = useForm<CommunityFormData>({
     defaultValues: {
       domainId: "",
@@ -48,38 +62,144 @@ export default function CreateCommunityModal({
   const [submitError, setSubmitError] =
     useState<string | null>(null);
 
+  const [coverImageFile, setCoverImageFile] =
+    useState<File | null>(null);
+
+  const [coverPreviewUrl, setCoverPreviewUrl] =
+    useState("");
+
+  const [coverUploadError, setCoverUploadError] =
+    useState<string | null>(null);
+
+  const [isUploadingCover, setIsUploadingCover] =
+    useState(false);
+
   const values = watch();
 
-  /* =========================
-     CHANGES DETECTION
-  ========================= */
+  useEffect(() => {
+    if (isOpen) {
+      setSubmitError(null);
+      setCoverUploadError(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (coverPreviewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(coverPreviewUrl);
+      }
+    };
+  }, [coverPreviewUrl]);
 
   const hasChanges =
     values.domainId?.trim().length > 0 ||
     values.name?.trim().length > 0 ||
     values.description?.trim().length > 0 ||
-    values.coverImageUrl?.trim().length > 0;
+    values.coverImageUrl?.trim().length > 0 ||
+    coverImageFile !== null;
 
-  /* =========================
-     SUBMIT
-  ========================= */
+  const applyFieldErrors = (
+    errors: CommunityFieldErrors
+  ) => {
+    clearErrors();
+
+    (
+      Object.entries(errors) as Array<
+        [keyof CommunityFieldErrors, string]
+      >
+    ).forEach(([field, message]) => {
+      if (field === "coverImage") {
+        setCoverUploadError(message);
+        return;
+      }
+
+      setError(field as keyof CommunityFormData, {
+        type: "manual",
+        message,
+      });
+    });
+  };
+
+  const resetFormState = () => {
+    reset();
+    setCoverImageFile(null);
+    setCoverUploadError(null);
+
+    if (coverPreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(coverPreviewUrl);
+    }
+
+    setCoverPreviewUrl("");
+  };
 
   const submitHandler = async (
     data: CommunityFormData
   ) => {
     setSubmitError(null);
+    setCoverUploadError(null);
+
+    const fieldErrors =
+      validateCreateCommunityForm(data);
+
+    if (Object.keys(fieldErrors).length > 0) {
+      applyFieldErrors(fieldErrors);
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        ...data,
-        domainId: Number(data.domainId),
-      };
+      let coverImageUrl =
+        data.coverImageUrl.trim() || undefined;
 
-      await createCommunity(payload);
+      if (coverImageFile) {
+        setIsUploadingCover(true);
 
-      reset();
+        try {
+          coverImageUrl =
+            await uploadCommunityCoverImage(
+              coverImageFile
+            );
+          setValue(
+            "coverImageUrl",
+            coverImageUrl
+          );
+        } catch (uploadError) {
+          const message =
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Failed to upload cover image.";
+
+          setCoverUploadError(message);
+          return;
+        } finally {
+          setIsUploadingCover(false);
+        }
+      }
+
+      const communityId =
+        await createCommunity({
+          name: data.name,
+          description: data.description,
+          domainId: Number(data.domainId),
+          coverImageUrl,
+        });
+
+      await ensureDomainsLoaded();
+
+      const createdCommunity =
+        await getCommunityById(
+          communityId
+        );
+
+      const mappedCommunity =
+        mapCommunityDetails(
+          createdCommunity
+        );
+
+      resetFormState();
+
+      await onSuccess?.(mappedCommunity);
 
       onClose();
     } catch (err) {
@@ -91,27 +211,20 @@ export default function CreateCommunityModal({
         setSubmitError(err.message);
       } else {
         setSubmitError(
-          "Something went wrong"
+          "Something went wrong. Please try again."
         );
       }
     } finally {
       setIsSubmitting(false);
+      setIsUploadingCover(false);
     }
   };
 
-  /* =========================
-     DISCARD
-  ========================= */
-
   const handleDiscard = () => {
-    reset();
-
+    resetFormState();
+    setSubmitError(null);
     onClose();
   };
-
-  /* =========================
-     FOOTER
-  ========================= */
 
   const footer = (
     <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
@@ -126,11 +239,16 @@ export default function CreateCommunityModal({
       <button
         type="button"
         onClick={handleSubmit(submitHandler)}
-        disabled={isSubmitting}
+        disabled={
+          isSubmitting ||
+          isUploadingCover
+        }
         className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
       >
         {isSubmitting
-          ? "Creating…"
+          ? isUploadingCover
+            ? "Uploading cover…"
+            : "Creating…"
           : "Create Community"}
       </button>
     </div>
@@ -160,8 +278,21 @@ export default function CreateCommunityModal({
         register={register}
         values={values}
         setValue={setValue}
+        errors={errors}
+        coverPreviewUrl={coverPreviewUrl}
+        coverUploadError={coverUploadError}
+        isUploadingCover={isUploadingCover}
+        onCoverFileChange={(
+          file,
+          previewUrl,
+          errorMessage
+        ) => {
+          setCoverImageFile(file);
+          setCoverPreviewUrl(previewUrl);
+          setCoverUploadError(errorMessage);
+          setValue("coverImageUrl", "");
+        }}
       />
     </BaseModal>
   );
 }
-

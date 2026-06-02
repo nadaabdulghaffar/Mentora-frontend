@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Flag, Link, Mail, MapPin, Pencil, Settings, Share2 } from 'lucide-react';
 import type { ProfileEntity } from '../../pages/profile/types';
+import { ProfileAvatar } from './ProfileAvatar';
 
 export interface ProfileBannerProps {
   profile: ProfileEntity;
   isOwner: boolean;
+  showFollow?: boolean;
+  showMessage?: boolean;
+  isFollowing?: boolean;
+  followLoading?: boolean;
+  messageLoading?: boolean;
   onEdit?: () => void;
   onSettings?: () => void;
   onFollow?: () => void;
@@ -15,13 +21,17 @@ export interface ProfileBannerProps {
 export function ProfileBanner({
   profile,
   isOwner,
+  showFollow = false,
+  showMessage = false,
+  isFollowing = false,
+  followLoading = false,
+  messageLoading = false,
   onEdit,
   onSettings,
   onFollow,
   onMessage,
   onReport,
 }: ProfileBannerProps) {
-  const isMentor = profile.role === 'mentor';
   const [shareOpen, setShareOpen] = useState(false);
 
   const profileLink = useMemo(() => {
@@ -43,12 +53,15 @@ export function ProfileBanner({
     }
   };
 
+  const showVisitorActions = !isOwner && (showFollow || showMessage);
+
   return (
     <header className="relative overflow-visible rounded-3xl bg-primary px-6 py-8 text-white shadow-lg shadow-primary/25 md:px-10 md:py-10">
       <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-          <img
-            src={profile.avatarUrl}
+          <ProfileAvatar
+            pictureUrl={profile.profilePicturePath ?? profile.avatarUrl}
+            name={profile.displayName}
             alt=""
             className="h-28 w-28 shrink-0 rounded-full border-4 border-white/30 object-cover shadow-lg sm:h-32 sm:w-32"
           />
@@ -146,22 +159,28 @@ export function ProfileBanner({
                 ) : null}
               </div>
             </>
-          ) : isMentor ? (
+          ) : showVisitorActions ? (
             <>
-              <button
-                type="button"
-                onClick={onFollow}
-                className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-white/90"
-              >
-                Follow
-              </button>
-              <button
-                type="button"
-                onClick={onMessage}
-                className="rounded-full bg-[#4DB6AC] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3da096]"
-              >
-                Message
-              </button>
+              {showFollow ? (
+                <button
+                  type="button"
+                  onClick={onFollow}
+                  disabled={followLoading}
+                  className="rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-primary shadow-sm transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {followLoading ? 'Updating…' : isFollowing ? 'Following' : 'Follow'}
+                </button>
+              ) : null}
+              {showMessage ? (
+                <button
+                  type="button"
+                  onClick={onMessage}
+                  disabled={messageLoading}
+                  className="rounded-full bg-[#4DB6AC] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3da096] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {messageLoading ? 'Opening...' : 'Message'}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onReport}
@@ -171,25 +190,7 @@ export function ProfileBanner({
                 <Flag size={18} />
               </button>
             </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={onMessage}
-                className="rounded-full bg-[#4DB6AC] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3da096]"
-              >
-                Message
-              </button>
-              <button
-                type="button"
-                onClick={onReport}
-                className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
-                aria-label="Report"
-              >
-                <Flag size={18} />
-              </button>
-            </>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

@@ -333,6 +333,8 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
   const [classroomData, setClassroomData] =
   useState<any>(null);
 
+  const [mentorUserId, setMentorUserId] = useState<string | null>(null);
+
   const [roadmapId, setRoadmapId] =
   useState<number | null>(null);
 
@@ -700,6 +702,7 @@ useState<MentorRegistryRow[]>([]);
 
           const programResponse = await getProgramView(classroomProgramId);
           setRoadmapId(programResponse.roadmap?.roadmapId ?? null);
+          setMentorUserId(programResponse.mentorProfileId ?? null);
         }
       } catch (error) {
         console.error("Failed to fetch classroom", error);
@@ -2619,6 +2622,21 @@ const handleResubmitTask = async (
             <div>
               <p className="text-[28px] font-bold leading-tight text-[#1F2432]">{classroomData?.title || "Classroom"}</p>
             </div>
+            {mentorUserId && Number.isFinite(classroomProgramId) ? (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/profile/${mentorUserId}?programId=${classroomProgramId}&tab=reviews`
+                  )
+                }
+                className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-primary transition hover:text-primary-dark lg:self-center"
+              >
+                <span aria-hidden>💬</span>
+                <span>Feedback</span>
+                <span aria-hidden>→</span>
+              </button>
+            ) : null}
           </div>
           <ClassroomTabsNav tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
         </section>

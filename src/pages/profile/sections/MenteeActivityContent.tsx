@@ -1,54 +1,97 @@
-import { Award } from 'lucide-react';
-import type { ProfileEntity } from '../types';
-import { AiInsightCard, ProgramCard } from '../../../components/profile';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ProgramCard from '../../../components/ProgramCard';
+import { ActivityScrollSection } from '../../../components/profile/ActivityScrollSection';
+import { getMyApplications } from '../../../services/programService';
+import {
+  mapAcceptedApplicationToMyProgram,
+  type MyProgramStyleItem,
+} from '../profileActivityMappers';
 
 interface MenteeActivityContentProps {
-  profile: ProfileEntity;
   isOwner: boolean;
-  onAiCta?: () => void;
 }
 
-export function MenteeActivityContent({ profile, isOwner, onAiCta }: MenteeActivityContentProps) {
-  const enrolled = profile.enrolledProgram;
-  const showAi = isOwner && profile.aiInsight;
+export function MenteeActivityContent({ isOwner }: MenteeActivityContentProps) {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(isOwner);
+  const [programs, setPrograms] = useState<MyProgramStyleItem[]>([]);
 
-  const main = enrolled ? (
-    <section>
-      <div className="mb-4 flex items-center gap-2">
-        <Award className="text-primary" size={22} />
-        <h2 className="text-lg font-bold text-[#1F2533]">Enrolled Program</h2>
-      </div>
-      <div className="max-w-lg">
-        <ProgramCard program={enrolled} />
-      </div>
-    </section>
-  ) : (
-    <section className="flex flex-col items-center justify-center rounded-3xl border border-[#E8EBF2] bg-white px-8 py-16 text-center shadow-sm">
-      <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 text-emerald-500">
-        <Award size={40} strokeWidth={1.5} />
-      </div>
-      <h2 className="text-2xl font-bold text-[#1F2533]">No Activity yet!</h2>
-      <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6B7289]">
-        Start your journey and connect with mentors, complete sessions, and grow your skills.
-      </p>
-    </section>
-  );
+  const loadOwnPrograms = useCallback(async () => {
+    setLoading(true);
+    try {
+      const appsRes = await getMyApplications();
+      if (appsRes.success && appsRes.data) {
+        const items = appsRes.data.items ?? appsRes.data.Items ?? [];
+        const accepted = (items as Record<string, unknown>[]).filter(
+          (a) => String(a.status ?? '').toLowerCase() === 'accepted'
+        );
+        setPrograms(accepted.map(mapAcceptedApplicationToMyProgram));
+      } else {
+        setPrograms([]);
+      }
+    } catch (error) {
+      console.error(error);
+      setPrograms([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  if (!showAi) {
-    return <div>{main}</div>;
+  useEffect(() => {
+    if (isOwner) {
+      void loadOwnPrograms();
+    }
+  }, [isOwner, loadOwnPrograms]);
+
+  if (!isOwner) {
+    return (
+      <div className="w-full min-w-0 space-y-6">
+        <ActivityScrollSection
+          title="Programs"
+          isEmpty
+          emptyMessage="No programs yet"
+        >
+          {null}
+        </ActivityScrollSection>
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-      <div>{main}</div>
-      {profile.aiInsight ? (
-        <AiInsightCard
-          title={profile.aiInsight.title}
-          body={profile.aiInsight.body}
-          ctaLabel={profile.aiInsight.ctaLabel}
-          onCta={onAiCta}
-        />
-      ) : null}
+    <div className="w-full min-w-0 space-y-6">
+      <ActivityScrollSection
+        title="My Programs"
+        loading={loading}
+        isEmpty={programs.length === 0}
+        emptyMessage="No programs yet"
+      >
+        {programs.map((program) => (
+          <div key={program.id} className="w-[320px] shrink-0 snap-start md:w-[360px]">
+            <ProgramCard
+              variant="simple-button"
+              tag={program.tag}
+              phases={program.phases}
+              title={program.title}
+              description={program.description}
+              progress={program.progress}
+              author={{
+                name: program.mentorName ?? 'Mentor',
+                avatar:
+                  program.mentorAvatar ??
+                  'https://randomuser.me/api/portraits/lego/1.jpg',
+              }}
+              primaryButtonText="Join classroom"
+              className="h-full w-full"
+              onPrimaryClick={() => {
+                navigate(`/classroom/${program.id}`, {
+                  state: { role: 'mentee' },
+                });
+              }}
+            />
+          </div>
+        ))}
+      </ActivityScrollSection>
     </div>
   );
 }

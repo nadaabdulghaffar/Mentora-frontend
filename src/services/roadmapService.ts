@@ -424,3 +424,48 @@ export const uploadTaskAttachment =
 
     return response.data.data;
 };
+
+export const getPublishedRoadmapsByMentorProfile = async (
+  mentorProfileId: string
+): Promise<RoadmapDetailsDto[]> => {
+  const response = await apiClient.get(
+    `/Roadmap/${mentorProfileId}/published`
+  );
+
+  try {
+    return unwrapRoadmapEnvelope(
+      response.data as ApiResponse<RoadmapDetailsDto[]>
+    );
+  } catch {
+    const body = response.data as ApiResponse<RoadmapDetailsDto[]> | RoadmapDetailsDto[];
+    if (Array.isArray(body)) {
+      return body;
+    }
+    if (Array.isArray(body?.data)) {
+      return body.data;
+    }
+    throw new Error('Failed to load published roadmaps');
+  }
+};
+
+/** Mentor dashboard — own published roadmaps (`View-my-published-Roadmaps`). */
+export const getMyPublishedRoadmaps = async (): Promise<RoadmapDetailsDto[]> => {
+  const response = await apiClient.get(
+    '/Roadmap/View-my-published-Roadmaps'
+  );
+
+  try {
+    return unwrapRoadmapEnvelope(
+      response.data as ApiResponse<RoadmapDetailsDto[]>
+    );
+  } catch {
+    const body = response.data as ApiResponse<RoadmapDetailsDto[]> | RoadmapDetailsDto[];
+    if (Array.isArray(body)) {
+      return body;
+    }
+    if (Array.isArray(body?.data)) {
+      return body.data;
+    }
+    return [];
+  }
+};

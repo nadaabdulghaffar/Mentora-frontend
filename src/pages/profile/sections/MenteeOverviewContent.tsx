@@ -1,6 +1,6 @@
 import { BookOpen, Pencil } from 'lucide-react';
 import type { ProfileEntity } from '../types';
-import { AiInsightCard } from '../../../components/profile';
+import { AiInsightCard, ProfileOverviewDetails } from '../../../components/profile';
 
 interface MenteeOverviewContentProps {
   profile: ProfileEntity;
@@ -24,6 +24,8 @@ export function MenteeOverviewContent({
       className={`grid gap-6 ${showAi ? 'lg:grid-cols-[1fr_300px]' : ''}`}
     >
       <div className="rounded-3xl border border-[#E8EBF2] bg-white p-6 shadow-sm md:p-8">
+        <ProfileOverviewDetails profile={profile} />
+
         <div className="relative mb-8">
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-xl font-bold text-[#1F2533]">Bio</h2>

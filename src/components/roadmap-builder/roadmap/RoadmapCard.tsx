@@ -2,9 +2,10 @@ import { useState } from "react";
 
 import {
   MoreVertical,
-  Layers3,
   Trash2,
 } from "lucide-react";
+
+import { formatRoadmapDuration } from "../../../utils/roadmapDisplayUtils";
 
 import { useNavigate } from "react-router-dom";
 
@@ -56,6 +57,8 @@ export default function RoadmapCard({
           90
         ) + "..."
       : safeDescription;
+
+  const durationLabel = formatRoadmapDuration(roadmap.duration);
 
   return (
     <div
@@ -199,20 +202,27 @@ export default function RoadmapCard({
         {shortDescription}
       </p>
 
-      {/* phases */}
+      {/* domain / subdomain / duration */}
       <div
         className="
           mt-5
-          flex items-center gap-2
+          space-y-1.5
           text-[#98A2B3]
           text-sm font-semibold
         "
       >
-        <Layers3 size={16} />
-
-        <span>
-          {roadmap.phasesCount} PHASES
-        </span>
+        <p>
+          <span className="text-[#B0B7C3]">Domain:</span>{' '}
+          {roadmap.domainName || '—'}
+        </p>
+        <p>
+          <span className="text-[#B0B7C3]">Subdomain:</span>{' '}
+          {roadmap.subDomainName || '—'}
+        </p>
+        <p>
+          <span className="text-[#B0B7C3]">Duration:</span>{' '}
+          {durationLabel || '—'}
+        </p>
       </div>
 
       {/* button */}

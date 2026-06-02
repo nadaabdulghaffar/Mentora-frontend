@@ -168,6 +168,11 @@ function baseMentorProfile(overrides: Partial<ProfileEntity>): ProfileEntity {
     },
     reviews: defaultReviews,
     roadmaps: roadmapList,
+    subDomains: [],
+    technologies: [],
+    expertise: [],
+    relevantExpertise: [],
+    tools: [],
     ...overrides,
   };
 }
@@ -204,6 +209,11 @@ function baseMenteeProfile(overrides: Partial<ProfileEntity>): ProfileEntity {
       body: 'Based on your experience at TechCorp, we found 3 mentors specialized in Enterprise SaaS scaling.',
       ctaLabel: 'View Matches',
     },
+    subDomains: [],
+    technologies: [],
+    expertise: [],
+    relevantExpertise: [],
+    tools: [],
     ...overrides,
   };
 }

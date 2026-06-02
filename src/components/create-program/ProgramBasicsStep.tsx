@@ -17,7 +17,7 @@ import {
 
 import ExtraProgramCard from "../ExtraProgramCard";
 
-export default function ProgramBasicsStep() {
+export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?: boolean }) {
   const { values, setFieldValue, errors } = useFormikContext<CreateProgramFormData>();
 
   const [domains, setDomains] = useState<Option[]>([]);
@@ -31,6 +31,7 @@ export default function ProgramBasicsStep() {
   const subDomainId = values.subDomainId;
   const title = values.title;
   const description = values.description;
+  const existingImageUrl = values.existingImageUrl;
 
   /* Load current mentor */
   useEffect(() => {
@@ -95,6 +96,12 @@ export default function ProgramBasicsStep() {
     loadSubDomains();
   }, [domainId]);
 
+  useEffect(() => {
+    if (existingImageUrl && !previewImage) {
+      setPreviewImage(existingImageUrl);
+    }
+  }, [existingImageUrl, previewImage]);
+
   /* Upload image */
   const handleImageChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -132,25 +139,37 @@ export default function ProgramBasicsStep() {
       {/* LEFT */}
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputGroup label="Domain" htmlFor="domain">
+          <InputGroup label={isEditMode ? "Domain (Cannot be changed)" : "Domain"} htmlFor="domain">
             <SelectField
               id="domain"
               value={String(domainId || "")}
               onChange={(v) => setFieldValue("domainId", Number(v))}
               options={domains}
+              disabled={isEditMode}
             />
+            {isEditMode && (
+              <p className="text-xs text-amber-600 mt-1">
+                Domain cannot be changed. Create a new program if you need a different domain.
+              </p>
+            )}
             {getIn(errors, "domainId") && (
               <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "domainId"))}</p>
             )}
           </InputGroup>
 
-          <InputGroup label="Sub Domain" htmlFor="subDomain">
+          <InputGroup label={isEditMode ? "Sub Domain (Cannot be changed)" : "Sub Domain"} htmlFor="subDomain">
             <SelectField
               id="subDomain"
               value={String(subDomainId || "")}
               onChange={(v) => setFieldValue("subDomainId", Number(v))}
               options={subDomains}
+              disabled={isEditMode}
             />
+            {isEditMode && (
+              <p className="text-xs text-amber-600 mt-1">
+                Sub Domain cannot be changed. Create a new program if you need a different sub domain.
+              </p>
+            )}
             {getIn(errors, "subDomainId") && (
               <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "subDomainId"))}</p>
             )}
@@ -216,6 +235,7 @@ export default function ProgramBasicsStep() {
           className="w-full max-w-sm"
           image={
             previewImage ||
+            existingImageUrl ||
             "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1200&auto=format&fit=crop"
           }
           tag={selectedDomain}

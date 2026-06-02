@@ -1,8 +1,27 @@
 
 import type { Community } from "../types";
 
+import { getDomainName } from "../../../utils/domainCache";
+import {
+  getProfileAvatarFallback,
+  resolveProfilePictureUrl,
+} from "../../../utils/profileImageUrl";
+import { resolveCommunityImageUrl } from "../../../utils/communityImageUrl";
+
 export const mapCommunityResponse = (
-  data: any
+  data: {
+    communityId: string;
+    name: string;
+    description?: string;
+    coverImageUrl?: string;
+    domainId: number;
+    membersCount?: number;
+    createdAt: string;
+    createdByUserProfilePicture?: string;
+    isMember?: boolean;
+    currentUserRole?: string;
+    canManage?: boolean;
+  }
 ): Community => {
   return {
     id: data.communityId,
@@ -13,15 +32,21 @@ export const mapCommunityResponse = (
       data.description || "",
 
     avatar:
-      data.coverImageUrl ||
-      "https://api.dicebear.com/7.x/avataaars/svg?seed=community",
+      resolveProfilePictureUrl(
+        data.createdByUserProfilePicture
+      ) ||
+      getProfileAvatarFallback(data.name),
 
     cover:
-      data.coverImageUrl ||
-      "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200&h=300&fit=crop",
+      resolveCommunityImageUrl(
+        data.coverImageUrl
+      ),
 
     domain:
-      String(data.domainId),
+      getDomainName(data.domainId),
+
+    domainId:
+      data.domainId,
 
     memberCount:
       data.membersCount || 0,
@@ -33,11 +58,17 @@ export const mapCommunityResponse = (
 
     isJoined:
       data.isMember,
+
+    currentUserRole:
+      data.currentUserRole,
+
+    canManage:
+      data.canManage,
   };
 };
 
 export const mapCommunitiesResponse = (
-  communities: any[]
+  communities: Array<Parameters<typeof mapCommunityResponse>[0]>
 ): Community[] => {
   return communities.map(
     mapCommunityResponse

@@ -1,4 +1,5 @@
 import type { ProgramCardData } from '../../pages/profile/types';
+import { ProfileAvatar } from './ProfileAvatar';
 
 const tagStyles = {
   leadership: 'bg-emerald-50 text-emerald-700',
@@ -28,8 +29,9 @@ export function ProgramCard({ program, actionLabel, onAction }: ProgramCardProps
         <p className="mt-2 flex-1 text-sm leading-relaxed text-[#6B7289]">{program.description}</p>
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#F0F2F8] pt-4">
           <div className="flex items-center gap-2">
-            <img
-              src={program.instructorAvatar}
+            <ProfileAvatar
+              pictureUrl={program.instructorAvatar}
+              name={program.instructorName}
               alt=""
               className="h-8 w-8 rounded-full object-cover"
             />

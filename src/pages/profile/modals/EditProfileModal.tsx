@@ -1,12 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, ChevronDown, Link, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../../components/Modal';
 import { InputGroup, SelectField, SelectWithTags, TextAreaField, type Option } from '../../../components/MultiStepForm';
+import { ProfileAvatar } from '../../../components/profile/ProfileAvatar';
 import authAPI from '../../../services/authService';
 import lookupAPI from '../../../services/lookupService';
+import { toStorageProfilePictureUrl } from '../../../utils/profileImageUrl';
 import type { ProfileEntity, SocialLink } from '../types';
 import type { SubDomain, Technology } from '../../../types/api';
-import type { OwnProfileUpdatePayload } from '../profileService';
+import {
+  isMentorLinkedInSyntheticId,
+  mentorLinkedInSyntheticId,
+  normalizeSocialPlatform,
+  experienceLevelToApiValue,
+  experienceLevelToSelectValue,
+  enumNameToSelectValue,
+  mentorYearsSelectToApiValue,
+  mentorYearsToSelectValue,
+  MENTOR_YEARS_OPTIONS,
+  selectValueToEnumName,
+  validateSocialLinks,
+  type OwnProfileUpdatePayload,
+} from '../profileService';
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -16,31 +31,43 @@ interface EditProfileModalProps {
 }
 
 type ToolSelection = {
+  technologyId: number;
   name: string;
   level: string;
 };
 
+function toolsFromProfile(profile: ProfileEntity): ToolSelection[] {
+  if (profile.role === 'mentor') {
+    return profile.expertise.map((item) => ({
+      technologyId: item.technologyId,
+      name: item.technologyName,
+      level: '',
+    }));
+  }
+
+  return profile.technologies.map((item) => ({
+    technologyId: item.technologyId,
+    name: item.technologyName,
+    level: experienceLevelToSelectValue(item.experienceLevel),
+  }));
+}
+
+function parseTechnologyId(id: string): number {
+  const parsed = Number(id);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 const DEFAULT_EXPERIENCE_LEVELS: Option[] = [
-  { label: 'Beginner', value: 'beginner' },
-  { label: 'Intermediate', value: 'intermediate' },
-  { label: 'Advanced', value: 'advanced' },
-  { label: 'Expert', value: 'expert' },
+  { label: 'None', value: '1' },
+  { label: 'Beginner', value: '2' },
+  { label: 'Intermediate', value: '3' },
+  { label: 'Advanced', value: '4' },
 ];
 
-function toExperienceOption(level: unknown): Option {
-  if (typeof level === 'string' || typeof level === 'number') {
-    const text = String(level);
-    return { label: text, value: text.toLowerCase() };
-  }
-
-  if (level && typeof level === 'object') {
-    const raw = level as { label?: unknown; name?: unknown; value?: unknown; id?: unknown };
-    const label = String(raw.label ?? raw.name ?? raw.value ?? raw.id ?? 'Option');
-    const value = String(raw.value ?? raw.id ?? raw.label ?? raw.name ?? label);
-    return { label, value: value.toLowerCase() };
-  }
-
-  return { label: 'Option', value: 'option' };
+function toExperienceLevelOption(level: { name?: string; label?: string; value?: string | number }): Option {
+  const label = String(level.name ?? level.label ?? 'Option');
+  const value = String(level.value ?? label);
+  return { label, value };
 }
 
 function SectionHeader({
@@ -71,31 +98,60 @@ function SectionHeader({
 
 export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfileModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isMentor = profile.role === 'mentor';
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [headline, setHeadline] = useState(profile.headline);
   const [countryCode, setCountryCode] = useState(profile.countryCode ?? '');
   const [email, setEmail] = useState(profile.email);
   const [bio, setBio] = useState(profile.bio);
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
+  const [profilePicturePath, setProfilePicturePath] = useState(
+    profile.profilePicturePath ?? ''
+  );
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [links, setLinks] = useState<SocialLink[]>(profile.socialLinks);
   const [domainId, setDomainId] = useState(profile.domainId ?? '');
-  const [yearsOfExperience, setYearsOfExperience] = useState(profile.yearsOfExperience ?? '');
-  const [relevantExpertise, setRelevantExpertise] = useState<string[]>(profile.relevantExpertise ?? []);
-  const [tools, setTools] = useState<ToolSelection[]>(profile.tools ?? []);
+  const [yearsOfExperience, setYearsOfExperience] = useState(
+    mentorYearsToSelectValue(profile.yearsOfExperience)
+  );
+  const [educationStatus, setEducationStatus] = useState(
+    enumNameToSelectValue('educationStatus', profile.educationStatus)
+  );
+  const [currentLevel, setCurrentLevel] = useState(
+    enumNameToSelectValue('currentLevel', profile.currentLevel)
+  );
+  const [relevantExpertise, setRelevantExpertise] = useState<string[]>(
+    profile.subDomains.map((item) => item.name)
+  );
+  const [selectedSubDomainIds, setSelectedSubDomainIds] = useState<number[]>(
+    profile.subDomains.map((item) => item.id)
+  );
+  const [tools, setTools] = useState<ToolSelection[]>(() => toolsFromProfile(profile));
   const [basicInfoOpen, setBasicInfoOpen] = useState(true);
   const [experienceOpen, setExperienceOpen] = useState(true);
   const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
   const [domains, setDomains] = useState<Option[]>([]);
   const [subDomainOptions, setSubDomainOptions] = useState<SubDomain[]>([]);
   const [technologyOptions, setTechnologyOptions] = useState<Technology[]>([]);
-  const [experienceLevels, setExperienceLevels] = useState<Option[]>(DEFAULT_EXPERIENCE_LEVELS);
+  const [technologySubDomainMap, setTechnologySubDomainMap] = useState<Map<number, number>>(
+    () => new Map()
+  );
+  const [toolExperienceLevels, setToolExperienceLevels] = useState<Option[]>(DEFAULT_EXPERIENCE_LEVELS);
+  const [educationStatusOptions, setEducationStatusOptions] = useState<Option[]>([]);
+  const [currentLevelOptions, setCurrentLevelOptions] = useState<Option[]>([]);
+  const mentorYearsOptions = useMemo<Option[]>(
+    () => MENTOR_YEARS_OPTIONS.map((option) => ({ ...option })),
+    []
+  );
   const [loadingLookups, setLoadingLookups] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [toolError, setToolError] = useState('');
+  const [linkError, setLinkError] = useState('');
 
-  const selectedToolNames = tools.map((tool) => tool.name);
-  const availableTechnologies = technologyOptions.filter((tech) => !selectedToolNames.includes(tech.name));
+  const selectedToolIds = useMemo(() => new Set(tools.map((tool) => tool.technologyId)), [tools]);
+  const availableTechnologies = technologyOptions.filter(
+    (tech) => !selectedToolIds.has(parseTechnologyId(tech.id))
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -107,25 +163,26 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     setCountryCode(profile.countryCode ?? '');
     setEmail(profile.email);
     setBio(profile.bio);
-    setAvatarUrl(profile.avatarUrl);
+    setProfilePicturePath(profile.profilePicturePath ?? '');
     setLinks(profile.socialLinks);
     setDomainId(profile.domainId ?? '');
-    setYearsOfExperience(profile.yearsOfExperience ?? '');
-    setRelevantExpertise(profile.relevantExpertise ?? []);
-    setTools(profile.tools ?? []);
+    setYearsOfExperience(mentorYearsToSelectValue(profile.yearsOfExperience));
+    setEducationStatus(enumNameToSelectValue('educationStatus', profile.educationStatus));
+    setCurrentLevel(enumNameToSelectValue('currentLevel', profile.currentLevel));
+    setRelevantExpertise(profile.subDomains.map((item) => item.name));
+    setSelectedSubDomainIds(profile.subDomains.map((item) => item.id));
+    setTools(toolsFromProfile(profile));
     setBasicInfoOpen(true);
     setExperienceOpen(true);
     setToolDropdownOpen(false);
     setSaveError('');
     setToolError('');
+    setLinkError('');
 
     const loadLookups = async () => {
       setLoadingLookups(true);
       try {
-        const [domainsResponse, experienceResponse] = await Promise.all([
-          lookupAPI.getDomains(),
-          lookupAPI.getExperienceLevels(),
-        ]);
+        const domainsResponse = await lookupAPI.getDomains();
 
         if (domainsResponse.success && domainsResponse.data) {
           const domainOptions = domainsResponse.data.map((domain) => ({
@@ -133,8 +190,16 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
             value: domain.id,
           }));
           setDomains(domainOptions);
-          if (!profile.domainId && domainOptions.length > 0) {
-            setDomainId(domainOptions[0].value);
+
+          const domainName = profile.domainName?.trim().toLowerCase();
+          const matchedDomain = domainName
+            ? domainOptions.find((option) => option.label.trim().toLowerCase() === domainName)
+            : undefined;
+
+          if (profile.domainId) {
+            setDomainId(profile.domainId);
+          } else if (matchedDomain) {
+            setDomainId(matchedDomain.value);
           }
         } else {
           setDomains([
@@ -144,8 +209,26 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
           ]);
         }
 
-        if (experienceResponse.success && experienceResponse.data) {
-          setExperienceLevels(experienceResponse.data.map(toExperienceOption));
+        if (!isMentor) {
+          const [educationResponse, currentLevelResponse, experienceResponse] = await Promise.all([
+            lookupAPI.getEducationStatuses(),
+            lookupAPI.getCurrentLevels(),
+            lookupAPI.getExperienceLevels(),
+          ]);
+
+          if (educationResponse.success && educationResponse.data) {
+            setEducationStatusOptions(educationResponse.data.map(toExperienceLevelOption));
+          }
+
+          if (currentLevelResponse.success && currentLevelResponse.data) {
+            setCurrentLevelOptions(currentLevelResponse.data.map(toExperienceLevelOption));
+          }
+
+          if (experienceResponse.success && experienceResponse.data) {
+            setToolExperienceLevels(experienceResponse.data.map(toExperienceLevelOption));
+          }
+        } else {
+          setYearsOfExperience((prev) => prev || mentorYearsToSelectValue(profile.yearsOfExperience));
         }
       } catch (error) {
         setDomains([
@@ -153,14 +236,16 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
           { label: 'Software', value: 'software' },
           { label: 'Marketing', value: 'marketing' },
         ]);
-        setExperienceLevels(DEFAULT_EXPERIENCE_LEVELS);
+        if (!isMentor) {
+          setToolExperienceLevels(DEFAULT_EXPERIENCE_LEVELS);
+        }
       } finally {
         setLoadingLookups(false);
       }
     };
 
     void loadLookups();
-  }, [isOpen, profile]);
+  }, [isOpen, profile, isMentor]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -170,8 +255,6 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     if (!domainId) {
       setSubDomainOptions([]);
       setTechnologyOptions([]);
-      setRelevantExpertise([]);
-      setTools([]);
       setToolDropdownOpen(false);
       return;
     }
@@ -197,13 +280,17 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
       return;
     }
 
-    const selectedSubDomainIds = subDomainOptions
-      .filter((subDomain) => relevantExpertise.includes(subDomain.name))
-      .map((subDomain) => subDomain.id);
+    const subDomainIdsForCatalog =
+      selectedSubDomainIds.length > 0
+        ? selectedSubDomainIds
+        : subDomainOptions
+            .filter((subDomain) => relevantExpertise.includes(subDomain.name))
+            .map((subDomain) => Number(subDomain.id))
+            .filter((id) => Number.isFinite(id) && id > 0);
 
-    if (selectedSubDomainIds.length === 0) {
+    if (subDomainIdsForCatalog.length === 0) {
       setTechnologyOptions([]);
-      setTools([]);
+      setTechnologySubDomainMap(new Map());
       setToolDropdownOpen(false);
       return;
     }
@@ -211,51 +298,146 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     const loadTechnologies = async () => {
       try {
         const responses = await Promise.all(
-          selectedSubDomainIds.map((id) => lookupAPI.getTechnologies(id))
+          subDomainIdsForCatalog.map((id) => lookupAPI.getTechnologies(String(id)))
         );
 
-        const technologies = responses
-          .filter((response) => response.success && response.data)
-          .flatMap((response) => response.data ?? []);
+        const uniqueById = new Map<number, Technology>();
+        const subDomainMap = new Map<number, number>();
 
-        const uniqueByName = new Map<string, Technology>();
-        technologies.forEach((technology) => {
-          if (!uniqueByName.has(technology.name)) {
-            uniqueByName.set(technology.name, technology);
+        subDomainIdsForCatalog.forEach((subDomainId, index) => {
+          const response = responses[index];
+          if (!response?.success || !response.data) {
+            return;
+          }
+
+          response.data.forEach((technology) => {
+            const technologyId = parseTechnologyId(technology.id);
+            if (technologyId <= 0) {
+              return;
+            }
+
+            subDomainMap.set(technologyId, subDomainId);
+            if (!uniqueById.has(technologyId)) {
+              uniqueById.set(technologyId, {
+                ...technology,
+                subDomainId: String(subDomainId),
+              });
+            }
+          });
+        });
+
+        tools.forEach((tool) => {
+          if (tool.technologyId > 0 && !uniqueById.has(tool.technologyId)) {
+            uniqueById.set(tool.technologyId, {
+              id: String(tool.technologyId),
+              name: tool.name,
+            });
           }
         });
 
-        const dedupedTechnologies = Array.from(uniqueByName.values());
-        const validNames = new Set(dedupedTechnologies.map((technology) => technology.name));
-        setTechnologyOptions(dedupedTechnologies);
-        setTools((prev) => prev.filter((tool) => validNames.has(tool.name)));
-      } catch (error) {
-        setTechnologyOptions([]);
-        setTools([]);
+        setTechnologySubDomainMap(subDomainMap);
+        setTechnologyOptions(Array.from(uniqueById.values()));
+      } catch {
+        setTechnologySubDomainMap(new Map());
+        setTechnologyOptions(
+          tools.map((tool) => ({
+            id: String(tool.technologyId),
+            name: tool.name,
+          }))
+        );
       }
     };
 
     void loadTechnologies();
-  }, [isOpen, relevantExpertise, subDomainOptions]);
+  }, [isOpen, selectedSubDomainIds, relevantExpertise, subDomainOptions, tools]);
+
+  const removeToolsForSubDomain = (subDomainId: number) => {
+    const removedTechnologyIds = new Set<number>();
+
+    technologySubDomainMap.forEach((mappedSubDomainId, technologyId) => {
+      if (mappedSubDomainId === subDomainId) {
+        removedTechnologyIds.add(technologyId);
+      }
+    });
+
+    technologyOptions.forEach((technology) => {
+      if (Number(technology.subDomainId) === subDomainId) {
+        const technologyId = parseTechnologyId(technology.id);
+        if (technologyId > 0) {
+          removedTechnologyIds.add(technologyId);
+        }
+      }
+    });
+
+    setTools((prev) => prev.filter((tool) => !removedTechnologyIds.has(tool.technologyId)));
+    setToolError('');
+  };
 
   const handleSave = async () => {
-    const incompleteTools = tools.filter((tool) => !tool.level);
-    if (incompleteTools.length > 0) {
-      setToolError('Please select a level for each selected tool');
+    if (selectedSubDomainIds.length === 0) {
+      setToolError('Please select at least one area of expertise');
       setExperienceOpen(true);
+      return;
+    }
+
+    if (!isMentor) {
+      if (tools.length === 0) {
+        setToolError('Please select at least one tool');
+        setExperienceOpen(true);
+        return;
+      }
+
+      const incompleteTools = tools.filter((tool) => !tool.level);
+      if (incompleteTools.length > 0) {
+        setToolError('Please select a level for each selected tool');
+        setExperienceOpen(true);
+        return;
+      }
+    } else if (tools.length === 0) {
+      setToolError('Please select at least one area of expertise');
+      setExperienceOpen(true);
+      return;
+    }
+
+    const linkValidationError = validateSocialLinks(links);
+    if (linkValidationError) {
+      setLinkError(linkValidationError);
+      setBasicInfoOpen(true);
       return;
     }
 
     setSaving(true);
     setSaveError('');
+    setLinkError('');
     try {
-      const linkedInUrl = links.find((link) => link.platform === 'linkedin' || link.label.toLowerCase().includes('linkedin'))?.url;
+      const linkedInLink = links.find(
+        (link) =>
+          isMentorLinkedInSyntheticId(link.id, profile.userId) ||
+          link.platform === 'linkedin' ||
+          link.label.toLowerCase().includes('linkedin')
+      );
 
       await onSave({
         bio,
         countryCode,
-        profilePictureUrl: avatarUrl,
-        linkedInUrl,
+        profilePictureUrl: profilePicturePath || undefined,
+        linkedInUrl: isMentor ? linkedInLink?.url.trim() ?? '' : undefined,
+        socialLinks: links,
+        subDomainIds: selectedSubDomainIds,
+        technologyInterests: isMentor
+          ? undefined
+          : tools.map((tool) => ({
+              technologyId: tool.technologyId,
+              experienceLevel: experienceLevelToApiValue(tool.level),
+            })),
+        expertiseTechnologyIds: isMentor ? tools.map((tool) => tool.technologyId) : undefined,
+        educationStatus: isMentor
+          ? undefined
+          : selectValueToEnumName(educationStatusOptions, educationStatus),
+        currentLevel: isMentor
+          ? undefined
+          : selectValueToEnumName(currentLevelOptions, currentLevel),
+        yearsOfExperience: isMentor ? mentorYearsSelectToApiValue(yearsOfExperience) : undefined,
       });
       onClose();
     } catch (error) {
@@ -266,19 +448,42 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
   };
 
   const handleAddLink = () => {
+    const isMentor = profile.role === 'mentor';
+    const hasLinkedIn = links.some(
+      (link) =>
+        isMentorLinkedInSyntheticId(link.id, profile.userId) ||
+        link.platform === 'linkedin' ||
+        link.label.toLowerCase().includes('linkedin')
+    );
+
+    if (isMentor && !hasLinkedIn) {
+      setLinks((prev) => [
+        ...prev,
+        {
+          id: mentorLinkedInSyntheticId(profile.userId),
+          platform: 'linkedin',
+          label: 'LinkedIn',
+          url: '',
+        },
+      ]);
+      return;
+    }
+
     setLinks((prev) => [
       ...prev,
       {
         id: `link-${Date.now()}`,
-        platform: 'linkedin',
-        label: 'LinkedIn',
+        platform: 'other',
+        label: '',
         url: '',
       },
     ]);
+    setLinkError('');
   };
 
   const handleRemoveLink = (linkId: string) => {
     setLinks((prev) => prev.filter((link) => link.id !== linkId));
+    setLinkError('');
   };
 
   const handlePhotoClick = () => {
@@ -294,35 +499,53 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     const input = event.target;
 
     void (async () => {
+      setUploadingPhoto(true);
+      setSaveError('');
       try {
         const response = await authAPI.uploadFile(file, 'profile-picture');
         if (response.success && response.data?.fileUrl) {
-          setAvatarUrl(response.data.fileUrl);
+          setProfilePicturePath(
+            toStorageProfilePictureUrl(response.data.fileUrl) ?? response.data.fileUrl
+          );
+        } else {
+          setSaveError(response.message || 'Failed to upload profile picture.');
         }
+      } catch (error) {
+        setSaveError(
+          error instanceof Error ? error.message : 'Failed to upload profile picture.'
+        );
       } finally {
+        setUploadingPhoto(false);
         input.value = '';
       }
     })();
   };
 
-  const handleAddTool = (toolName: string) => {
+  const handleAddTool = (technology: Technology) => {
+    const technologyId = parseTechnologyId(technology.id);
+    if (!technologyId) {
+      return;
+    }
+
     setTools((prev) => {
-      if (prev.some((tool) => tool.name === toolName)) {
+      if (prev.some((tool) => tool.technologyId === technologyId)) {
         return prev;
       }
-      return [...prev, { name: toolName, level: '' }];
+      return [...prev, { technologyId, name: technology.name, level: '' }];
     });
     setToolDropdownOpen(false);
     setToolError('');
   };
 
-  const handleRemoveTool = (toolName: string) => {
-    setTools((prev) => prev.filter((tool) => tool.name !== toolName));
+  const handleRemoveTool = (technologyId: number) => {
+    setTools((prev) => prev.filter((tool) => tool.technologyId !== technologyId));
     setToolError('');
   };
 
-  const handleToolLevelChange = (toolName: string, level: string) => {
-    setTools((prev) => prev.map((tool) => (tool.name === toolName ? { ...tool, level } : tool)));
+  const handleToolLevelChange = (technologyId: number, level: string) => {
+    setTools((prev) =>
+      prev.map((tool) => (tool.technologyId === technologyId ? { ...tool, level } : tool))
+    );
     if (level) {
       setToolError('');
     }
@@ -346,10 +569,11 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
               className="group block rounded-full outline-none"
               aria-label="Change photo"
             >
-              <img
-                src={avatarUrl}
+              <ProfileAvatar
+                pictureUrl={profilePicturePath}
+                name={displayName}
                 alt=""
-                className="h-28 w-28 rounded-full object-cover ring-4 ring-[#F0F2F8] transition group-hover:opacity-90"
+                className={`h-28 w-28 rounded-full object-cover ring-4 ring-[#F0F2F8] transition group-hover:opacity-90 ${uploadingPhoto ? 'opacity-60' : ''}`}
               />
             </button>
             <input
@@ -370,7 +594,9 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
           </div>
           <div className="mt-4 text-center sm:mt-0 sm:text-left">
             <p className="font-semibold text-[#1F2533]">Your Photo</p>
-            <p className="text-sm text-[#6B7289]">Update your profile picture</p>
+            <p className="text-sm text-[#6B7289]">
+              {uploadingPhoto ? 'Uploading...' : 'Update your profile picture'}
+            </p>
           </div>
         </div>
 
@@ -397,8 +623,10 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                       </label>
                       <input
                         value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        className="w-full rounded-xl border border-[#D8DCE8] px-4 py-2.5 text-sm outline-none focus:border-primary"
+                        readOnly
+                        disabled
+                        aria-readonly="true"
+                        className="w-full cursor-not-allowed rounded-xl border border-[#D8DCE8] bg-[#F8F9FD] px-4 py-2.5 text-sm text-[#5C6378] outline-none"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -429,8 +657,10 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                       <input
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-xl border border-[#D8DCE8] px-4 py-2.5 text-sm outline-none focus:border-primary"
+                        readOnly
+                        disabled
+                        aria-readonly="true"
+                        className="w-full cursor-not-allowed rounded-xl border border-[#D8DCE8] bg-[#F8F9FD] px-4 py-2.5 text-sm text-[#5C6378] outline-none"
                       />
                     </div>
                     <div className="sm:col-span-2">
@@ -455,23 +685,50 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                       </button>
                     </div>
                     <ul className="space-y-3">
-                        disabled={saving}
                       {links.map((link) => (
-                        <li key={link.id} className="flex items-center gap-3 rounded-xl border border-[#E8EBF2] px-3 py-2">
-                        {saving ? 'Saving...' : 'Save'}
+                        <li
+                          key={link.id}
+                          className="flex flex-col gap-2 rounded-xl border border-[#E8EBF2] px-3 py-2 sm:flex-row sm:items-center"
+                        >
                           <input
-                            value={link.url}
-                            onChange={(e) =>
+                            disabled={saving}
+                            value={link.label}
+                            onChange={(e) => {
+                              const label = e.target.value;
                               setLinks((prev) =>
-                                prev.map((item) => (item.id === link.id ? { ...item, url: e.target.value } : item))
-                              )
-                            }
-                            className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                                prev.map((item) =>
+                                  item.id === link.id
+                                    ? {
+                                        ...item,
+                                        label,
+                                        platform: normalizeSocialPlatform(label),
+                                      }
+                                    : item
+                                )
+                              );
+                              setLinkError('');
+                            }}
+                            placeholder="Label (e.g. GitHub)"
+                            className="w-full min-w-0 rounded-lg border border-[#E8EBF2] bg-white px-3 py-2 text-sm outline-none focus:border-primary sm:w-36"
+                          />
+                          <input
+                            disabled={saving}
+                            value={link.url}
+                            onChange={(e) => {
+                              setLinks((prev) =>
+                                prev.map((item) =>
+                                  item.id === link.id ? { ...item, url: e.target.value } : item
+                                )
+                              );
+                              setLinkError('');
+                            }}
+                            placeholder="https://..."
+                            className="min-w-0 flex-1 rounded-lg border border-[#E8EBF2] bg-white px-3 py-2 text-sm outline-none focus:border-primary"
                           />
                           <button
                             type="button"
                             onClick={() => handleRemoveLink(link.id)}
-                            className="text-[#9CA3B8] hover:text-red-500"
+                            className="self-end text-[#9CA3B8] hover:text-red-500 sm:self-center"
                             aria-label="Remove"
                           >
                             <Trash2 size={18} />
@@ -479,6 +736,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                         </li>
                       ))}
                     </ul>
+                    {linkError ? <p className="mt-2 text-sm text-red-600">{linkError}</p> : null}
                   </div>
                 </div>
               ) : null}
@@ -499,38 +757,76 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                       <SelectField
                         id="domainId"
                         value={domainId}
-                        onChange={(value) => {
-                          setDomainId(value);
-                          setRelevantExpertise([]);
-                          setTools([]);
-                          setToolDropdownOpen(false);
-                          setToolError('');
-                        }}
+                        onChange={() => {}}
                         options={domains}
+                        disabled
                       />
                     </InputGroup>
 
-                    <InputGroup label="Years of Experience" htmlFor="yearsOfExperience">
-                      <SelectField
-                        id="yearsOfExperience"
-                        value={yearsOfExperience}
-                        onChange={setYearsOfExperience}
-                        options={experienceLevels}
-                      />
-                    </InputGroup>
+                    {isMentor ? (
+                      <InputGroup label="Years of Experience" htmlFor="yearsOfExperience">
+                        <SelectField
+                          id="yearsOfExperience"
+                          value={yearsOfExperience}
+                          onChange={setYearsOfExperience}
+                          options={mentorYearsOptions}
+                        />
+                      </InputGroup>
+                    ) : (
+                      <>
+                        <InputGroup label="Education Status" htmlFor="educationStatus">
+                          <SelectField
+                            id="educationStatus"
+                            value={educationStatus}
+                            onChange={setEducationStatus}
+                            options={educationStatusOptions}
+                          />
+                        </InputGroup>
+
+                        <InputGroup label="Current Level" htmlFor="currentLevel">
+                          <SelectField
+                            id="currentLevel"
+                            value={currentLevel}
+                            onChange={setCurrentLevel}
+                            options={currentLevelOptions}
+                          />
+                        </InputGroup>
+                      </>
+                    )}
 
                     <InputGroup label="Relevant Expertise" htmlFor="relevantExpertise">
                       <SelectWithTags
                         id="relevantExpertise"
                         options={subDomainOptions.map((subDomain) => subDomain.name)}
                         selected={relevantExpertise}
-                        onAdd={(item) => setRelevantExpertise((prev) => [...prev, item])}
-                        onRemove={(item) => setRelevantExpertise((prev) => prev.filter((value) => value !== item))}
+                        onAdd={(item) => {
+                          setRelevantExpertise((prev) => [...prev, item]);
+                          const subDomain = subDomainOptions.find((option) => option.name === item);
+                          if (subDomain) {
+                            const subDomainId = Number(subDomain.id);
+                            if (subDomainId > 0) {
+                              setSelectedSubDomainIds((prev) =>
+                                prev.includes(subDomainId) ? prev : [...prev, subDomainId]
+                              );
+                            }
+                          }
+                        }}
+                        onRemove={(item) => {
+                          setRelevantExpertise((prev) => prev.filter((value) => value !== item));
+                          const subDomain = subDomainOptions.find((option) => option.name === item);
+                          if (subDomain) {
+                            const subDomainId = Number(subDomain.id);
+                            if (subDomainId > 0) {
+                              setSelectedSubDomainIds((prev) => prev.filter((id) => id !== subDomainId));
+                              removeToolsForSubDomain(subDomainId);
+                            }
+                          }
+                        }}
                         placeholder="Select expertise..."
                       />
                     </InputGroup>
 
-                    <InputGroup label="Tools" htmlFor="tools">
+                    <InputGroup label={isMentor ? 'Expertise' : 'Tools'} htmlFor="tools">
                       <div className="space-y-3">
                         <div
                           onClick={() => setToolDropdownOpen((prev) => !prev)}
@@ -539,7 +835,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                           {tools.length > 0 ? (
                             tools.map((tool) => (
                               <div
-                                key={tool.name}
+                                key={tool.technologyId}
                                 className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
                               >
                                 <span>#{tool.name}</span>
@@ -547,7 +843,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    handleRemoveTool(tool.name);
+                                    handleRemoveTool(tool.technologyId);
                                   }}
                                   className="inline-flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-primary transition hover:bg-primary/20"
                                 >
@@ -570,7 +866,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                               <button
                                 key={technology.id}
                                 type="button"
-                                onClick={() => handleAddTool(technology.name)}
+                                onClick={() => handleAddTool(technology)}
                                 className="block w-full px-4 py-3 text-left text-sm text-slateInk transition hover:bg-indigo-50 first:rounded-t-xl last:rounded-b-xl"
                               >
                                 {technology.name}
@@ -583,7 +879,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                           <div className="space-y-3">
                             {tools.map((tool) => (
                               <div
-                                key={tool.name}
+                                key={tool.technologyId}
                                 className="flex flex-col gap-3 rounded-xl border border-[#E8EBF2] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                               >
                                 <div className="flex items-center gap-2">
@@ -592,21 +888,25 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  <select
-                                    value={tool.level}
-                                    onChange={(event) => handleToolLevelChange(tool.name, event.target.value)}
-                                    className="rounded-xl border border-[#D8DCE8] bg-white px-3 py-2 text-sm outline-none focus:border-primary"
-                                  >
-                                    <option value="">Level</option>
-                                    {experienceLevels.map((level) => (
-                                      <option key={level.value} value={level.value}>
-                                        {level.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                  {!isMentor ? (
+                                    <select
+                                      value={tool.level}
+                                      onChange={(event) =>
+                                        handleToolLevelChange(tool.technologyId, event.target.value)
+                                      }
+                                      className="rounded-xl border border-[#D8DCE8] bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                                    >
+                                      <option value="">Level</option>
+                                      {toolExperienceLevels.map((level) => (
+                                        <option key={level.value} value={level.value}>
+                                          {level.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  ) : null}
                                   <button
                                     type="button"
-                                    onClick={() => handleRemoveTool(tool.name)}
+                                    onClick={() => handleRemoveTool(tool.technologyId)}
                                     className="rounded-full p-2 text-[#9CA3B8] transition hover:bg-red-50 hover:text-red-500"
                                     aria-label={`Remove ${tool.name}`}
                                   >

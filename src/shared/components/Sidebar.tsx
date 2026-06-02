@@ -10,8 +10,10 @@ import {
     Layers3,
     ChevronDown,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ProfileAvatar } from "../../components/profile";
+import { refreshOwnProfile } from "../../pages/profile/profileService";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
 
@@ -23,7 +25,15 @@ const Sidebar = () => {
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [user, setUser] = useState<AuthUser | null>(null);
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const userRole = user?.role?.toLowerCase();
+
+  const sidebarDisplayName = useMemo(() => {
+    if (!user) {
+      return 'Guest';
+    }
+    return `${user.firstName}${user.lastName ? ` ${user.lastName}` : ''}`;
+  }, [user]);
 
   const goHome = () => {
     navigate(userRole === 'mentor' ? '/mentor/dashboard' : '/dashboard');
@@ -85,6 +95,17 @@ const Sidebar = () => {
             } catch (err) {
                 // keep local user if present
                 console.error('Sidebar: failed to refresh user', err);
+            }
+
+            try {
+                const profile = await refreshOwnProfile();
+                if (profile) {
+                    setProfilePictureUrl(
+                        profile.profilePicturePath || profile.avatarUrl || null
+                    );
+                }
+            } catch (err) {
+                console.error('Sidebar: failed to load profile avatar', err);
             }
         })();
     }, []);
@@ -195,16 +216,15 @@ const Sidebar = () => {
         setOpen(false);
       }}
     >
-      <img
-        src="https://randomuser.me/api/portraits/lego/1.jpg"
+      <ProfileAvatar
+        pictureUrl={profilePictureUrl}
+        name={sidebarDisplayName}
         alt=""
         className="h-9 w-9 shrink-0 rounded-full object-cover"
       />
       <div className="min-w-0 flex-1 leading-tight">
         <p className="truncate text-sm font-semibold text-[#2E2A47]">
-          {user
-            ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
-            : 'Guest'}
+          {sidebarDisplayName}
         </p>
         <p className="truncate text-xs text-gray-400">{user?.email ?? '—'}</p>
       </div>

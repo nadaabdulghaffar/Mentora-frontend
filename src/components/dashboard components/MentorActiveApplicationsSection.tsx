@@ -1,114 +1,203 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  getMyPublishedPrograms,
+  getApplicantsByProgram,
+} from "../../services/programService";
 
-type LevelKey = "Senior" | "Mid-level" | "Junior";
-
-const LEVEL_STYLES: Record<LevelKey, string> = {
-  Senior: "bg-sky-100 text-sky-800",
-  "Mid-level": "bg-violet-100 text-violet-800",
-  Junior: "bg-emerald-100 text-emerald-800",
+/* =========================
+   TYPES
+========================= */
+type DashboardApplication = {
+  applicationId: number;
+  programId: number;
+  applicantName: string;
+  applicantAvatar: string | null;
+  appliedAt: string;
+  level: string;
+  programName: string;
 };
 
-const ROWS: {
-  id: string;
-  name: string;
-  avatar: string;
-  date: string;
-  level: LevelKey;
-  program: string;
-}[] = [
-  {
-    id: "1",
-    name: "Sarah Jenkins",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=128&q=80",
-    date: "Oct 12, 2023",
-    level: "Senior",
-    program: "Leadership Coaching",
-  },
-  {
-    id: "2",
-    name: "Emma Robinson",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=128&q=80",
-    date: "Oct 11, 2023",
-    level: "Mid-level",
-    program: "Product Leadership",
-  },
-  {
-    id: "3",
-    name: "James Chen",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=128&q=80",
-    date: "Oct 10, 2023",
-    level: "Junior",
-    program: "Project Management",
-  },
-];
 
-const MentorActiveApplicationsSection = () => {
+/* =========================
+   STYLES
+========================= */
+const levelStyles = {
+  Senior: "bg-blue-50 text-blue-600",
+  "Mid-level": "bg-purple-50 text-purple-600",
+  Junior: "bg-green-50 text-green-600",
+};
+
+export default function ActiveApplicationsSection() {
+  const navigate = useNavigate();
+   const [applications, setApplications] =
+    useState<DashboardApplication[]>([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  useEffect(() => {
+  const loadApplications = async () => {
+    try {
+      setLoading(true);
+
+      const programsResponse =
+        await getMyPublishedPrograms();
+
+      const programs =
+        programsResponse?.data?.items ??
+        programsResponse?.data ??
+        [];
+
+      const allApplications = [];
+
+      for (const program of programs) {
+        const applicantsResponse =
+          await getApplicantsByProgram(
+            program.programId,
+            1,
+            5
+          );
+
+        const applicants =
+          applicantsResponse?.data?.items ?? [];
+
+        const mappedApplicants =
+          applicants.map((applicant: any) => ({
+            applicationId:
+              applicant.applicationId,
+
+            programId:
+              program.programId,
+
+            applicantName:
+              applicant.menteeName,
+
+            applicantAvatar:
+              applicant.menteeProfilePicture,
+
+            appliedAt:
+              applicant.appliedAt,
+
+            level:
+              applicant.level,
+
+            programName:
+              applicant.programName,
+          }));
+
+        allApplications.push(
+          ...mappedApplicants
+        );
+      }
+
+      allApplications.sort(
+        (a, b) =>
+          new Date(b.appliedAt).getTime() -
+          new Date(a.appliedAt).getTime()
+      );
+
+      setApplications(
+        allApplications.slice(0, 5)
+      );
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadApplications();
+}, []);
+
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-6 lg:p-8">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <h3 className="text-base font-semibold text-[#1F2533] md:text-lg lg:text-xl">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+
+      {/* HEADER */}
+      <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100">
+        <h2 className="text-[22px] font-bold text-[#1F2432]">
           Active Applications
-        </h3>
-        <Link
-          to="/search-mentorship?tab=programs"
-          className="shrink-0 text-xs font-medium text-gray-500 transition hover:text-primary md:text-sm"
+        </h2>
+
+        {/* 🔥 VIEW ALL BUTTON */}
+        <button
+          onClick={() => navigate("/applications")}
+          className="px-4 py-2 rounded-lg bg-primary/10 text-primary text-[14px] font-semibold hover:bg-primary/20 transition"
         >
-          view All
-        </Link>
+          View All
+        </button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-[#E8EBF2]">
-        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-[#E8EBF2] bg-[#F9FAFB]">
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] md:px-5">
-                Applicant name
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] md:px-5">
-                Date
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] md:px-5">
-                Level
-              </th>
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[#6B7280] md:px-5">
-                Applied program
-              </th>
-              <th className="w-10 px-2 py-3" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {ROWS.map((row) => (
-              <tr key={row.id} className="border-b border-[#EEF0F5] last:border-0">
-                <td className="px-4 py-4 md:px-5">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={row.avatar}
-                      alt=""
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                    <span className="font-semibold text-[#1F2533]">{row.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-4 text-[#5D657A] md:px-5">{row.date}</td>
-                <td className="px-4 py-4 md:px-5">
-                  <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${LEVEL_STYLES[row.level]}`}
-                  >
-                    {row.level}
-                  </span>
-                </td>
-                <td className="px-4 py-4 font-medium text-[#1F2533] md:px-5">{row.program}</td>
-                <td className="px-2 py-4 text-gray-400">
-                  <ChevronRight className="h-5 w-5" aria-hidden />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* TABLE HEADER */}
+      <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_2fr_auto] px-8 py-4 text-[13px] font-semibold text-gray-500 uppercase tracking-wide">
+        <span>Applicant Name</span>
+        <span>Date</span>
+        <span>Level</span>
+        <span>Applied Program</span>
+        <span></span>
+      </div>
+
+      {/* ROWS */}
+      <div className="space-y-3 px-4 pb-4 pt-2">
+        {applications.map((app) => (
+          <div
+            key={app.applicationId}
+
+onClick={() =>
+  navigate(
+    `/applications/${app.programId}/manage`
+  )
+}
+            className="grid grid-cols-[2fr_1fr_1fr_2fr_auto] items-center px-6 py-5 bg-white border rounded-2xl hover:shadow-md transition cursor-pointer"
+          >
+            {/* NAME */}
+            <div className="flex items-center gap-4">
+              <img
+src={
+  app.applicantAvatar ??
+  "https://i.pravatar.cc/100"
+}                className="w-12 h-12 rounded-full object-cover"
+              />
+
+              <span className="font-semibold text-[16px] text-[#1F2432]">
+                {app.applicantName}
+              </span>
+            </div>
+
+            {/* DATE */}
+            <span className="text-[15px] text-gray-500 font-medium">
+              {new Date(app.appliedAt)
+  .toLocaleDateString()}
+            </span>
+
+            {/* LEVEL */}
+            <span
+className={`text-[13px] px-3 py-1 rounded-full font-semibold w-fit ${
+  levelStyles[
+    app.level as keyof typeof levelStyles
+  ]
+}`}
+            >
+              {app.level}
+            </span>
+
+            {/* PROGRAM */}
+            <span className="text-[15px] text-gray-700 font-medium">
+              {app.programName}
+            </span>
+
+            {/* 🔥 BIGGER ARROW */}
+            <div className="flex justify-end">
+              <ChevronRight
+                size={26}
+                strokeWidth={2.5}
+                className="text-gray-400"
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
-};
-
-export default MentorActiveApplicationsSection;
+}

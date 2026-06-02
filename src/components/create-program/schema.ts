@@ -201,6 +201,12 @@ deadline: z
         questionSchema
       )
       .default([]),
+
+    /** Populated in edit mode only — not sent to create API */
+    existingImageUrl: z.string().optional(),
+
+    /** Populated in edit mode only — preserves publish state on save */
+    programStatus: z.number().optional(),
   })
   .superRefine(
     (data, ctx) => {

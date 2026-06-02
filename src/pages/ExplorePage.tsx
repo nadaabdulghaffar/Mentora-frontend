@@ -9,6 +9,11 @@ import { exploreCommunities, joinCommunity, leaveCommunity } from "../services/c
 import { mapCommunitiesResponse } from "./community/mappers/community.mapper";
 import { exploreMentors, explorePrograms } from "../services/exploreService";
 import { getRoadmapView } from "../services/roadmapService";
+import {
+  exploreRoadmapToListItem,
+  formatRoadmapExplorePhases,
+  loadRoadmapDomainNameMaps,
+} from "../utils/roadmapDisplayUtils";
 
 type ExploreTab = "mentors" | "programs" | "communities" | "roadmaps";
 
@@ -194,6 +199,7 @@ const ExplorePage: React.FC = () => {
       try {
         const searchToUse = prevTab !== 'roadmaps' ? '' : debouncedQuery;
         const res = await exploreRoadmaps(searchToUse);
+        const maps = await loadRoadmapDomainNameMaps();
 
         const apiRoot = (import.meta.env.VITE_API_URL ?? "http://localhost:5069/api").replace(/\/api\/?$/, "");
 
@@ -213,6 +219,8 @@ const ExplorePage: React.FC = () => {
               // ignore per-item errors
             }
 
+            const listItem = exploreRoadmapToListItem(r, maps);
+
             return {
               id: String(r.roadmapId),
               tab: "roadmaps" as const,
@@ -220,7 +228,7 @@ const ExplorePage: React.FC = () => {
               description: r.description,
               image: mentorAvatar,
               tag: undefined,
-              phases: `${r.phasesCount} phases`,
+              phases: formatRoadmapExplorePhases(listItem),
               author: { avatar: mentorAvatar ?? `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(mentorName || r.title)}`, name: mentorName || "Unknown" },
             };
           })

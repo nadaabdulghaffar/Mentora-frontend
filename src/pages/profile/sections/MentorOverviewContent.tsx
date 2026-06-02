@@ -1,5 +1,5 @@
-import { BookOpen, Pencil, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { BookOpen, Pencil } from 'lucide-react';
+import { ProfileOverviewDetails } from '../../../components/profile';
 import type { ProfileEntity } from '../types';
 
 interface MentorOverviewContentProps {
@@ -10,10 +10,10 @@ interface MentorOverviewContentProps {
 }
 
 export function MentorOverviewContent({ profile, isOwner, onEditBio, onEditEducation }: MentorOverviewContentProps) {
-  const navigate = useNavigate();
-
   return (
     <div className="rounded-3xl border border-[#E8EBF2] bg-white p-6 shadow-sm md:p-8">
+      <ProfileOverviewDetails profile={profile} />
+
       <div className="relative mb-8">
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-bold text-[#1F2533]">Bio</h2>

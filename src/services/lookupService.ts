@@ -7,7 +7,6 @@ import type {
   CareerGoal,
   LearningStyle,
   Technology,
-  EducationStatus,
 } from '../types/api';
 
 type ExperienceLevelOption = {
@@ -15,6 +14,11 @@ type ExperienceLevelOption = {
   name: string;
   value: string;
   label: string;
+};
+
+type EnumLookupOption = {
+  name: string;
+  value: string;
 };
 
 // خدمات الـ Lookups
@@ -92,10 +96,26 @@ export const lookupAPI = {
   },
 
   // الحصول على حالات التعليم
-  getEducationStatuses: async (): Promise<ApiResponse<EducationStatus[]>> => {
+  getEducationStatuses: async (): Promise<ApiResponse<EnumLookupOption[]>> => {
     const response = await apiClient.get('/lookup/education-statuses');
     if (Array.isArray(response.data)) {
-      return { success: true, data: response.data };
+      const normalized = response.data.map((status: any) => ({
+        name: String(status.name ?? status.label ?? ''),
+        value: String(status.value ?? status.id ?? ''),
+      }));
+      return { success: true, data: normalized };
+    }
+    return response.data;
+  },
+
+  getCurrentLevels: async (): Promise<ApiResponse<EnumLookupOption[]>> => {
+    const response = await apiClient.get('/lookup/current-levels');
+    if (Array.isArray(response.data)) {
+      const normalized = response.data.map((level: any) => ({
+        name: String(level.name ?? level.label ?? ''),
+        value: String(level.value ?? level.id ?? ''),
+      }));
+      return { success: true, data: normalized };
     }
     return response.data;
   },

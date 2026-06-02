@@ -1,13 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Layout from "../shared/components/Layout";
 import ExtraProgramCard from "../components/ExtraProgramCard";
 import CreateProgramModal from "../components/create-program/CreateProgramModal";
-import { fetchProgramById } from "../services/programService";
+import { Alert } from "../components/Alert";
 import type { CreateProgramFormData } from "../components/create-program/types";
 import {
+  fetchProgramById,
   getMyPublishedPrograms,
+  mapProgramResponseToFormData,
+  resolveProgramImageUrl,
+  unpublishProgram,
 } from "../services/programService";
 
 import authAPI from "../services/authService";
@@ -23,8 +27,10 @@ type MyApplicationItem = {
   status: "Open" | "Closed" | "Accepted" | "Under Review" | "Rejected";
 };
 
-
-
+type PageAlert = {
+  type: "success" | "error";
+  message: string;
+};
 
 const getProgramStatus = (
   deadline?: string
@@ -34,111 +40,95 @@ const getProgramStatus = (
   }
 
   const today = new Date();
-  const deadlineDate =
-    new Date(deadline);
+  const deadlineDate = new Date(deadline);
 
   today.setHours(0, 0, 0, 0);
-  deadlineDate.setHours(
-    0,
-    0,
-    0,
-    0
-  );
+  deadlineDate.setHours(0, 0, 0, 0);
 
-  return deadlineDate >= today
-    ? "Open"
-    : "Closed";
+  return deadlineDate >= today ? "Open" : "Closed";
 };
 
-const formatDeadline = (
-  deadline?: string
-) => {
-  if (
-    !deadline ||
-    deadline.startsWith("0001-01-01")
-  ) {
+const formatDeadline = (deadline?: string) => {
+  if (!deadline || deadline.startsWith("0001-01-01")) {
     return "No deadline";
   }
 
-  return new Date(
-    deadline
-  ).toLocaleDateString();
+  return new Date(deadline).toLocaleDateString();
 };
 
+const mapPublishedProgramToItem = (
+  p: Record<string, unknown>
+): MyApplicationItem => ({
+  id: String(p.programId ?? p.ProgramId),
+  title: String(p.title ?? p.Title ?? ""),
+  description: String(p.description ?? p.Description ?? ""),
+  image: resolveProgramImageUrl(
+    String(p.programImageUrl ?? p.ProgramImageUrl ?? "")
+  ),
+  applicantsCount: 0,
+  deadline: (p.deadline ?? p.Deadline) as string | undefined,
+  status: getProgramStatus(String(p.deadline ?? p.Deadline ?? "")),
+});
 
 const ManageApplicantsPage = () => {
   const navigate = useNavigate();
 
-  const [user, setUser] =
-    useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mentorApplications, setMentorApplications] = useState<MyApplicationItem[]>([]);
+  const [menteeApplications, setMenteeApplications] = useState<MyApplicationItem[]>([]);
+  const [pageAlert, setPageAlert] = useState<PageAlert | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
+  const [editingInitialValues, setEditingInitialValues] = useState<Partial<CreateProgramFormData> | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  const userRole = String(user?.role || "").toLowerCase();
+  const isMentee = userRole === "mentee";
+  const applications = isMentee ? menteeApplications : mentorApplications;
+
+  const mentorName = user
+    ? `${user.firstName} ${user.lastName ?? ""}`
+    : "Mentor";
+
+  const loadMentorPrograms = useCallback(async () => {
+    const programsRes = await getMyPublishedPrograms();
+
+    if (programsRes.success && programsRes.data) {
+      const rawItems =
+        programsRes.data.items ??
+        programsRes.data.Items ??
+        [];
+      const mapped = (rawItems as Record<string, unknown>[]).map(
+        mapPublishedProgramToItem
+      );
+
+      setMentorApplications(mapped);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const loadUser = async () => {
       try {
-        const local =
-          authAPI.getCurrentUser();
+        const local = authAPI.getCurrentUser();
 
         if (local && mounted) {
           setUser(local);
         }
 
-        const res =
-          await authAPI.getMe();
+        const res = await authAPI.getMe();
 
-       if (
-  res.success &&
-  res.data &&
-  mounted
-) {
-  setUser(res.data);
+        if (res.success && res.data && mounted) {
+          setUser(res.data);
 
-  if (
-    String(res.data.role).toLowerCase() ===
-    "mentor"
-  ) {
-    const programsRes =
-      await getMyPublishedPrograms();
-console.log(programsRes);
-    if (
-      programsRes.success &&
-      programsRes.data
-    ) {
-const mapped =
-  programsRes.data.items.map((p: any) => ({
-    id: String(p.programId),
-
-    title: p.title,
-
-    description: p.description,
-
-    image: p.programImageUrl
-  ? `http://localhost:5069${p.programImageUrl}`
-  : undefined,
-
-    applicantsCount: 0,
-
-    deadline:
-      p.deadline ?? undefined,
-
-    status: getProgramStatus(
-      p.deadline
-    ),
-  }));
-
-      setMentorApplications(
-        mapped
-        
-      );
-      
-    }
-  }
-}
-        
+          if (String(res.data.role).toLowerCase() === "mentor") {
+            await loadMentorPrograms();
+          }
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -153,30 +143,8 @@ const mapped =
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadMentorPrograms]);
 
-  const mentorName = user
-    ? `${user.firstName} ${
-        user.lastName ?? ""
-      }`
-    : "Mentor";
-
-  const userRole = String(user?.role || "").toLowerCase();
-  const isMentee = userRole === "mentee";
-
-const [mentorApplications, setMentorApplications] =
-  useState<MyApplicationItem[]>([]);
-
-  const [menteeApplications, setMenteeApplications] =
-useState<MyApplicationItem[]>([]);
-
-  const applications = isMentee ? menteeApplications : mentorApplications;
-
-  /* =========================
-     🔥 NAVIGATION (FIXED)
-  ========================= */
-
-  // 🟢 View Application
   const goToApplicationDetails = (id: string) =>
     navigate(`/applications/${id}`, {
       state: {
@@ -185,7 +153,6 @@ useState<MyApplicationItem[]>([]);
       },
     });
 
-  // 🔵 Manage Applicants
   const goToManageApplicants = (id: string) =>
     navigate(`/applications/${id}/manage`, {
       state: {
@@ -194,52 +161,45 @@ useState<MyApplicationItem[]>([]);
       },
     });
 
-  const goToClassroom = () =>
-    navigate("/classroom");
+  const goToClassroom = () => navigate("/classroom");
 
-  const goToProgramView = (id: string) =>
-    navigate(`/applications/${id}`);
+  const goToProgramView = (id: string) => navigate(`/applications/${id}`);
 
   const handleCancelApplying = (id: string) => {
-    setMenteeApplications((current) =>
-      current.filter((item) => item.id !== id)
-    );
+    setMenteeApplications((current) => current.filter((item) => item.id !== id));
   };
-
-  // Edit modal state
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
-  const [editingInitialValues, setEditingInitialValues] = useState<Partial<CreateProgramFormData> | null>(null);
 
   const openEditModal = async (programId: string) => {
     setEditingProgramId(Number(programId));
+    setEditingInitialValues(null);
     setIsEditOpen(true);
+    setEditLoading(true);
 
     try {
       const res = await fetchProgramById(Number(programId));
-      if (res && res.success && res.data) {
-        // Map backend shape to form initial values (best-effort)
-        const d = res.data as any;
-        const mapped: Partial<CreateProgramFormData> = {
-          title: String(d.title ?? ""),
-          description: String(d.description ?? ""),
-          domainId: Number(d.domainId ?? 0),
-          subDomainId: Number(d.subDomainId ?? 0),
-          targetLevel: Number(d.targetLevel ?? 0),
-          educationLevel: Number(d.educationLevel ?? 0),
-          capacity: Number(d.capacity ?? 1),
-          duration: String(d.duration ?? ""),
-          availability: String(d.availability ?? ""),
-          technologies: Array.isArray(d.technologies) ? d.technologies.map((t: any) => ({ technologyId: Number(t.technologyId), requiredExperienceLevel: Number(t.requiredExperienceLevel) })) : [],
-          roadmapId: d.roadmapId ?? null,
-          questions: Array.isArray(d.questions) ? d.questions.map((q: any) => ({ questionText: String(q.questionText ?? ""), answerType: String(q.answerType ?? "Paragraph"), maxSelections: q.maxSelections ?? null, options: q.options ?? [] })) : [],
-          deadline: String(d.deadline ?? ""),
-        };
 
-        setEditingInitialValues(mapped);
+      if (res?.success && res.data) {
+        setEditingInitialValues(
+          mapProgramResponseToFormData(res.data as Record<string, unknown>)
+        );
+      } else {
+        setPageAlert({
+          type: "error",
+          message: res?.message || "Could not load program details for editing.",
+        });
+        setIsEditOpen(false);
+        setEditingProgramId(null);
       }
     } catch (err) {
       console.error("Failed to load program for editing", err);
+      setPageAlert({
+        type: "error",
+        message: "Could not load program details for editing.",
+      });
+      setIsEditOpen(false);
+      setEditingProgramId(null);
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -247,6 +207,63 @@ useState<MyApplicationItem[]>([]);
     setIsEditOpen(false);
     setEditingProgramId(null);
     setEditingInitialValues(null);
+  };
+
+  const handleEditSuccess = async (
+    message?: string,
+    updatedProgram?: Record<string, unknown>
+  ) => {
+    setPageAlert({
+      type: "success",
+      message: message || "Program updated successfully.",
+    });
+
+    if (updatedProgram) {
+      const patch = mapPublishedProgramToItem(updatedProgram);
+      setMentorApplications((prev) =>
+        prev.map((item) => (item.id === patch.id ? { ...item, ...patch } : item))
+      );
+      return;
+    }
+
+    await loadMentorPrograms();
+  };
+
+  const handleUnpublish = async (programId: string) => {
+    const confirmed = window.confirm(
+      "Unpublish this program? It will no longer be visible to mentees, but applications will be kept."
+    );
+
+    if (!confirmed) return;
+
+    setActionLoadingId(programId);
+
+    try {
+      const res = await unpublishProgram(Number(programId));
+
+      if (res?.success) {
+        setPageAlert({
+          type: "success",
+          message: res.message || "Program unpublished successfully.",
+        });
+        setMentorApplications((prev) =>
+          prev.filter((item) => item.id !== programId)
+        );
+      } else {
+        setPageAlert({
+          type: "error",
+          message: res?.message || "Could not unpublish program.",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to unpublish program", err);
+      setPageAlert({
+        type: "error",
+        message: "Could not unpublish program.",
+      });
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   if (loading) {
@@ -262,7 +279,6 @@ useState<MyApplicationItem[]>([]);
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <h1 className="text-[42px] font-bold leading-tight text-[#1F2432]">
             My Applications
@@ -275,7 +291,14 @@ useState<MyApplicationItem[]>([]);
           </p>
         </div>
 
-        {/* Empty */}
+        {pageAlert && (
+          <Alert
+            type={pageAlert.type}
+            message={pageAlert.message}
+            onClose={() => setPageAlert(null)}
+          />
+        )}
+
         {applications.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[#C8CDD9] bg-white p-10 text-center">
             <h2 className="text-xl font-semibold text-[#2A3042]">
@@ -290,64 +313,66 @@ useState<MyApplicationItem[]>([]);
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start max-w-full">
-            {applications.map(
-              (item) => (
-                <ExtraProgramCard
-                  key={item.id}
-                  id={item.id} // 🔥 مهم للدروب داون
-
-                  variant={isMentee ? "mentee-application-card" : "mentor-application-card"}
-                  title={item.title}
-                  description={
-                    item.description
-                  }
-                  image={item.image}
-                  applicantsCount={item.applicantsCount}
-deadline={formatDeadline(item.deadline)}
-                  status={item.status}
-                  className="w-full"
-                  primaryButtonText={
-                    isMentee
-                      ? item.status === "Accepted"
-                        ? "Join Classroom"
-                        : "View Program"
+            {applications.map((item) => (
+              <ExtraProgramCard
+                key={item.id}
+                variant={isMentee ? "mentee-application-card" : "mentor-application-card"}
+                title={item.title}
+                description={item.description}
+                image={item.image}
+                applicantsCount={item.applicantsCount}
+                deadline={formatDeadline(item.deadline)}
+                status={item.status}
+                className="w-full"
+                primaryButtonText={
+                  isMentee
+                    ? item.status === "Accepted"
+                      ? "Join Classroom"
+                      : "View Program"
+                    : actionLoadingId === item.id
+                      ? "Working…"
                       : "Manage Applicants"
-                  }
-
-                  onPrimaryClick={() => {
-                    if (isMentee) {
-                      if (item.status === "Accepted") {
-                        goToClassroom();
-                      } else {
-                        goToProgramView(item.id);
-                      }
+                }
+                onPrimaryClick={() => {
+                  if (isMentee) {
+                    if (item.status === "Accepted") {
+                      goToClassroom();
                     } else {
-                      goToManageApplicants(item.id);
+                      goToProgramView(item.id);
                     }
-                  }}
-
-                  // 🟢 VIEW (dropdown)
-                  onViewApplicants={() => goToApplicationDetails(item.id)}
-
-                  onEdit={() => openEditModal(item.id)}
-
-                  onUnpublish={() =>
-                    console.log(
-                      "Unpublish",
-                      item.id
-                    )
+                  } else {
+                    goToManageApplicants(item.id);
                   }
-
-                  onCancelApplying={() =>
-                    handleCancelApplying(item.id)
-                  }
-                />
-              )
-            )}
+                }}
+                onViewApplicants={() => goToApplicationDetails(item.id)}
+                onEdit={() => openEditModal(item.id)}
+                onUnpublish={() => handleUnpublish(item.id)}
+                onCancelApplying={() => handleCancelApplying(item.id)}
+              />
+            ))}
           </div>
         )}
+
         {isEditOpen && (
-          <CreateProgramModal isOpen={isEditOpen} onClose={closeEditModal} programId={editingProgramId ?? undefined} initialValues={editingInitialValues} />
+          <>
+            {editLoading && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
+                <div className="rounded-xl bg-white px-6 py-4 shadow-lg">
+                  Loading program details…
+                </div>
+              </div>
+            )}
+
+            {!editLoading && editingInitialValues && (
+              <CreateProgramModal
+                isOpen={isEditOpen}
+                onClose={closeEditModal}
+                programId={editingProgramId ?? undefined}
+                initialValues={editingInitialValues}
+                onSuccess={handleEditSuccess}
+              />
+            )}
+          </>
         )}
       </div>
     </Layout>

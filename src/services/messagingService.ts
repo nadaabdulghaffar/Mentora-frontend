@@ -13,7 +13,7 @@ const CHAT_ATTACHMENT_ACCEPT =
 
 export { CHAT_ATTACHMENT_ACCEPT };
 
-function getBackendOrigin(): string {
+export function getBackendOrigin(): string {
   const apiBase =
     import.meta.env.VITE_API_URL || "http://localhost:5069/api";
 

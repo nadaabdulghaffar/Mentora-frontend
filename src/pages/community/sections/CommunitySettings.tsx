@@ -3,34 +3,34 @@
  * Community settings and management interface
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronUp } from 'lucide-react';
-import { CommunitySettings, Community } from '../types';
-
-const COMMUNITY_DOMAINS = [
-  'Software Engineering',
-  'Data Science',
-  'UI/UX Design',
-  'Product Management',
-  'Cybersecurity',
-];
+import type { CommunitySettings, Community } from '../types';
+import lookupAPI from '../../../services/lookupService';
+import { uploadCommunityCoverImage } from '../../../services/fileUploadService';
+import {
+  resolveCommunityImageUrl,
+  toStorageCommunityImageUrl,
+} from '../../../utils/communityImageUrl';
+import {
+  validateCommunityImageFile,
+  validateUpdateCommunityForm,
+  type CommunityFieldErrors,
+} from '../../../validators/community';
 
 interface CommunitySettingsSectionProps {
   community: Community;
-  onSave: (settings: Partial<CommunitySettings>) => void;
+  onSave: (settings: Partial<CommunitySettings>) => void | Promise<void>;
   isLoading?: boolean;
   onDelete?: () => void;
   onClose?: () => void;
 }
 
-/**
- * CommunitySettingsSection - Settings management
- * Features:
- * - Edit community info
- * - Change avatar and cover
- * - Update description and domain
- * - Delete community (admin only)
- */
+type DomainOption = {
+  id: number;
+  name: string;
+};
+
 export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> = ({
   community,
   onSave,
@@ -41,49 +41,141 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
   const [formData, setFormData] = useState({
     name: community.name,
     description: community.description,
-    domain: community.domain,
+    domainId: community.domainId,
     avatar: community.avatar,
     cover: community.cover,
   });
+  const [storedCoverUrl, setStoredCoverUrl] = useState(
+    toStorageCommunityImageUrl(community.cover) ?? ''
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<CommunityFieldErrors>({});
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
+  const [domains, setDomains] = useState<DomainOption[]>([]);
+  const [loadingDomains, setLoadingDomains] = useState(true);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFilePick = (type: 'avatar' | 'cover') => {
-    if (type === 'avatar') avatarInputRef.current?.click();
-    else coverInputRef.current?.click();
+  useEffect(() => {
+    setFormData({
+      name: community.name,
+      description: community.description,
+      domainId: community.domainId,
+      avatar: community.avatar,
+      cover: community.cover,
+    });
+    setStoredCoverUrl(
+      toStorageCommunityImageUrl(community.cover) ?? ''
+    );
+  }, [community]);
+
+  useEffect(() => {
+    const loadDomains = async () => {
+      try {
+        const response = await lookupAPI.getDomains();
+        if (response.success && response.data) {
+          setDomains(
+            response.data.map((domain) => ({
+              id: Number(domain.id),
+              name: domain.name,
+            }))
+          );
+        }
+      } catch (error) {
+        console.error('Failed to load domains', error);
+      } finally {
+        setLoadingDomains(false);
+      }
+    };
+
+    loadDomains();
+  }, []);
+
+  const handleCoverPick = () => {
+    coverInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setFormData((prev) => ({ ...prev, [type]: result }));
-    };
-    reader.readAsDataURL(file);
+  const handleCoverChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const validation = validateCommunityImageFile(file);
+    if (!validation.valid) {
+      setCoverUploadError(validation.message || 'Invalid cover image.');
+      event.target.value = '';
+      return;
+    }
+
+    setCoverUploadError(null);
+    setIsUploadingCover(true);
+    setSaveError(null);
+
+    try {
+      const uploadedUrl = await uploadCommunityCoverImage(file);
+      const storageUrl = toStorageCommunityImageUrl(uploadedUrl) ?? uploadedUrl;
+
+      setStoredCoverUrl(storageUrl);
+      setFormData((prev) => ({
+        ...prev,
+        cover: resolveCommunityImageUrl(storageUrl),
+      }));
+    } catch (error) {
+      setCoverUploadError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to upload cover image.'
+      );
+    } finally {
+      setIsUploadingCover(false);
+      event.target.value = '';
+    }
   };
 
   const handleSave = async () => {
+    setSaveError(null);
+    setFieldErrors({});
+
+    const validationErrors = validateUpdateCommunityForm({
+      name: formData.name,
+      description: formData.description,
+      domainId: formData.domainId,
+    });
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+      return;
+    }
+
     setIsSaving(true);
+
     try {
-      // Support sync or async onSave handlers
-      const res = onSave(formData);
-      if (res && typeof (res as Promise<unknown>).then === 'function') {
-        await res;
-      }
-      // Save succeeded — modal will be closed below in finally
+      await onSave({
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        domainId: formData.domainId,
+        cover: storedCoverUrl || undefined,
+        avatar: formData.avatar,
+      });
+      onClose?.();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save community settings.'
+      );
     } finally {
       setIsSaving(false);
-      // Close modal regardless (defensive) so UI doesn't hang; parent can handle errors if needed
-      try {
-        onClose?.();
-      } catch (err) {
-        // swallow
-      }
     }
   };
+
+  const coverPreview = resolveCommunityImageUrl(
+    storedCoverUrl || formData.cover
+  );
 
   return (
     <div className="space-y-6 bg-pane">
@@ -91,25 +183,36 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
         <div className="mb-4 flex items-center justify-between border-b border-gray-100 pb-4">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Community Information</h2>
-            <p className="mt-1 text-sm text-gray-500">Basic details and visual identity for your mentorship space.</p>
+            <p className="mt-1 text-sm text-gray-500">
+              Basic details and visual identity for your mentorship space.
+            </p>
           </div>
           <ChevronUp size={18} className="text-gray-500" />
         </div>
 
+        {saveError && (
+          <p className="mb-4 text-sm text-red-600" role="alert">
+            {saveError}
+          </p>
+        )}
+
         <div className="space-y-5">
-          {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Community Name</label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
               className="mt-2 w-full rounded-xl border border-gray-200 bg-pane px-3 py-2.5 text-sm text-gray-900 outline-none"
               disabled={isLoading || isSaving}
             />
+            {fieldErrors.name && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+            )}
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
             <textarea
@@ -121,79 +224,93 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
               className="mt-2 w-full rounded-xl border border-gray-200 bg-pane px-3 py-2.5 text-sm text-gray-900 outline-none"
               disabled={isLoading || isSaving}
             />
+            {fieldErrors.description && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.description}</p>
+            )}
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700">Community Avatar</label>
               <div className="mt-2 flex items-center gap-3">
-                <img src={formData.avatar} alt={community.name} className="h-12 w-12 rounded-lg border border-gray-200 object-cover" />
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleFilePick('avatar')}
-                    type="button"
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-primary"
-                  >
-                    Change Avatar
-                  </button>
-                </div>
-                <input
-                  ref={avatarInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => handleFileChange(e, 'avatar')}
+                <img
+                  src={formData.avatar}
+                  alt={community.name}
+                  className="h-12 w-12 rounded-lg border border-gray-200 object-cover"
                 />
+                <p className="text-xs text-gray-500">
+                  Avatar reflects the community creator&apos;s profile picture and cannot be changed here.
+                </p>
               </div>
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700">Community Cover</label>
               <div className="mt-2 flex items-center gap-3">
-                <img src={formData.cover} alt={community.name} className="h-12 w-12 rounded-lg border border-gray-200 object-cover" />
+                <img
+                  src={coverPreview || formData.cover}
+                  alt={community.name}
+                  className="h-12 w-12 rounded-lg border border-gray-200 object-cover"
+                />
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleFilePick('cover')}
+                    onClick={handleCoverPick}
                     type="button"
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-primary"
+                    disabled={isLoading || isSaving || isUploadingCover}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-primary disabled:opacity-50"
                   >
-                    Change Cover
+                    {isUploadingCover ? 'Uploading…' : 'Change Cover'}
                   </button>
                 </div>
                 <input
                   ref={coverInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/jpg,image/png"
                   className="hidden"
-                  onChange={(e) => handleFileChange(e, 'cover')}
+                  onChange={handleCoverChange}
                 />
               </div>
+              {coverUploadError && (
+                <p className="mt-1 text-sm text-red-600">{coverUploadError}</p>
+              )}
             </div>
           </div>
 
-          {/* Domain */}
           <div>
             <label className="block text-sm font-medium text-gray-700">Domain</label>
             <select
-              value={formData.domain}
-              onChange={(e) => setFormData((prev) => ({ ...prev, domain: e.target.value }))}
+              value={formData.domainId || ''}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  domainId: Number(e.target.value),
+                }))
+              }
               className="mt-2 w-full rounded-xl border border-gray-200 bg-pane px-3 py-2.5 text-sm text-gray-900 outline-none"
-              disabled={isLoading || isSaving}
+              disabled={isLoading || isSaving || loadingDomains}
             >
-              {COMMUNITY_DOMAINS.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+              <option value="">
+                {loadingDomains ? 'Loading domains…' : 'Select domain'}
+              </option>
+              {domains.map((domain) => (
+                <option key={domain.id} value={domain.id}>
+                  {domain.name}
                 </option>
               ))}
             </select>
+            {fieldErrors.domainId && (
+              <p className="mt-1 text-sm text-red-600">{fieldErrors.domainId}</p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Danger Zone */}
       {onDelete && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <h3 className="text-2xl font-bold text-slate-900">Advanced Actions</h3>
-          <p className="mt-1 text-sm text-red-500">Warning: These actions are permanent and cannot be undone.</p>
+          <p className="mt-1 text-sm text-red-500">
+            Warning: These actions are permanent and cannot be undone.
+          </p>
           <div className="mt-6 flex items-center justify-between rounded-xl border border-gray-100 p-4">
             <div>
               <h4 className="font-semibold text-slate-900">Delete community</h4>
@@ -220,10 +337,10 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
           </button>
           <button
             onClick={handleSave}
-            disabled={isLoading || isSaving}
-            className="rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow"
+            disabled={isLoading || isSaving || isUploadingCover}
+            className="rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white shadow disabled:opacity-50"
           >
-            Save Changes
+            {isSaving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>

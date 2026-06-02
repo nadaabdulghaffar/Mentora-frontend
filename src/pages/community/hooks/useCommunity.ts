@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { Community, CommunityMember, MemberRequest, CommunitySettings } from '../types';
+import type { Community, CommunityMember, MemberRequest, CommunitySettings } from '../types';
 
 interface UseCommunityOptions {
   initialCommunity: Community;
@@ -33,14 +33,12 @@ export const useCommunity = ({
     );
   }, [members, searchQuery]);
 
-  // Get admins and moderators
   const staffMembers = useMemo(() => {
-    return members.filter((m) => m.role === 'admin' || m.role === 'moderator');
+    return members.filter((m) => m.role === 'Owner' || m.role === 'Admin');
   }, [members]);
 
-  // Get regular members
   const regularMembers = useMemo(() => {
-    return members.filter((m) => m.role === 'member');
+    return members.filter((m) => m.role === 'Member');
   }, [members]);
 
   // Update community settings
@@ -63,7 +61,7 @@ export const useCommunity = ({
 
   // Update member role
   const updateMemberRole = useCallback(
-    (memberId: string, newRole: 'admin' | 'moderator' | 'member') => {
+    (memberId: string, newRole: CommunityMember['role']) => {
       setMembers((prev) =>
         prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
       );
@@ -87,7 +85,7 @@ export const useCommunity = ({
         id: request.userId,
         name: request.name,
         avatar: request.avatar,
-        role: 'member',
+        role: 'Member',
         joinedDate: new Date().toLocaleDateString(),
         bio: request.bio,
       };
@@ -113,7 +111,7 @@ export const useCommunity = ({
 
   // Convert a request into a real community member with selected role
   const changeRequestRole = useCallback(
-    (requestId: string, newRole: 'admin' | 'member') => {
+    (requestId: string, newRole: 'Admin' | 'Member') => {
       const request = memberRequests.find((r) => r.id === requestId);
       if (!request) return;
 
@@ -151,7 +149,7 @@ export const useCommunity = ({
   const isStaff = useCallback(
     (userId: string): boolean => {
       const member = getMemberById(userId);
-      return member?.role === 'admin' || member?.role === 'moderator';
+      return member?.role === 'Owner' || member?.role === 'Admin';
     },
     [getMemberById]
   );
@@ -160,7 +158,7 @@ export const useCommunity = ({
   const isAdmin = useCallback(
     (userId: string): boolean => {
       const member = getMemberById(userId);
-      return member?.role === 'admin';
+      return member?.role === 'Owner' || member?.role === 'Admin';
     },
     [getMemberById]
   );

@@ -5,7 +5,7 @@ FILE: src/components/create-program/CreateProgramModal.tsx
 
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { Formik, getIn } from "formik";
+import { Formik } from "formik";
 
 import BaseModal from "../modals/BaseModal";
 
@@ -18,7 +18,6 @@ import type { CreateProgramFormData } from "./types";
 import {
   buildQuestionsPayload,
   createProgram,
-  fetchProgramById,
   fetchRoadmapBasicOptions,
   formatCreateProgramFailureMessage,
   getAllowedTechnologyIdsForSubdomain,
@@ -36,6 +35,10 @@ type Props = {
   onClose: () => void;
   programId?: number | null;
   initialValues?: Partial<CreateProgramFormData> | null;
+  onSuccess?: (
+    message?: string,
+    updatedProgram?: Record<string, unknown>
+  ) => void | Promise<void>;
 };
 
 function goToStepWithErrors(errors: any, setStep: (n: number) => void) {
@@ -81,11 +84,7 @@ function findFirstMcqMissingOptions(
   return -1;
 }
 
-export default function CreateProgramModal({ isOpen, onClose, programId = null, initialValues = null }: Props) {
-  useEffect(() => {
-    console.log('CreateProgramModal mounted, isOpen=', isOpen);
-    return () => console.log('CreateProgramModal unmounted');
-  }, []);
+export default function CreateProgramModal({ isOpen, onClose, programId = null, initialValues = null, onSuccess }: Props) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,7 +126,7 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
   };
   const runCreateProgram = async (
     data: CreateProgramFormData,
-    kind: "draft" | "publish",
+    kind: "draft" | "publish" | "save",
     setFieldError: (field: string, message?: string | undefined) => void,
     resetForm: () => void
   ) => {
@@ -154,7 +153,7 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
     const rawTechnologies = data.technologies ?? [];
     const technologiesSanitized = sanitizeTechnologiesForSubdomain(rawTechnologies, allowedTechIds);
 
-    if (kind === "publish") {
+    if (kind === "publish" || (kind === "save" && programId && programId > 0)) {
       if (technologiesSanitized.length === 0) {
         if (rawTechnologies.length > 0) {
           setFieldError(
@@ -211,13 +210,16 @@ if (data.image) {
       technologies: technologiesSanitized,
       roadmapId: safeRoadmapId,
       questions: apiQuestions,
-      status: kind === "publish" ? PROGRAM_POST_STATUS.PUBLISHED : PROGRAM_POST_STATUS.DRAFT,
+      status:
+        kind === "save"
+          ? data.programStatus ?? PROGRAM_POST_STATUS.PUBLISHED
+          : kind === "publish"
+            ? PROGRAM_POST_STATUS.PUBLISHED
+            : PROGRAM_POST_STATUS.DRAFT,
       programImageUrl: uploadedImageUrl,
       deadline: data.deadline
-  ? new Date(data.deadline).toISOString()
-  : null,
-
-      
+        ? new Date(data.deadline).toISOString()
+        : null,
     };
 
     setIsSubmitting(true);
@@ -226,8 +228,9 @@ if (data.image) {
       let res: CreateProgramApiResponse | null = null;
 
       if (programId && programId > 0) {
-        // edit flow
-        res = await updateProgram(programId, input);
+        res = await updateProgram(programId, input, {
+          omitStatus: kind === "save",
+        });
       } else {
         res = await createProgram(input);
       }
@@ -236,9 +239,20 @@ if (data.image) {
         setSubmitError(formatCreateProgramFailureMessage(res ?? undefined, "Could not save program"));
         return;
       }
+
       resetForm();
       setStep(1);
       setSubmitError(null);
+
+      const updatedProgram =
+        res.data && typeof res.data === "object"
+          ? (res.data as Record<string, unknown>)
+          : undefined;
+
+      await onSuccess?.(
+        res.message || "Program saved successfully",
+        programId && programId > 0 ? updatedProgram : undefined
+      );
       onClose();
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -276,6 +290,15 @@ if (data.image) {
         if (el instanceof HTMLElement) el.focus();
       }
     });
+  };
+
+  const startSave = async (validateForm: any, values: CreateProgramFormData, setFieldError: any, resetForm: any) => {
+    const errors = await validateForm();
+    if (Object.keys(errors).length > 0) {
+      onInvalid(errors);
+      return;
+    }
+    await runCreateProgram(values, "save", setFieldError, resetForm);
   };
 
   const startDraft = async (validateForm: any, values: CreateProgramFormData, setFieldError: any, resetForm: any) => {
@@ -338,8 +361,12 @@ if (data.image) {
     questions: [],
     image: undefined,
     deadline: "",
+    existingImageUrl: undefined,
+    programStatus: undefined,
     ...(initialValues || {}),
   } as CreateProgramFormData;
+
+  const isEditMode = !!(programId && programId > 0);
 
   return (
     <Formik
@@ -355,7 +382,6 @@ if (data.image) {
         } catch (e: any) {
           const out: any = {};
           if (e?.errors) {
-            // zod error
             const z = e;
             const flat = z.flatten ? z.flatten() : null;
             if (flat && flat.fieldErrors) {
@@ -365,6 +391,14 @@ if (data.image) {
               });
             }
           }
+
+          if (
+            isEditMode &&
+            out.deadline === "Please choose a future application deadline"
+          ) {
+            delete out.deadline;
+          }
+
           return out;
         }
       }}
@@ -405,18 +439,20 @@ if (data.image) {
             </div>
 
             <div className="grid grid-cols-2 sm:flex gap-3">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={async () => {
-                  setCurrentAction("draft");
-                  await startDraft(formik.validateForm, values, formik.setFieldError, formik.resetForm);
-                  setCurrentAction(null);
-                }}
-                className="h-11 px-5 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-              >
-                {isSubmitting && currentAction === "draft" ? "Saving…" : "Draft"}
-              </button>
+              {!isEditMode && (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={async () => {
+                    setCurrentAction("draft");
+                    await startDraft(formik.validateForm, values, formik.setFieldError, formik.resetForm);
+                    setCurrentAction(null);
+                  }}
+                  className="h-11 px-5 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {isSubmitting && currentAction === "draft" ? "Saving…" : "Draft"}
+                </button>
+              )}
 
               {step < 3 ? (
                 <button
@@ -426,6 +462,19 @@ if (data.image) {
                   className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
                 >
                   Next
+                </button>
+              ) : isEditMode ? (
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={async () => {
+                    setCurrentAction("publish");
+                    await startSave(formik.validateForm, values, formik.setFieldError, formik.resetForm);
+                    setCurrentAction(null);
+                  }}
+                  className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {isSubmitting && currentAction === "publish" ? "Saving…" : "Save Changes"}
                 </button>
               ) : (
                 <button
@@ -445,13 +494,18 @@ if (data.image) {
           </div>
         );
 
+        const modalTitle = isEditMode ? "Edit Mentorship Program" : "Create Mentorship Program";
+        const modalSubtitle = isEditMode
+          ? "Update your program details. Domain, sub-domain, and questions cannot be changed."
+          : subtitle;
+
         return (
           <BaseModal
             isOpen={isOpen}
             onClose={onClose}
             onDiscard={() => handleDiscard(formik.resetForm)}
-            title="Create Mentorship Program"
-            subtitle={subtitle}
+            title={modalTitle}
+            subtitle={modalSubtitle}
             width={width}
             hasChanges={hasChanges}
             footer={footerEl}
@@ -463,11 +517,11 @@ if (data.image) {
               </p>
             )}
 
-            {step === 1 && <ProgramBasicsStep />}
+            {step === 1 && <ProgramBasicsStep isEditMode={isEditMode} />}
 
             {step === 2 && <ProgramRequirementsStep />}
 
-            {step === 3 && <ProgramQuestionsStep />}
+            {step === 3 && <ProgramQuestionsStep isEditMode={isEditMode} />}
           </BaseModal>
         );
       }}

@@ -1,22 +1,16 @@
 
-import type {
-  Community,
-} from "../types";
+import type { Community } from "../types";
 
 import type {
   CommunityResponse,
 } from "../../../services/communityService";
 
-const DOMAIN_NAMES: Record<
-  number,
-  string
-> = {
-  1: "Technology",
-  2: "Business",
-  3: "Design",
-  4: "Marketing",
-  5: "AI",
-};
+import { getDomainName } from "../../../utils/domainCache";
+import {
+  getProfileAvatarFallback,
+  resolveProfilePictureUrl,
+} from "../../../utils/profileImageUrl";
+import { resolveCommunityImageUrl } from "../../../utils/communityImageUrl";
 
 export const mapCommunityDetails =
   (
@@ -34,17 +28,25 @@ export const mapCommunityDetails =
         "",
 
       avatar:
-        community.createdByUserProfilePicture ||
-        "https://api.dicebear.com/7.x/initials/svg?seed=Community",
+        resolveProfilePictureUrl(
+          community.createdByUserProfilePicture
+        ) ||
+        getProfileAvatarFallback(
+          community.name
+        ),
 
       cover:
-        community.coverImageUrl ||
-        "",
+        resolveCommunityImageUrl(
+          community.coverImageUrl
+        ),
 
       domain:
-        DOMAIN_NAMES[
+        getDomainName(
           community.domainId
-        ] || "General",
+        ),
+
+      domainId:
+        community.domainId,
 
       memberCount:
         community.membersCount,
