@@ -466,6 +466,97 @@ export interface CommunityPostResponse {
   canDelete: boolean;
 }
 
+export interface CommunityFeedPostResponse {
+  communityPostId: string;
+
+  content: string;
+
+  imageUrl?: string;
+
+  linkUrl?: string;
+
+  createdAt: string;
+
+  authorId: string;
+
+  authorName: string;
+
+  authorProfilePicture?: string;
+
+  likesCount: number;
+
+  commentsCount: number;
+
+  isLiked: boolean;
+
+  isSaved: boolean;
+
+  canEdit: boolean;
+
+  canDelete: boolean;
+
+  communityId: string;
+
+  communityName: string;
+}
+
+export interface CommunityFeedResult {
+  items: CommunityFeedPostResponse[];
+
+  totalCount: number;
+}
+
+export const getCommunityFeed = async (
+  page = 1,
+  pageSize = 20
+): Promise<CommunityFeedResult> => {
+  const response = await apiClient.get(
+    '/communities/posts/feed',
+    {
+      params: {
+        page,
+        pageSize,
+      },
+    }
+  );
+
+  if (!response.data?.success) {
+    throw new Error(
+      response.data?.message ||
+        'Failed to fetch community feed'
+    );
+  }
+
+  const data = response.data.data;
+
+  return {
+    items: data?.items || [],
+    totalCount: data?.totalCount ?? 0,
+  };
+};
+
+export const getCommunityPostById =
+  async (
+    postId: string
+  ): Promise<CommunityPostResponse> => {
+    const response =
+      await apiClient.get(
+        `/communities/posts/${postId}`
+      );
+
+    if (
+      !response.data?.success
+    ) {
+      throw new Error(
+        response.data?.message ||
+          'Failed to fetch post'
+      );
+    }
+
+    return response.data.data;
+  };
+
+
 export const getCommunityPosts =
   async (
     communityId: string
@@ -800,7 +891,9 @@ leaveCommunity,
   createCommunityPost,
   updateCommunityPost,
   deleteCommunityPost,
+  getCommunityPostById,
   getCommunityPosts,
+  getCommunityFeed,
   getPostComments,
   createComment,
   updateComment,

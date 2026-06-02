@@ -6,16 +6,16 @@ import type {
 } from "../../../services/communityService";
 
 import { getDomainName } from "../../../utils/domainCache";
-import {
-  getProfileAvatarFallback,
-  resolveProfilePictureUrl,
-} from "../../../utils/profileImageUrl";
 import { resolveCommunityImageUrl } from "../../../utils/communityImageUrl";
 
 export const mapCommunityDetails =
   (
     community: CommunityResponse
   ): Community => {
+    const cover = resolveCommunityImageUrl(
+      community.coverImageUrl
+    );
+
     return {
       id:
         community.communityId,
@@ -27,18 +27,9 @@ export const mapCommunityDetails =
         community.description ||
         "",
 
-      avatar:
-        resolveProfilePictureUrl(
-          community.createdByUserProfilePicture
-        ) ||
-        getProfileAvatarFallback(
-          community.name
-        ),
+      avatar: cover,
 
-      cover:
-        resolveCommunityImageUrl(
-          community.coverImageUrl
-        ),
+      cover,
 
       domain:
         getDomainName(

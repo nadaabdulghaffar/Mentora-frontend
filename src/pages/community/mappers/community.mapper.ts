@@ -2,10 +2,6 @@
 import type { Community } from "../types";
 
 import { getDomainName } from "../../../utils/domainCache";
-import {
-  getProfileAvatarFallback,
-  resolveProfilePictureUrl,
-} from "../../../utils/profileImageUrl";
 import { resolveCommunityImageUrl } from "../../../utils/communityImageUrl";
 
 export const mapCommunityResponse = (
@@ -23,6 +19,8 @@ export const mapCommunityResponse = (
     canManage?: boolean;
   }
 ): Community => {
+  const cover = resolveCommunityImageUrl(data.coverImageUrl);
+
   return {
     id: data.communityId,
 
@@ -31,16 +29,9 @@ export const mapCommunityResponse = (
     description:
       data.description || "",
 
-    avatar:
-      resolveProfilePictureUrl(
-        data.createdByUserProfilePicture
-      ) ||
-      getProfileAvatarFallback(data.name),
+    avatar: cover,
 
-    cover:
-      resolveCommunityImageUrl(
-        data.coverImageUrl
-      ),
+    cover,
 
     domain:
       getDomainName(data.domainId),

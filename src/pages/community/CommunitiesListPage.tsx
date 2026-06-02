@@ -6,13 +6,11 @@ import React, {
 } from 'react';
 
 import { useNavigate } from 'react-router-dom';
+import { Plus, Users } from 'lucide-react';
 
 import Layout from '../../shared/components/Layout';
 
-import {
-  MOCK_COMMUNITIES,
-  MOCK_COMMUNITY_THREADS,
-} from './constants';
+import { MOCK_COMMUNITIES } from './constants';
 
 import { PostCard } from '../../components/community/PostCard';
 
@@ -30,11 +28,22 @@ import {
 
 import {
   getMyCommunities,
+  getCommunityFeed,
+  togglePostLike,
+  createComment,
+  deleteComment,
+  updateComment,
+  updateCommunityPost,
+  deleteCommunityPost,
 } from '../../services/communityService';
+
+import authAPI from '../../services/authService';
 
 import {
   mapCommunitiesResponse,
 } from './mappers/community.mapper';
+import { mapFeedPostToThread } from './mappers/feedPost.mapper';
+import { resolveAuthorAvatar } from './utils/authorAvatar';
 import { ensureDomainsLoaded } from '../../utils/domainCache';
 
 import type {
@@ -51,12 +60,14 @@ const CommunitiesListPage: React.FC = () => {
     useCommunityModal();
 
   const threads = useThreads({
-    initialThreads:
-      MOCK_COMMUNITY_THREADS,
+    initialThreads: [],
   });
 
+  const currentUser =
+    authAPI.getCurrentUser();
+
   const currentUserId =
-    'current-user';
+    currentUser?.userId || '';
 
   const [
     isCreateCommunityOpen,
@@ -74,6 +85,15 @@ const CommunitiesListPage: React.FC = () => {
     isLoadingCommunities,
     setIsLoadingCommunities,
   ] = useState(false);
+
+  const [
+    isLoadingFeed,
+    setIsLoadingFeed,
+  ] = useState(false);
+
+  const [feedError, setFeedError] = useState<
+    string | null
+  >(null);
 
   const [pageAlert, setPageAlert] = useState<{
     type: 'success' | 'error';
@@ -108,6 +128,29 @@ const CommunitiesListPage: React.FC = () => {
     void loadMyCommunities();
   }, [loadMyCommunities]);
 
+  useEffect(() => {
+    const loadFeed = async () => {
+      try {
+        setIsLoadingFeed(true);
+        setFeedError(null);
+
+        const { items } = await getCommunityFeed();
+        threads.setThreads(
+          items.map(mapFeedPostToThread)
+        );
+      } catch (error) {
+        console.error('Failed to fetch community feed', error);
+        setFeedError('Failed to load feed');
+        threads.setThreads([]);
+      } finally {
+        setIsLoadingFeed(false);
+      }
+    };
+
+    void loadFeed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once on mount
+  }, []);
+
   const handleThreadClick =
     useCallback(
       (
@@ -129,221 +172,125 @@ const CommunitiesListPage: React.FC = () => {
 
   const handleCommentSubmit =
     useCallback(
-      (content: string) => {
+      async (content: string) => {
         const threadId =
-          threads.selectedThread
-            ?.id;
+          threads.selectedThread?.id;
 
         if (!threadId) return;
 
-        const newComment: ThreadComment =
-          {
-            id: `comment-${Date.now()}`,
+        try {
+          const commentId = await createComment(
+            threadId,
+            content
+          );
 
-            authorId:
-              currentUserId,
-
+          const newComment: ThreadComment = {
+            id: commentId,
+            authorId: currentUserId,
             authorName: 'You',
-
-            authorAvatar:
-              'https://api.dicebear.com/7.x/avataaars/svg?seed=You',
-
+            authorAvatar: resolveAuthorAvatar('You', null),
             content,
-
-            timestamp:
-              new Date().toISOString(),
-
+            timestamp: new Date().toISOString(),
             likes: 0,
-
             isLiked: false,
-
             replies: [],
-
             canEdit: true,
-
             canDelete: true,
           };
 
-        threads.addComment(
-          threadId,
-          newComment
-        );
+          threads.addComment(threadId, newComment);
+        } catch (error) {
+          console.error('Failed to create comment', error);
+        }
       },
       [
-        threads.selectedThread
-          ?.id,
+        threads.selectedThread?.id,
         threads.addComment,
-        currentUserId,
-      ]
-    );
-
-  const handleCommentLike =
-    useCallback(
-      (commentId: string) => {
-        const threadId =
-          threads.selectedThread
-            ?.id;
-
-        if (!threadId) return;
-
-        threads.toggleCommentLike(
-          threadId,
-          commentId
-        );
-      },
-      [
-        threads.selectedThread
-          ?.id,
-        threads.toggleCommentLike,
-      ]
-    );
-
-  const handleCommentReply =
-    useCallback(
-      (
-        parentCommentId: string,
-        content: string
-      ) => {
-        const threadId =
-          threads.selectedThread
-            ?.id;
-
-        if (!threadId) return;
-
-        const reply: ThreadComment =
-          {
-            id: `reply-${Date.now()}`,
-
-            authorId:
-              currentUserId,
-
-            authorName: 'You',
-
-            authorAvatar:
-              'https://api.dicebear.com/7.x/avataaars/svg?seed=You',
-
-            content,
-
-            timestamp:
-              new Date().toISOString(),
-
-            likes: 0,
-
-            isLiked: false,
-
-            replies: [],
-
-            canEdit: true,
-
-            canDelete: true,
-          };
-
-        threads.addReplyToComment(
-          threadId,
-          parentCommentId,
-          reply
-        );
-      },
-      [
-        threads.selectedThread
-          ?.id,
-        threads.addReplyToComment,
         currentUserId,
       ]
     );
 
   const handleCommentDelete =
     useCallback(
-      (commentId: string) => {
+      async (commentId: string) => {
         const threadId =
-          threads.selectedThread
-            ?.id;
+          threads.selectedThread?.id;
 
         if (!threadId) return;
 
-        threads.deleteComment(
-          threadId,
-          commentId
-        );
+        try {
+          await deleteComment(commentId);
+          threads.deleteComment(threadId, commentId);
+        } catch (error) {
+          console.error('Failed to delete comment', error);
+        }
       },
       [
-        threads.selectedThread
-          ?.id,
+        threads.selectedThread?.id,
         threads.deleteComment,
       ]
     );
 
   const handleCommentEdit =
     useCallback(
-      (
-        commentId: string,
-        content: string
-      ) => {
+      async (commentId: string, content: string) => {
         const threadId =
-          threads.selectedThread
-            ?.id;
+          threads.selectedThread?.id;
 
         if (!threadId) return;
 
-        threads.editComment(
-          threadId,
-          commentId,
-          content
-        );
+        try {
+          await updateComment(commentId, content);
+          threads.editComment(threadId, commentId, content);
+        } catch (error) {
+          console.error('Failed to edit comment', error);
+        }
       },
       [
-        threads.selectedThread
-          ?.id,
+        threads.selectedThread?.id,
         threads.editComment,
       ]
     );
 
   const handleThreadDelete =
     useCallback(
-      (threadId: string) => {
-        threads.deleteThread(
-          threadId
-        );
-
-        modalState.closeModal();
+      async (threadId: string) => {
+        try {
+          await deleteCommunityPost(threadId);
+          threads.deleteThread(threadId);
+          modalState.closeModal();
+        } catch (error) {
+          console.error('Failed to delete post', error);
+        }
       },
-      [
-        threads.deleteThread,
-        modalState,
-      ]
+      [threads, modalState]
     );
 
   const handleThreadComposerSubmit =
     useCallback(
-      (
-        payload: CreateThreadPayload
-      ) => {
-        const editing =
-          modalState.editingThread;
+      async (payload: CreateThreadPayload) => {
+        const editing = modalState.editingThread;
 
         if (!editing) return;
 
-        threads.updateThread(
-          editing.id,
-          {
-            content:
-              payload.content,
+        try {
+          const updated = await updateCommunityPost(
+            editing.id,
+            {
+              content: payload.content,
+              imageUrl: payload.attachments?.[0]?.url,
+            }
+          );
 
-            ...(editing.title !=
-            null
-              ? {
-                  title:
-                    payload.title?.trim() ??
-                    '',
-                }
-              : {}),
+          threads.updateThread(editing.id, {
+            content: updated.content,
+            attachments: payload.attachments,
+          });
 
-            attachments:
-              payload.attachments,
-          }
-        );
-
-        modalState.closeModal();
+          modalState.closeModal();
+        } catch (error) {
+          console.error('Failed to update post', error);
+        }
       },
       [threads, modalState]
     );
@@ -360,33 +307,17 @@ const CommunitiesListPage: React.FC = () => {
       [modalState]
     );
 
-  const handleThreadLike =
-    useCallback(() => {
-      const id =
-        threads.selectedThread?.id;
-
-      if (id)
-        threads.toggleThreadLike(
-          id
-        );
-    }, [
-      threads.selectedThread?.id,
-      threads.toggleThreadLike,
-    ]);
-
-  const handleThreadSave =
-    useCallback(() => {
-      const id =
-        threads.selectedThread?.id;
-
-      if (id)
-        threads.toggleThreadSave(
-          id
-        );
-    }, [
-      threads.selectedThread?.id,
-      threads.toggleThreadSave,
-    ]);
+  const handleThreadLike = useCallback(
+    async (threadId: string) => {
+      try {
+        await togglePostLike(threadId);
+        threads.toggleThreadLike(threadId);
+      } catch (error) {
+        console.error('Failed to toggle like', error);
+      }
+    },
+    [threads]
+  );
 
   const selectedThread =
     threads.selectedThread;
@@ -405,77 +336,104 @@ const CommunitiesListPage: React.FC = () => {
         )}
 
         <div className="py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="w-full max-w-2xl mx-auto text-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex-1 text-center sm:text-left">
               <p className="text-sm text-gray-500">
-                Here is communities
-                where you can
-                connect and grow
-                with others
+                Connect and grow with others across mentorship communities.
               </p>
             </div>
 
-            <div className="ml-4">
-              <button
-                className="rounded-full bg-primary text-white px-4 py-2 text-sm"
-                onClick={() =>
-                  setIsCreateCommunityOpen(
-                    true
-                  )
-                }
-              >
-                Create Community
-              </button>
-            </div>
+            <button
+              type="button"
+              className="inline-flex shrink-0 items-center justify-center gap-2 self-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 transition hover:bg-primary-dark sm:self-auto"
+              onClick={() => setIsCreateCommunityOpen(true)}
+            >
+              <Plus size={18} strokeWidth={2.5} aria-hidden />
+              Create Community
+            </button>
           </div>
 
           <div className="grid gap-6 grid-cols-3">
             <div className="col-span-2 space-y-6">
-              {threads.threads.map(
-                (thread) => (
+              {!isLoadingCommunities && myCommunities.length === 0 ? (
+                <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white px-8 py-12 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Users size={28} aria-hidden />
+                  </div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    No joined communities yet
+                  </h3>
+                  <p className="mt-2 max-w-md text-sm text-gray-600 leading-relaxed">
+                    Join communities to connect with people, discover discussions,
+                    and participate in mentorship activities.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate('/search-mentorship?tab=communities')
+                    }
+                    className="mt-6 rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark"
+                  >
+                    Explore Communities →
+                  </button>
+                </div>
+              ) : isLoadingFeed ? (
+                <div className="text-sm text-gray-500 py-8 text-center">
+                  Loading feed...
+                </div>
+              ) : feedError ? (
+                <div className="text-sm text-red-600 py-8 text-center">
+                  {feedError}
+                </div>
+              ) : threads.threads.length === 0 ? (
+                <div className="text-sm text-gray-500 py-8 text-center">
+                  No posts yet. Join a community to see posts here.
+                </div>
+              ) : (
+                threads.threads.map((thread) => (
                   <PostCard
                     key={thread.id}
                     thread={thread}
-                    onThreadClick={
-                      handleThreadClick
-                    }
-                    onLike={
-                      threads.toggleThreadLike
-                    }
-                    onSave={
-                      threads.toggleThreadSave
-                    }
+                    onThreadClick={handleThreadClick}
+                    onLike={handleThreadLike}
                     onShare={() => {}}
-                    currentUserId={
-                      currentUserId
-                    }
+                    currentUserId={currentUserId}
                     onThreadEditRequest={
                       handleThreadEditRequest
                     }
-                    onThreadDelete={
-                      handleThreadDelete
-                    }
+                    onThreadDelete={handleThreadDelete}
                   />
-                )
+                ))
               )}
             </div>
 
             <aside className="space-y-4">
               <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                <input
-                  placeholder="Search community name"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div className="rounded-2xl border border-gray-100 bg-white p-4">
                 <h4 className="text-sm font-semibold text-slate-800 mb-3">
-                  Your Communities
+                  Joined Communities
                 </h4>
 
                 {isLoadingCommunities ? (
                   <div className="text-sm text-gray-500">
                     Loading...
+                  </div>
+                ) : myCommunities.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+                    <p className="text-sm font-medium text-slate-800">
+                      No joined communities yet
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+                      Explore communities to start connecting.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate('/search-mentorship?tab=communities')
+                      }
+                      className="mt-3 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Explore Communities →
+                    </button>
                   </div>
                 ) : (
                   <ul className="space-y-3">
@@ -489,12 +447,12 @@ const CommunitiesListPage: React.FC = () => {
                           <div className="flex items-center gap-3">
                             <img
                               src={
-                                c.avatar
+                                c.cover || c.avatar
                               }
                               alt={
                                 c.name
                               }
-                              className="h-8 w-8 rounded-full"
+                              className="h-8 w-8 rounded-lg object-cover"
                             />
 
                             <div>
@@ -528,18 +486,17 @@ const CommunitiesListPage: React.FC = () => {
 
               </div>
 
-              <div className="mt-4">
-                <button
-                  onClick={() =>
-                    navigate(
-                      "/my-communities"
-                    )
-                  }
-                  className="w-full rounded-md border border-gray-100 px-3 py-2 text-sm bg-gray-50"
-                >
-                  See All
-                </button>
-              </div>
+              {myCommunities.length > 0 && (
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/my-communities')}
+                    className="w-full rounded-md border border-gray-100 px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 transition"
+                  >
+                    See All
+                  </button>
+                </div>
+              )}
 
 
               <div className="rounded-2xl border border-gray-100 bg-white p-4">
@@ -558,12 +515,12 @@ const CommunitiesListPage: React.FC = () => {
                         <div className="flex items-center gap-3">
                           <img
                             src={
-                              c.avatar
+                              c.cover || c.avatar
                             }
                             alt={
                               c.name
                             }
-                            className="h-8 w-8 rounded-full"
+                            className="h-8 w-8 rounded-lg object-cover"
                           />
 
                           <div className="text-sm">
@@ -634,7 +591,12 @@ const CommunitiesListPage: React.FC = () => {
                 onCancel={
                   modalState.closeModal
                 }
-                authorAvatar="https://api.dicebear.com/7.x/avataaars/svg?seed=You"
+                authorAvatar={resolveAuthorAvatar(
+                  currentUser
+                    ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
+                    : 'You',
+                  null
+                )}
                 authorName="You"
               />
             </div>
@@ -655,23 +617,14 @@ const CommunitiesListPage: React.FC = () => {
             onCommentSubmit={
               handleCommentSubmit
             }
-            onCommentReply={
-              handleCommentReply
-            }
-            onCommentLike={
-              handleCommentLike
-            }
             onCommentDelete={
               handleCommentDelete
             }
             onCommentEdit={
               handleCommentEdit
             }
-            onThreadLike={
-              handleThreadLike
-            }
-            onThreadSave={
-              handleThreadSave
+            onThreadLike={() =>
+              handleThreadLike(selectedThread.id)
             }
             onThreadEditRequest={
               handleThreadEditRequest

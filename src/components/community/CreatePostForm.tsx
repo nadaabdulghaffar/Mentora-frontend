@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Image, Paperclip, X } from 'lucide-react';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 import type { CreateThreadPayload, ThreadAttachment } from '../../pages/community/types';
 import { validateThreadContent } from '../../pages/community/utils/threadUtils';
 
@@ -126,8 +127,9 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({
     <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
       {/* Header */}
       <div className="mb-4 flex items-center gap-3">
-        <img
-          src={authorAvatar}
+        <ProfileAvatar
+          pictureUrl={authorAvatar}
+          name={authorName}
           alt={authorName}
           className="h-10 w-10 rounded-full object-cover"
         />

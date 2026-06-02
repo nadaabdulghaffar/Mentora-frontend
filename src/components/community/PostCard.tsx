@@ -6,16 +6,17 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Link, Pencil, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Link, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { CommunityThread } from '../../pages/community/types';
 import { formatTimestamp, truncateText } from '../../pages/community/utils/threadUtils';
+import { buildCommunityPostShareUrl } from '../../pages/community/utils/shareUtils';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 
 interface PostCardProps {
   thread: CommunityThread;
   onThreadClick: (thread: CommunityThread) => void;
   onLike?: (threadId: string) => void;
-  onSave?: (threadId: string) => void;
   onShare?: (threadId: string) => void;
   /** Legacy generic “more” (e.g. report) when owner menu is not shown */
   onMoreOptions?: (threadId: string) => void;
@@ -71,7 +72,6 @@ export const PostCard: React.FC<PostCardProps> = ({
   thread,
   onThreadClick,
   onLike,
-  onSave,
   onShare,
   onMoreOptions,
   currentUserId,
@@ -137,14 +137,10 @@ export const PostCard: React.FC<PostCardProps> = ({
     return isCompact ? truncateText(thread.content, 120) : thread.content;
   }, [thread.content, isCompact]);
 
-  const shareLink = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-
-    const path = thread.communityId ? `/community/${thread.communityId}` : window.location.pathname;
-    return `${window.location.origin}${path}?thread=${thread.id}`;
-  }, [thread.communityId, thread.id]);
+  const shareLink = useMemo(
+    () => buildCommunityPostShareUrl(thread.id, thread.communityId),
+    [thread.communityId, thread.id]
+  );
 
   const handleCopyLink = async () => {
     if (!shareLink) return;
@@ -210,41 +206,35 @@ export const PostCard: React.FC<PostCardProps> = ({
       {ownerMenuPortal}
       {/* Header */}
       <div className="px-4 py-3 sm:px-6">
-        {/* Community Info */}
-        {thread.communityName && thread.communityId && (
-          <div className="mb-3 flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/community/${thread.communityId}`);
-              }}
-              className="text-sm font-semibold text-gray-900 hover:text-blue-600"
-            >
-              {thread.communityName}
-            </button>
-            <span className="text-xs text-gray-400">·</span>
-            <button
-              type="button"
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs text-gray-500 hover:underline"
-            >
-              Join Community
-            </button>
-          </div>
-        )}
-
         <div className="flex items-start justify-between gap-3">
           {/* Author Info */}
           <div className="flex flex-1 items-start gap-3">
-            <img
-              src={thread.authorAvatar}
+            <ProfileAvatar
+              pictureUrl={thread.authorProfilePicture}
+              name={thread.authorName}
               alt={thread.authorName}
               className="h-10 w-10 rounded-full object-cover"
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-semibold text-gray-900">{thread.authorName}</p>
+                {thread.communityName && thread.communityId && (
+                  <>
+                    <span className="text-gray-400" aria-hidden>
+                      ·
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/community/${thread.communityId}`);
+                      }}
+                      className="text-sm font-medium text-gray-600 hover:text-blue-600"
+                    >
+                      {thread.communityName}
+                    </button>
+                  </>
+                )}
                 {thread.authorRole && thread.authorRole !== 'member' && (
                   <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 capitalize">
                     {thread.authorRole}
@@ -314,8 +304,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 
       {/* Footer - Compact Engagement Bar */}
       <div className="border-t border-gray-100 px-4 py-3 sm:px-6">
-        <div className="flex items-center justify-between gap-3 text-sm text-gray-600">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 text-sm text-gray-600">
             <button
               type="button"
               onClick={(e) => {
@@ -389,21 +378,6 @@ export const PostCard: React.FC<PostCardProps> = ({
                 </div>
               ) : null}
             </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSave?.(thread.id);
-            }}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition ${
-              thread.isSaved ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Bookmark size={15} fill={thread.isSaved ? 'currentColor' : 'none'} />
-            <span>Save</span>
-          </button>
         </div>
       </div>
     </div>

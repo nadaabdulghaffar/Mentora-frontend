@@ -68,6 +68,8 @@ export interface ThreadComment {
   authorId: string;
   authorName: string;
   authorAvatar: string;
+  /** Raw profile picture from API (for ProfileAvatar resolution). */
+  authorProfilePicture?: string;
   authorRole?: 'admin' | 'moderator' | 'member' | 'author';
   content: string;
   timestamp: string;
@@ -83,6 +85,8 @@ export interface CommunityThread {
   authorId: string;
   authorName: string;
   authorAvatar: string;
+  /** Raw profile picture from API (for ProfileAvatar resolution). */
+  authorProfilePicture?: string;
   authorRole?: string;
   title?: string; // For discussion threads
   content: string;

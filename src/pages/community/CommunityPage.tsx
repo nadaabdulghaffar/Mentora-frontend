@@ -12,7 +12,7 @@ import React, {
 } from 'react';
 
 
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CommunitySidebar } from '../../components/community/CommunitySidebar';
 import Layout from '../../shared/components/Layout';
 import { CreatePostForm } from '../../components/community/CreatePostForm';
@@ -36,6 +36,11 @@ import type {
 import { Alert } from '../../components/Alert';
 import { CommunityRole } from '../../constants/communityRoles';
 import { ensureDomainsLoaded } from '../../utils/domainCache';
+import { resolveAuthorAvatar } from './utils/authorAvatar';
+import {
+  messagingService,
+  isValidUserGuid,
+} from '../../services/messagingService';
 import { toStorageCommunityImageUrl } from '../../utils/communityImageUrl';
 
 import {
@@ -48,6 +53,7 @@ import {
   updateCommunityPost,
   deleteCommunityPost,
   getCommunityPosts,
+  getCommunityPostById,
   createComment,
   updateComment,
   deleteComment,
@@ -61,6 +67,7 @@ import {
 import {
   mapCommunityDetails,
 } from './mappers/communityDetails.mapper';
+import { mapCommunityPostToThread } from './mappers/communityPost.mapper';
 
 import authAPI from "../../services/authService";
 
@@ -103,6 +110,7 @@ const threads =
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isLoadingComment, setIsLoadingComment] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showJoinToPostDialog, setShowJoinToPostDialog] = useState(false);
   // Temporary: current user id - replace with real auth context
 
 const currentUser =
@@ -116,6 +124,8 @@ const currentUserId =
   const navigate = useNavigate();
   const params = useParams();
   const viewingCommunityId = params.id;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sharedThreadId = searchParams.get('thread');
 
   const [
   backendCommunity,
@@ -211,7 +221,42 @@ const [pageAlert, setPageAlert] = useState<{
   fetchCommunity();
 }, [viewingCommunityId]);
 
-const handleCreatePost = useCallback(() => { modalState.openCreateModal(); }, [modalState]);
+const handleCreatePost = useCallback(() => {
+  if (!activeCommunity?.isJoined) {
+    setShowJoinToPostDialog(true);
+    return;
+  }
+  modalState.openCreateModal();
+}, [activeCommunity?.isJoined, modalState]);
+
+const handleJoinFromPostDialog = useCallback(async () => {
+  if (!viewingCommunityId) {
+    return;
+  }
+
+  try {
+    await joinCommunity(viewingCommunityId);
+
+    setBackendCommunity((prev) =>
+      prev
+        ? {
+            ...prev,
+            isJoined: true,
+            memberCount: prev.memberCount + 1,
+          }
+        : prev
+    );
+
+    setShowJoinToPostDialog(false);
+    modalState.openCreateModal();
+  } catch (error) {
+    console.error('Failed to join community', error);
+    setPageAlert({
+      type: 'error',
+      message: 'Failed to join community. Please try again.',
+    });
+  }
+}, [viewingCommunityId, modalState]);
 const handleThreadEditRequest = useCallback((thread: CommunityThread) => {
 
 modalState.openEditPostModal(thread)
@@ -235,72 +280,9 @@ useEffect(() => {
           );
 
 
-const mappedThreads =
-  posts.map(
-    (post): CommunityThread => ({
-
-              id:
-                post.communityPostId,
-
-              authorId:
-                post.authorId,
-
-              authorName:
-                post.authorName,
-
-              authorAvatar:
-                post.authorProfilePicture ||
-                "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
-
-              content:
-                post.content,
-
-              timestamp:
-                post.createdAt,
-
-              likes:
-                post.likesCount,
-
-              commentCount:
-                post.commentsCount,
-
-              shareCount:
-                post.sharesCount,
-
-              comments: [],
-
-              attachments:
-                post.imageUrl
-                  ? [
-                      {
-                        id:
-                          post.communityPostId,
-
-                        type:
-                          "image",
-
-                        url:
-                          post.imageUrl,
-
-                        name:
-                          "Post image",
-                      },
-                    ]
-                  : undefined,
-
-              isLiked:
-                post.isLiked,
-
-              isSaved:
-                post.isSaved,
-
-              canEdit:
-                post.canEdit,
-
-              canDelete:
-                post.canDelete,
-            })
-          );
+const mappedThreads = posts.map((post) =>
+          mapCommunityPostToThread(post, viewingCommunityId)
+        );
 
         threads.setThreads(
           mappedThreads
@@ -404,8 +386,7 @@ if (editing) {
             authorName:
               "You",
 
-            authorAvatar:
-              "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
+            authorAvatar: resolveAuthorAvatar("You", null),
 
             content:
               payload.content,
@@ -440,6 +421,9 @@ if (editing) {
 
             canDelete:
               true,
+
+            communityId:
+              viewingCommunityId,
           };
 
         threads.addThread(
@@ -471,6 +455,58 @@ if (editing) {
     [threads, modalState]
   );
 
+  useEffect(() => {
+    if (!sharedThreadId || !viewingCommunityId) {
+      return;
+    }
+
+    const clearThreadParam = () => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('thread');
+          return next;
+        },
+        { replace: true }
+      );
+    };
+
+    const existing = threads.getThreadById(sharedThreadId);
+    if (existing) {
+      handleThreadClick(existing);
+      clearThreadParam();
+      return;
+    }
+
+    let cancelled = false;
+
+    const openSharedPost = async () => {
+      try {
+        const post = await getCommunityPostById(sharedThreadId);
+        if (cancelled) {
+          return;
+        }
+        const mapped = mapCommunityPostToThread(post, viewingCommunityId);
+        handleThreadClick(mapped);
+        clearThreadParam();
+      } catch (error) {
+        console.error('Failed to open shared post', error);
+      }
+    };
+
+    void openSharedPost();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    sharedThreadId,
+    viewingCommunityId,
+    threads,
+    handleThreadClick,
+    setSearchParams,
+  ]);
+
  
 
 const handleThreadLike =
@@ -496,12 +532,6 @@ const handleThreadLike =
     [threads]
   );
 
-
-  const handleThreadSave = useCallback(() => {
-    if (threads.selectedThread) {
-      threads.toggleThreadSave(threads.selectedThread.id);
-    }
-  }, [threads]);
 
   // ============================================
   // Comment Operations
@@ -537,8 +567,7 @@ const handleCommentSubmit =
             authorName:
               "You",
 
-            authorAvatar:
-              "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
+            authorAvatar: resolveAuthorAvatar("You", null),
 
             content,
 
@@ -572,38 +601,6 @@ const handleCommentSubmit =
       threads,
       currentUserId,
     ]
-  );
-
-
-  const handleCommentLike = useCallback(
-    (commentId: string) => {
-      const threadId = threads.selectedThread?.id;
-      if (!threadId) return;
-      threads.toggleCommentLike(threadId, commentId);
-    },
-    [threads.selectedThread?.id, threads.toggleCommentLike]
-  );
-
-  const handleCommentReply = useCallback(
-    (parentCommentId: string, content: string) => {
-      const threadId = threads.selectedThread?.id;
-      if (!threadId) return;
-      const reply: ThreadComment = {
-        id: `reply-${Date.now()}`,
-        authorId: currentUserId,
-        authorName: 'You',
-        authorAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=You',
-        content,
-        timestamp: new Date().toISOString(),
-        likes: 0,
-        isLiked: false,
-        replies: [],
-        canEdit: true,
-        canDelete: true,
-      };
-      threads.addReplyToComment(threadId, parentCommentId, reply);
-    },
-    [threads.selectedThread?.id, threads.addReplyToComment, currentUserId]
   );
 
 
@@ -726,6 +723,44 @@ const handleThreadDelete =
       community.rejectMemberRequest(requestId);
     },
     [community]
+  );
+
+  const handleMessageMember = useCallback(
+    async (memberId: string) => {
+      if (memberId === currentUserId) {
+        return;
+      }
+
+      if (!isValidUserGuid(memberId)) {
+        setPageAlert({
+          type: 'error',
+          message: 'Unable to start a conversation for this member.',
+        });
+        return;
+      }
+
+      try {
+        const conversation =
+          await messagingService.createOrGetConversation(memberId);
+
+        navigate(
+          `/messages?conversationId=${conversation.conversationId}`,
+          {
+            state: {
+              conversationId: conversation.conversationId,
+              otherUserId: memberId,
+            },
+          }
+        );
+      } catch (error) {
+        console.error('Failed to open conversation', error);
+        setPageAlert({
+          type: 'error',
+          message: 'Could not open conversation. Please try again.',
+        });
+      }
+    },
+    [currentUserId, navigate]
   );
 
   // Admin / member actions
@@ -949,10 +984,10 @@ const handleJoinCommunity =
               : prev
         );
       } catch (error) {
-        console.error(
-          "Failed to join community",
-          error
-        );
+        setPageAlert({
+          type: 'error',
+          message: extractErrorMessage(error),
+        });
       }
     },
     [viewingCommunityId]
@@ -1076,20 +1111,13 @@ const canManageCommunity =
                       />
                     )}
                   </div>
-                  <div className="-mt-8 px-6 pb-6">
+                  <div className="px-6 pb-6 pt-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-end gap-4">
-                        <img
-                          src={activeCommunity.avatar}
-                          alt={activeCommunity.name}
-                          className="h-20 w-20 rounded-full border-4 border-card object-cover"
-                        />
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-800">{activeCommunity.name}</h2>
-                          <div className="mt-1 flex items-center gap-3 text-sm text-muted">
-                            <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-primary">{activeCommunity.domain}</span>
-                            <span>{activeCommunity.memberCount.toLocaleString()} members</span>
-                          </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-800">{activeCommunity.name}</h2>
+                        <div className="mt-1 flex items-center gap-3 text-sm text-muted">
+                          <span className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-primary">{activeCommunity.domain}</span>
+                          <span>{activeCommunity.memberCount.toLocaleString()} members</span>
                         </div>
                       </div>
 
@@ -1099,8 +1127,7 @@ const canManageCommunity =
                         ) : (
                           <button onClick={handleJoinCommunity} className="rounded-full bg-card border px-4 py-2 text-sm font-medium">Join</button>
                         )}
-                        <button className="rounded-full bg-primary text-white px-4 py-2 text-sm font-medium">Invite</button>
-                       
+
 {canManageCommunity && (
   <button
     type="button"
@@ -1145,10 +1172,7 @@ onLike={
 }
 
 
-                onSave={threads.toggleThreadSave}
-                onShare={(threadId) => {
-                  // Share logic
-                }}
+                onShare={() => {}}
                 onCreatePost={handleCreatePost}
                 currentUserId={currentUserId}
                 onThreadEditRequest={handleThreadEditRequest}
@@ -1164,9 +1188,7 @@ onLike={
                 totalCount={communityMemberCount}
                 searchQuery={community.searchQuery}
                 onSearchChange={community.setSearchQuery}
-                onMessageMember={() => {
-                  // Message logic
-                }}
+                onMessageMember={handleMessageMember}
                 onRemoveMember={
                   canManageCommunity
                     ? handleRemoveMember
@@ -1205,9 +1227,6 @@ onLike={
   onSettings={
     modalState.openSettingsModal
   }
-  onShare={() => {
-    // Share community logic
-  }}
   onJoin={
     handleJoinCommunity
   }
@@ -1239,7 +1258,12 @@ onLike={
               variant={modalState.editingThread ? 'edit' : 'create'}
               onSubmit={handleThreadSubmit}
               onCancel={modalState.closeModal}
-              authorAvatar="https://api.dicebear.com/7.x/avataaars/svg?seed=You"
+              authorAvatar={resolveAuthorAvatar(
+                currentUser
+                  ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
+                  : 'You',
+                null
+              )}
               authorName="You"
               isLoading={isCreatingPost}
             />
@@ -1254,8 +1278,6 @@ onLike={
           onClose={modalState.closeModal}
           thread={selectedThread}
           onCommentSubmit={handleCommentSubmit}
-          onCommentReply={handleCommentReply}
-          onCommentLike={handleCommentLike}
           onCommentDelete={handleCommentDelete}
           onCommentEdit={handleCommentEdit}
 
@@ -1264,12 +1286,41 @@ onThreadLike={() =>
     selectedThread.id
   )
 }
-          onThreadSave={handleThreadSave}
           onThreadEditRequest={handleThreadEditRequest}
           onThreadDelete={handleThreadDelete}
           isLoadingComment={isLoadingComment}
           currentUserId={currentUserId}
         />
+      )}
+
+      {/* Join to post dialog */}
+      {showJoinToPostDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-bold text-slate-900">
+              Only members can create posts
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Join this community to create posts and participate in discussions.
+            </p>
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowJoinToPostDialog(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleJoinFromPostDialog()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+              >
+                Join Community
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Dialog */}

@@ -5,11 +5,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, Share2, Bookmark, MessageCircle, Link, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { X, Heart, Share2, MessageCircle, Link, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Modal } from '../Modal';
 import { CommentThread } from './CommentThread';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 import type { CommunityThread, ThreadComment } from '../../pages/community/types';
 import { formatTimestamp } from '../../pages/community/utils/threadUtils';
+import { buildCommunityPostShareUrl } from '../../pages/community/utils/shareUtils';
+import { resolveAuthorAvatar } from '../../pages/community/utils/authorAvatar';
+import authAPI from '../../services/authService';
 
 import {
   getPostComments,
@@ -21,13 +25,10 @@ interface ThreadModalProps {
   onClose: () => void;
   thread: CommunityThread;
   onCommentSubmit?: (content: string) => void;
-  onCommentReply?: (parentCommentId: string, content: string) => void;
-  onCommentLike?: (commentId: string) => void;
   onCommentDelete?: (commentId: string) => void;
   onCommentEdit?: (commentId: string, content: string) => void;
   onThreadLike?: () => void;
   onThreadShare?: () => void;
-  onThreadSave?: () => void;
   /** Opens the same create/edit post modal (parent) prefilled with this thread */
   onThreadEditRequest?: (thread: CommunityThread) => void;
   onThreadDelete?: (threadId: string) => void;
@@ -69,13 +70,10 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
   onClose,
   thread,
   onCommentSubmit,
-  onCommentReply,
-  onCommentLike,
   onCommentDelete,
   onCommentEdit,
   onThreadLike,
   onThreadShare,
-  onThreadSave,
   onThreadEditRequest,
   onThreadDelete,
   isLoadingComment = false,
@@ -91,6 +89,15 @@ const [localComments, setLocalComments] =
 
   const [shareOpen, setShareOpen] = useState(false);
 
+  const currentUser = authAPI.getCurrentUser();
+  const currentUserDisplayName = currentUser
+    ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
+    : 'You';
+  const currentUserAvatar = resolveAuthorAvatar(
+    currentUserDisplayName,
+    null
+  );
+
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
   const [threadMenuCoords, setThreadMenuCoords] = useState<{ top: number; left: number } | null>(null);
   const threadMenuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -105,11 +112,10 @@ const [localComments, setLocalComments] =
   const showThreadDelete = modalOwnerCanDelete(currentUserId, thread, Boolean(onThreadDelete));
   const showThreadOwnerMenu = showThreadEdit || showThreadDelete;
 
-  const shareLink = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const path = thread.communityId ? `/community/${thread.communityId}` : window.location.pathname;
-    return `${window.location.origin}${path}?thread=${thread.id}`;
-  }, [thread.communityId, thread.id]);
+  const shareLink = useMemo(
+    () => buildCommunityPostShareUrl(thread.id, thread.communityId),
+    [thread.communityId, thread.id]
+  );
 
  
 
@@ -135,9 +141,13 @@ useEffect(() => {
               authorName:
                 comment.authorName,
 
-              authorAvatar:
-                comment.authorProfilePicture ||
-                "https://api.dicebear.com/7.x/avataaars/svg?seed=User",
+              authorProfilePicture:
+                comment.authorProfilePicture,
+
+              authorAvatar: resolveAuthorAvatar(
+                comment.authorName,
+                comment.authorProfilePicture
+              ),
 
               content:
                 comment.content,
@@ -448,8 +458,9 @@ const handleLocalEdit =
         <div className="mb-6">
           {/* Author Info */}
           <div className="mb-4 flex items-center gap-3">
-            <img
-              src={thread.authorAvatar}
+            <ProfileAvatar
+              pictureUrl={thread.authorProfilePicture}
+              name={thread.authorName}
               alt={thread.authorName}
               className="h-12 w-12 rounded-full object-cover"
             />
@@ -507,17 +518,6 @@ const handleLocalEdit =
                 <MessageCircle size={16} />
                 <span>{thread.commentCount}</span>
               </button>
-              <button
-                onClick={onThreadSave}
-                className={`flex items-center gap-1.5 transition ${
-                  thread.isSaved
-                    ? 'text-blue-500'
-                    : 'text-gray-600 hover:text-blue-600'
-                }`}
-              >
-                <Bookmark size={16} fill={thread.isSaved ? 'currentColor' : 'none'} />
-                <span>Save</span>
-              </button>
             </div>
 
             <button
@@ -547,8 +547,9 @@ Comments ({localComments.length})
           {/* Comment Input */}
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-3">
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser"
+              <ProfileAvatar
+                pictureUrl={currentUserAvatar}
+                name={currentUserDisplayName}
                 alt="Your avatar"
                 className="h-8 w-8 rounded-full object-cover"
               />
@@ -592,10 +593,8 @@ Comments ({localComments.length})
                 <CommentThread
                   key={comment.id}
                   comment={comment}
-                  onLike={onCommentLike}
-                  onReply={onCommentReply}
-                 onEdit={handleLocalEdit}
-onDelete={handleLocalDelete}
+                  onEdit={handleLocalEdit}
+                  onDelete={handleLocalDelete}
                   currentUserId={currentUserId}
                   variant="community"
                 />

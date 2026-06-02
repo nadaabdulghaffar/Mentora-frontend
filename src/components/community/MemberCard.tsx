@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquareText, Shield, MoreHorizontal } from 'lucide-react';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 import type { CommunityMember } from '../../pages/community/types';
 import type { CommunityRoleName } from '../../constants/communityRoles';
 import { communityRoleLabel } from '../../constants/communityRoles';
@@ -86,8 +87,9 @@ export const MemberCard: React.FC<MemberCardProps> = ({
     <div className="overflow-visible rounded-2xl border border-gray-200 bg-white transition hover:shadow-sm">
       <div className="p-4">
         <div className="flex items-center gap-3">
-          <img
-            src={member.avatar}
+          <ProfileAvatar
+            pictureUrl={member.avatar}
+            name={member.name}
             alt={member.name}
             className="h-12 w-12 rounded-full object-cover"
           />

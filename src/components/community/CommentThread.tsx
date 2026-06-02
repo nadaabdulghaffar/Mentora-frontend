@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import { Heart, Reply as ReplyIcon, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import type { ThreadComment } from '../../pages/community/types';
 import { formatTimestamp, validateCommentContent } from '../../pages/community/utils/threadUtils';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 
 interface CommentThreadProps {
   comment: ThreadComment;
@@ -49,8 +50,9 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   onDelete,
   currentUserId,
   depth = 0,
-  variant: _variant = 'community',
+  variant = 'community',
 }) => {
+  const isCommunity = variant === 'community';
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [showReplies, setShowReplies] = useState(false);
@@ -221,8 +223,9 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     <div style={{ marginLeft: `${marginLeft}px` }} className="space-y-3">
       {overflowMenu}
       <div className="flex gap-3">
-        <img
-          src={comment.authorAvatar}
+        <ProfileAvatar
+          pictureUrl={comment.authorProfilePicture}
+          name={comment.authorName}
           alt={comment.authorName}
           className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
         />
@@ -288,27 +291,29 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setLocalIsLiked((prevLiked) => {
-                  setLocalLikes((prevLikes) =>
-                    prevLiked ? Math.max(0, prevLikes - 1) : prevLikes + 1
-                  );
-                  return !prevLiked;
-                });
-                onLike?.(comment.id);
-              }}
-              className={`flex items-center gap-1 text-xs font-medium transition ${
-                localIsLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
-              }`}
-            >
-              <Heart size={14} fill={localIsLiked ? 'currentColor' : 'none'} />
-              {localLikes > 0 && <span>{localLikes}</span>}
-            </button>
+            {!isCommunity && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLocalIsLiked((prevLiked) => {
+                    setLocalLikes((prevLikes) =>
+                      prevLiked ? Math.max(0, prevLikes - 1) : prevLikes + 1
+                    );
+                    return !prevLiked;
+                  });
+                  onLike?.(comment.id);
+                }}
+                className={`flex items-center gap-1 text-xs font-medium transition ${
+                  localIsLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
+                }`}
+              >
+                <Heart size={14} fill={localIsLiked ? 'currentColor' : 'none'} />
+                {localLikes > 0 && <span>{localLikes}</span>}
+              </button>
+            )}
 
             <div className="inline-flex items-center gap-0.5">
-              {canNest && (
+              {!isCommunity && canNest && (
                 <button
                   type="button"
                   onClick={() => setShowReplyInput(!showReplyInput)}
@@ -334,7 +339,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </div>
           </div>
 
-          {showReplyInput && (
+          {!isCommunity && showReplyInput && (
             <div className="mt-3 space-y-2">
               <textarea
                 value={replyContent}
@@ -372,7 +377,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </div>
           )}
 
-          {(localReplies.length > 0 || comment.replies?.length) && (
+          {!isCommunity && (localReplies.length > 0 || comment.replies?.length) && (
             <div className="mt-3">
               {!showReplies ? (
                 <button

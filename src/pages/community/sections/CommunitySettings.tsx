@@ -159,7 +159,6 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
         description: formData.description.trim(),
         domainId: formData.domainId,
         cover: storedCoverUrl || undefined,
-        avatar: formData.avatar,
       });
       onClose?.();
     } catch (error) {
@@ -229,22 +228,7 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
             )}
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Community Avatar</label>
-              <div className="mt-2 flex items-center gap-3">
-                <img
-                  src={formData.avatar}
-                  alt={community.name}
-                  className="h-12 w-12 rounded-lg border border-gray-200 object-cover"
-                />
-                <p className="text-xs text-gray-500">
-                  Avatar reflects the community creator&apos;s profile picture and cannot be changed here.
-                </p>
-              </div>
-            </div>
-
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700">Community Cover</label>
               <div className="mt-2 flex items-center gap-3">
                 <img
@@ -273,7 +257,6 @@ export const CommunitySettingsSection: React.FC<CommunitySettingsSectionProps> =
               {coverUploadError && (
                 <p className="mt-1 text-sm text-red-600">{coverUploadError}</p>
               )}
-            </div>
           </div>
 
           <div>

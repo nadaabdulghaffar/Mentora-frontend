@@ -133,7 +133,7 @@ const MyCommunitiesPage = () => {
                   }
                   author={{
                     avatar:
-                      community.avatar,
+                      community.cover || community.avatar,
                     name: `Hosted community`,
                   }}
                   primaryButtonText="Open Community"
