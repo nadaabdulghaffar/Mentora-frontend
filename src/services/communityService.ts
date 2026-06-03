@@ -1,5 +1,7 @@
 
 import apiClient from "./api";
+import type { ExploreSearchParams, PagedResult } from "../types/api";
+import { toExploreQueryParams, unwrapPagedExplore } from "./exploreApiUtils";
 
 const CREATE_COMMUNITY_ENDPOINT =
   import.meta.env.VITE_CREATE_COMMUNITY_ENDPOINT ||
@@ -193,35 +195,18 @@ export const getMyCommunities =
     return response.data.data;
   };
 
-export const exploreCommunities =
-  async (
-    searchQuery = ""
-  ): Promise<
-    CommunityResponse[]
-  > => {
-    const response =
-      await apiClient.get(
-        EXPLORE_COMMUNITIES_ENDPOINT,
-        {
-          params: {
-            SearchQuery:
-              searchQuery,
-          },
-        }
-      );
+export const exploreCommunities = async (
+  params: ExploreSearchParams | string = {}
+): Promise<PagedResult<CommunityResponse>> => {
+  const searchParams =
+    typeof params === "string" ? { searchQuery: params } : params;
 
-    if (
-      !response.data?.success ||
-      !response.data?.data
-    ) {
-      throw new Error(
-        response.data?.message ||
-          "Failed to explore communities"
-      );
-    }
+  const response = await apiClient.get(EXPLORE_COMMUNITIES_ENDPOINT, {
+    params: toExploreQueryParams(searchParams),
+  });
 
-    return response.data.data;
-  };
+  return unwrapPagedExplore(response, "Failed to explore communities");
+};
 
 
 

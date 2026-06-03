@@ -1,10 +1,17 @@
 import apiClient from './api';
+import type { ExploreSearchParams, PagedResult } from '../types/api';
+import type { CommunityResponse } from './communityService';
+import type { RoadmapExploreDto } from './exploreRoadmapService';
+import { toExploreQueryParams, unwrapPagedExplore } from './exploreApiUtils';
 
 const EXPLORE_MENTORS_ENDPOINT =
   import.meta.env.VITE_EXPLORE_MENTORS_ENDPOINT || '/Explore/mentors';
 
 const EXPLORE_PROGRAMS_ENDPOINT =
   import.meta.env.VITE_EXPLORE_PROGRAMS_ENDPOINT || '/Explore/programs';
+
+const EXPLORE_PREVIEW_ENDPOINT =
+  import.meta.env.VITE_EXPLORE_PREVIEW_ENDPOINT || '/Explore/preview';
 
 export interface MentorExploreDto {
   mentorId: string;
@@ -25,32 +32,48 @@ export interface ProgramExploreDto {
   mentorProfileImageUrl?: string;
 }
 
+export interface ExplorePreviewSection<T> {
+  items: T[];
+  totalCount: number;
+}
+
+export interface ExploreAllPreviewDto {
+  programs: ExplorePreviewSection<ProgramExploreDto>;
+  mentors: ExplorePreviewSection<MentorExploreDto>;
+  roadmaps: ExplorePreviewSection<RoadmapExploreDto>;
+  communities: ExplorePreviewSection<CommunityResponse>;
+}
+
 export const exploreMentors = async (
-  searchQuery = ''
-): Promise<MentorExploreDto[]> => {
+  params: ExploreSearchParams = {}
+): Promise<PagedResult<MentorExploreDto>> => {
   const response = await apiClient.get(EXPLORE_MENTORS_ENDPOINT, {
-    params: { SearchQuery: searchQuery },
+    params: toExploreQueryParams(params),
   });
-
-  if (!response.data?.success || !response.data?.data) {
-    throw new Error(response.data?.message || 'Failed to fetch mentors');
-  }
-
-  return response.data.data as MentorExploreDto[];
+  return unwrapPagedExplore(response, 'Failed to fetch mentors');
 };
 
 export const explorePrograms = async (
-  searchQuery = ''
-): Promise<ProgramExploreDto[]> => {
+  params: ExploreSearchParams = {}
+): Promise<PagedResult<ProgramExploreDto>> => {
   const response = await apiClient.get(EXPLORE_PROGRAMS_ENDPOINT, {
-    params: { SearchQuery: searchQuery },
+    params: toExploreQueryParams(params),
+  });
+  return unwrapPagedExplore(response, 'Failed to fetch programs');
+};
+
+export const explorePreview = async (
+  params: Omit<ExploreSearchParams, 'pageNumber' | 'pageSize'> = {}
+): Promise<ExploreAllPreviewDto> => {
+  const response = await apiClient.get(EXPLORE_PREVIEW_ENDPOINT, {
+    params: toExploreQueryParams(params),
   });
 
   if (!response.data?.success || !response.data?.data) {
-    throw new Error(response.data?.message || 'Failed to fetch programs');
+    throw new Error(response.data?.message || 'Failed to fetch explore preview');
   }
 
-  return response.data.data as ProgramExploreDto[];
+  return response.data.data as ExploreAllPreviewDto;
 };
 
-export default { exploreMentors, explorePrograms };
+export default { exploreMentors, explorePrograms, explorePreview };

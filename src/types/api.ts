@@ -5,6 +5,29 @@ export interface ApiResponse<T> {
   errors?: string[];
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+/** Query params for explore tab and preview endpoints (maps to ExploreSearchRequest). */
+export interface ExploreSearchParams {
+  searchQuery?: string;
+  domainId?: number;
+  subDomainId?: number;
+  recommendedForYou?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+  openedNow?: boolean;
+  targetLevel?: number;
+  educationLevel?: number;
+}
+
 export interface CompleteRegistrationRequest {
   registrationToken: string;
   role: 'mentee' | 'mentor';

@@ -1,4 +1,6 @@
 import apiClient from './api';
+import type { ExploreSearchParams, PagedResult } from '../types/api';
+import { toExploreQueryParams, unwrapPagedExplore } from './exploreApiUtils';
 
 export interface RoadmapExploreDto {
   roadmapId: number;
@@ -10,14 +12,13 @@ export interface RoadmapExploreDto {
   phasesCount: number;
 }
 
-export const exploreRoadmaps = async (searchQuery = ''): Promise<RoadmapExploreDto[]> => {
-  const resp = await apiClient.get('/Explore/roadmaps', { params: { SearchQuery: searchQuery } });
-
-  if (!resp.data?.success || !resp.data?.data) {
-    throw new Error(resp.data?.message || 'Failed to fetch roadmaps');
-  }
-
-  return resp.data.data as RoadmapExploreDto[];
+export const exploreRoadmaps = async (
+  params: ExploreSearchParams = {}
+): Promise<PagedResult<RoadmapExploreDto>> => {
+  const response = await apiClient.get('/Explore/roadmaps', {
+    params: toExploreQueryParams(params),
+  });
+  return unwrapPagedExplore(response, 'Failed to fetch roadmaps');
 };
 
 export default { exploreRoadmaps };
