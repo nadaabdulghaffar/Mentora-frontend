@@ -1,4 +1,5 @@
 import apiClient from '../config/api';
+import { notificationSignalR } from '../notifications/services/notificationSignalR';
 import type {
   ApiResponse,
   AuthUser,
@@ -242,6 +243,7 @@ export const authAPI = {
         await apiClient.post('/auth/logout', { RefreshToken: refreshToken });
       }
     } finally {
+      await notificationSignalR.disconnect();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');

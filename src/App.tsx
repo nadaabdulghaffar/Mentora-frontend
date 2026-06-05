@@ -35,10 +35,13 @@ import MenteeClassroomPage from './pages/classroom/MenteeClassroomPage';
 import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingRoute from "./components/OnboardingRoute";
 import NotificationsTestPage from "./pages/dev/NotificationsTestPage";
+import { NotificationRealtimeBridge } from "./notifications";
 
 
 function App() { 
   return (
+    <>
+    <NotificationRealtimeBridge />
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
@@ -260,6 +263,7 @@ function App() {
         }
       />
     </Routes>
+    </>
   )
 }
 

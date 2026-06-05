@@ -43,3 +43,6 @@ export const REFERENCE_TYPE_ROUTE_TEMPLATE: Record<
   [ReferenceType.UserProfile]: "/profile/:id",
   [ReferenceType.Feedback]: "/feedback/:id",
 };
+
+/** Used when a notification has no resolvable deep link. */
+export const NOTIFICATION_NAVIGATION_FALLBACK_ROUTE = "/dashboard";

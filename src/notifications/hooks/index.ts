@@ -12,3 +12,5 @@ export {
   useDeleteNotification,
   type DeleteNotificationVariables,
 } from "./useDeleteNotification";
+export { useNotificationNavigation } from "./useNotificationNavigation";
+export { useNotificationRealtime } from "./useNotificationRealtime";

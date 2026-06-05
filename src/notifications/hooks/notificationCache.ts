@@ -4,7 +4,7 @@ import {
   NOTIFICATION_MIN_PAGE_SIZE,
   notificationKeys,
 } from "../constants";
-import type { NotificationPagedResult } from "../types";
+import type { NotificationDto, NotificationPagedResult } from "../types";
 
 export function clampNotificationPageSize(pageSize: number): number {
   return Math.min(
@@ -145,6 +145,51 @@ export function adjustUnreadCount(
   queryClient.setQueryData<number>(notificationKeys.unreadCount(), (current) =>
     Math.max(0, (current ?? 0) + delta)
   );
+}
+
+export function prependNotificationToLists(
+  queryClient: QueryClient,
+  notification: NotificationDto
+): boolean {
+  let inserted = false;
+
+  queryClient.setQueriesData<NotificationPagedResult>(
+    { queryKey: notificationKeys.lists() },
+    (current) => {
+      if (!current) {
+        return current;
+      }
+
+      const alreadyExists = current.items.some(
+        (item) => item.notificationId === notification.notificationId
+      );
+
+      if (alreadyExists) {
+        return current;
+      }
+
+      inserted = true;
+
+      return {
+        ...current,
+        items: [notification, ...current.items].slice(0, current.pageSize),
+        totalCount: current.totalCount + 1,
+      };
+    }
+  );
+
+  return inserted;
+}
+
+export function applyRealtimeNotification(
+  queryClient: QueryClient,
+  notification: NotificationDto
+): void {
+  const inserted = prependNotificationToLists(queryClient, notification);
+
+  if (inserted && !notification.isRead) {
+    adjustUnreadCount(queryClient, 1);
+  }
 }
 
 export function invalidateNotificationUnreadCount(
