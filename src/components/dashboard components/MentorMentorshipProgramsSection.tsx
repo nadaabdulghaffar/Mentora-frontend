@@ -19,9 +19,14 @@ const MentorMentorshipProgramsSection = () => {
         const res = await getMyPublishedPrograms();
         // Expecting envelope with { success, data: { items: ProgramViewDto[] } }
         const items = res?.data?.items ?? [];
+        const recentItems = [...items].sort((a: any, b: any) => {
+          const aId = Number(a?.programId ?? 0);
+          const bId = Number(b?.programId ?? 0);
+          return bId - aId;
+        });
 
         if (mounted) {
-          setPrograms(items.slice(0, 6)); // show up to 6
+          setPrograms(recentItems.slice(0, 3));
         }
       } catch (err: any) {
         console.error("Failed to load mentor programs", err);

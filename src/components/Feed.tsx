@@ -42,6 +42,7 @@ export interface FeedPostProps {
   timestamp: string;
   attachments?: PostAttachment[];
   likes: number;
+  commentCount?: number;
   likedByMe: boolean;
   comments: FeedComment[];
   variant: 'classroom' | 'community';
@@ -111,6 +112,19 @@ function feedCommentAllowsDelete(uid: string, c: FeedComment): boolean {
   return c.canDelete !== false;
 }
 
+function buildAvatarFallback(name: string): string {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}`;
+}
+
+function formatAbsoluteTimestamp(timestamp: string): string {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleString('ar-EG', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 interface ClassroomCommentBlockProps {
   comment: FeedComment;
   currentUserId: string;
@@ -131,6 +145,7 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
   depth = 0,
 }) => {
   const replies = comment.replies ?? [];
+  const formattedCommentTimestamp = formatAbsoluteTimestamp(comment.timestamp);
   const [showReplies, setShowReplies] = useState(false);
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyInput, setReplyInput] = useState('');
@@ -339,11 +354,13 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-3">
-            <span className="text-xs text-gray-500">{comment.timestamp}</span>
+            {formattedCommentTimestamp && (
+              <span className="text-xs text-gray-500">{formattedCommentTimestamp}</span>
+            )}
             <button
               type="button"
               onClick={handleCommentLikeClick}
-              className={`flex items-center gap-1 text-xs font-medium transition ${
+              className={`hidden items-center gap-1 text-xs font-medium transition ${
                 isCommentLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
               }`}
             >
@@ -370,7 +387,7 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
                   aria-expanded={menuOpen}
                   aria-haspopup="menu"
                   aria-label="Comment actions"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-200 hover:text-gray-800"
+                  className="hidden h-7 w-7 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-200 hover:text-gray-800"
                 >
                   <MoreHorizontal size={16} />
                 </button>
@@ -510,7 +527,7 @@ const Comment: React.FC<CommentProps> = ({ comment, variant }) => {
               }`}
             >
               <Heart size={12} fill={isCommentLiked ? 'currentColor' : 'none'} />
-              <span>{commentLikeCount}</span>
+              {commentLikeCount > 0 && <span>{commentLikeCount}</span>}
             </button>
           </div>
         </div>
@@ -555,7 +572,9 @@ const Comment: React.FC<CommentProps> = ({ comment, variant }) => {
                       }`}
                     >
                       <Heart size={12} fill={likedReplyIds[reply.id] ? 'currentColor' : 'none'} />
-                      <span>{replyLikeCounts[reply.id] ?? reply.likes}</span>
+                      {(replyLikeCounts[reply.id] ?? reply.likes) > 0 && (
+                        <span>{replyLikeCounts[reply.id] ?? reply.likes}</span>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -578,6 +597,7 @@ const Feed: React.FC<FeedPostProps> = ({
   timestamp,
   attachments = [],
   likes,
+  commentCount,
   likedByMe,
   comments,
   variant,
@@ -598,6 +618,10 @@ const Feed: React.FC<FeedPostProps> = ({
 }) => {
 const isLiked = likedByMe;
 const likeCount = likes;
+  const postTimestampLabel =
+    variant === 'classroom'
+      ? formatAbsoluteTimestamp(timestamp)
+      : timestamp;
   const [localComments, setLocalComments] = useState(comments);
   const [commentInput, setCommentInput] = useState('');
   const [showAllComments, setShowAllComments] = useState(false);
@@ -622,6 +646,10 @@ const likeCount = likes;
 
   const lastComment = localComments.length > 0 ? localComments[localComments.length - 1] : null;
   const hasMoreComments = localComments.length > 1;
+  const displayedCommentsCount = typeof commentCount === 'number'
+    ? Math.max(0, commentCount)
+    : localComments.length;
+  const postAvatarSrc = authorAvatar?.trim() || buildAvatarFallback(authorName);
 
   const [postMenuOpen, setPostMenuOpen] = useState(false);
   const [postMenuCoords, setPostMenuCoords] = useState<{ top: number; left: number } | null>(null);
@@ -629,6 +657,7 @@ const likeCount = likes;
   const postMenuPanelRef = useRef<HTMLDivElement>(null);
   const [isEditingPost, setIsEditingPost] = useState(false);
   const [editPostContent, setEditPostContent] = useState(content);
+  const [showDeletePostConfirm, setShowDeletePostConfirm] = useState(false);
 
   
 
@@ -661,6 +690,12 @@ const showPostDelete =
   useEffect(() => {
     setLocalComments(comments);
   }, [comments]);
+
+  useEffect(() => {
+    if (variant === 'classroom') {
+      console.log('Feed render attachments for post:', id, attachments);
+    }
+  }, [variant, id, attachments]);
 
   useEffect(() => {
     if (!isEditingPost) setEditPostContent(content);
@@ -730,10 +765,16 @@ const handleLikeClick = () => {
 
   const handleDeletePostClick = () => {
     closePostMenu();
-    if (typeof window !== 'undefined' && !window.confirm('Delete this post? This cannot be undone.')) {
-      return;
-    }
+    setShowDeletePostConfirm(true);
+  };
+
+  const confirmDeletePost = () => {
+    setShowDeletePostConfirm(false);
     onPostDelete?.(id);
+  };
+
+  const cancelDeletePost = () => {
+    setShowDeletePostConfirm(false);
   };
 
   
@@ -779,6 +820,35 @@ const postOwnerMenuPortal =
             Delete
           </button>
         )}
+      </div>,
+      document.body
+    );
+
+  const deletePostConfirmPortal =
+    showDeletePostConfirm &&
+    typeof document !== 'undefined' &&
+    createPortal(
+      <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/35 p-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <h3 className="text-lg font-semibold text-gray-900">Are you sure?</h3>
+          <p className="mt-2 text-sm text-gray-600">Delete this post? This cannot be undone.</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelDeletePost}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeletePost}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
       </div>,
       document.body
     );
@@ -830,97 +900,142 @@ const postOwnerMenuPortal =
     );
   };
 
+  const openPostThread = () => {
+    if (variant !== 'classroom') return;
+    if (onViewAllComments) {
+      onViewAllComments();
+      return;
+    }
+    onComment?.();
+  };
+
+  const handlePostCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('button, input, textarea, a, [role="menu"], [role="menuitem"]')) {
+      return;
+    }
+    openPostThread();
+  };
+
+  const handlePostCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, input, textarea, a, [role="menu"], [role="menuitem"]')) {
+      return;
+    }
+    event.preventDefault();
+    openPostThread();
+  };
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div
+      className="overflow-visible rounded-xl border border-gray-100 bg-white transition hover:shadow-lg"
+      onClick={handlePostCardClick}
+      onKeyDown={handlePostCardKeyDown}
+      role={variant === 'classroom' ? 'button' : undefined}
+      tabIndex={variant === 'classroom' ? 0 : -1}
+      aria-label={variant === 'classroom' ? 'Open post details' : undefined}
+    >
       {postOwnerMenuPortal}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img
-            src={authorAvatar}
-            alt={authorName}
-            className="h-10 w-10 rounded-full object-cover"
-          />
-          <div>
-            <h3 className="font-semibold text-gray-900">{authorName}</h3>
-            <p className="text-xs text-gray-500">{timestamp}</p>
+      {deletePostConfirmPortal}
+      <div className="px-4 py-3 sm:px-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-1 items-start gap-3">
+            <img
+              src={postAvatarSrc}
+              alt={authorName}
+              onError={(event) => {
+                const target = event.currentTarget;
+                const fallback = buildAvatarFallback(authorName);
+                if (target.src !== fallback) {
+                  target.src = fallback;
+                }
+              }}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-gray-900">{authorName}</h3>
+              {postTimestampLabel && (
+                <p className="text-sm text-gray-500">{postTimestampLabel}</p>
+              )}
+            </div>
           </div>
+          {showPostOwnerMenu && (
+            <button
+              ref={postMenuTriggerRef}
+              type="button"
+              onClick={openPostMenu}
+              aria-expanded={postMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Post actions"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+          )}
         </div>
-        {showPostOwnerMenu && (
-          <button
-            ref={postMenuTriggerRef}
-            type="button"
-            onClick={openPostMenu}
-            aria-expanded={postMenuOpen}
-            aria-haspopup="menu"
-            aria-label="Post actions"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-          >
-            <MoreHorizontal size={20} />
-          </button>
+      </div>
+
+      <div className="px-4 pb-3 sm:px-6">
+        {isEditingPost
+ && onPostUpdate && !onRequestPostEdit ? (
+          <div className="space-y-2">
+            <textarea
+              value={editPostContent}
+              onChange={(e) => setEditPostContent(e.target.value)}
+              rows={5}
+              className="w-full rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-800 outline-none focus:border-blue-400"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleSavePostEdit}
+                disabled={!validateThreadContent(editPostContent).isValid}
+                className="rounded-xl bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditingPost(false);
+                  setEditPostContent(content);
+                }}
+                className="rounded-xl border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{content}</p>
+        )}
+
+        {attachments.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {attachments.map((attachment) => (
+              <div key={attachment.id}>
+                {attachment.url ? (
+                  <img
+                    src={attachment.url}
+                    alt={attachment.name || 'attachment'}
+                    className="h-56 w-full rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-2xl">📎</div>
+                    <div className="flex-1 truncate">
+                      <p className="truncate text-sm font-medium text-gray-700">{attachment.name}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-  
-{isEditingPost
- && onPostUpdate && !onRequestPostEdit ? (
-        <div className="mb-3 space-y-2">
-          <textarea
-            value={editPostContent}
-            onChange={(e) => setEditPostContent(e.target.value)}
-            rows={5}
-            className="w-full rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800 outline-none focus:border-blue-400"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleSavePostEdit}
-              disabled={!validateThreadContent(editPostContent).isValid}
-              className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsEditingPost(false);
-                setEditPostContent(content);
-              }}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="mb-3 text-gray-800">{content}</p>
-      )}
-
-      {attachments.length > 0 && (
-        <div className="mb-3 grid grid-cols-2 gap-2">
-          {attachments.map((attachment) => (
-            <div key={attachment.id}>
-              {attachment.type === 'image' ? (
-                <img
-                  src={attachment.url}
-                  alt="attachment"
-                  className="h-40 w-full rounded-lg object-cover"
-                />
-              ) : (
-                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div className="text-2xl">📎</div>
-                  <div className="flex-1 truncate">
-                    <p className="truncate text-sm font-medium text-gray-700">{attachment.name}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="mb-3 border-t border-gray-100" />
-
-      <div className="mb-3 flex items-center justify-between">
+      <div className="border-t border-gray-100 px-4 py-3 sm:px-6">
         {variant === 'classroom' ? (
           <div className="flex items-center gap-6">
             <button
@@ -929,7 +1044,7 @@ const postOwnerMenuPortal =
               className={`flex items-center gap-2 transition ${isLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}
             >
               <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
-              <span className="text-sm">{likeCount}</span>
+              {likeCount > 0 && <span className="text-sm">{likeCount}</span>}
             </button>
             <button
               type="button"
@@ -937,7 +1052,9 @@ const postOwnerMenuPortal =
               className="flex items-center gap-2 text-gray-600 transition hover:text-blue-500"
             >
               <MessageCircle size={18} />
-              <span className="text-sm">{localComments.length}</span>
+              {displayedCommentsCount > 0 && (
+                <span className="text-sm">{displayedCommentsCount}</span>
+              )}
             </button>
           </div>
         ) : (
@@ -948,7 +1065,7 @@ const postOwnerMenuPortal =
               className={`flex items-center gap-2 transition ${isLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'}`}
             >
               <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
-              <span className="text-sm">{likeCount}</span>
+              {likeCount > 0 && <span className="text-sm">{likeCount}</span>}
             </button>
             <button
               type="button"
@@ -956,7 +1073,7 @@ const postOwnerMenuPortal =
               className="flex items-center gap-2 text-gray-600 transition hover:text-blue-500"
             >
               <MessageCircle size={18} />
-              <span className="text-sm">{localComments.length}</span>
+              {displayedCommentsCount > 0 && <span className="text-sm">{displayedCommentsCount}</span>}
             </button>
             <button
               type="button"
@@ -979,7 +1096,7 @@ const postOwnerMenuPortal =
       </div>
 
       {localComments.length > 0 && (
-        <div className="border-t border-gray-100 pt-3">
+        <div className="border-t border-gray-100 px-4 pt-3 sm:px-6">
           {hasMoreComments && (
             <button
               type="button"
@@ -999,28 +1116,30 @@ const postOwnerMenuPortal =
         </div>
       )}
 
-      <div className="mt-3 border-t border-gray-100 pt-3">
-        <div className="flex items-center gap-2">
-          <img
-            src="https://api.dicebear.com/7.x/adventurer/svg?seed=You"
-            alt="Your avatar"
-            className="h-8 w-8 rounded-full"
-          />
-          <input
-            type="text"
-            placeholder="Write a comment..."
-            value={commentInput}
-            onChange={(e) => setCommentInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleAddComment();
-              }
-            }}
-            className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm placeholder-gray-500 focus:border-blue-400 focus:outline-none"
-          />
+      {variant !== 'classroom' && (
+        <div className="mt-3 border-t border-gray-100 px-4 pt-3 pb-4 sm:px-6">
+          <div className="flex items-center gap-2">
+            <img
+              src={buildAvatarFallback('You')}
+              alt="Your avatar"
+              className="h-8 w-8 rounded-full"
+            />
+            <input
+              type="text"
+              placeholder="Write a comment..."
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddComment();
+                }
+              }}
+              className="flex-1 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm placeholder-gray-500 focus:border-blue-400 focus:outline-none"
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

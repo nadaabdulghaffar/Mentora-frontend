@@ -21,6 +21,7 @@ interface Props {
   material: LocalMaterial | null;
   phaseId: string;
   topicId: string;
+  readOnly?: boolean;
 }
 
 export default function EditMaterialModal({
@@ -29,6 +30,7 @@ export default function EditMaterialModal({
   material,
   phaseId,
   topicId,
+  readOnly = false,
 }: Props) {
   const updateMaterial = useRoadmapBuilderStore(
     (state) => state.updateMaterial
@@ -38,13 +40,25 @@ export default function EditMaterialModal({
   const [url, setUrl] = useState("");
   const [materialType, setMaterialType] =
     useState<MaterialType>("article");
-  const [saving, setSaving] = useState(false);
+  const [linkError, setLinkError] = useState("");
+
+  const [originalTitle, setOriginalTitle] = useState("");
+  const [originalUrl, setOriginalUrl] = useState("");
+  const [originalMaterialType, setOriginalMaterialType] =
+    useState<MaterialType>("article");
 
   useEffect(() => {
     if (!material) return;
+
     setTitle(material.title);
     setUrl(material.url || "");
     setMaterialType(material.materialType);
+
+    setOriginalTitle(material.title);
+    setOriginalUrl(material.url || "");
+    setOriginalMaterialType(material.materialType);
+
+    setLinkError("");
   }, [material]);
 
   const getIcon = () => {
@@ -60,32 +74,83 @@ export default function EditMaterialModal({
     }
   };
 
-  const handleSave = async () => {
-    if (!material || !title.trim()) return;
+  const handleSaveChanges = async () => {
+    if (!material) return;
 
-    setSaving(true);
+    if (!title.trim()) return;
+
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl) {
+      setLinkError("Link is required");
+      return;
+    }
+
+    try {
+      const parsedUrl = new URL(trimmedUrl);
+
+      if (
+        parsedUrl.protocol !== "http:" &&
+        parsedUrl.protocol !== "https:"
+      ) {
+        setLinkError(
+          "Please enter a valid link starting with http:// or https://"
+        );
+        return;
+      }
+    } catch {
+      setLinkError(
+        "Please enter a valid link starting with http:// or https://"
+      );
+      return;
+    }
+
+    setLinkError("");
+
     await updateMaterial(
       phaseId,
       topicId,
       material._localId,
-      { title, url, materialType }
+      {
+        title: title.trim(),
+        url: trimmedUrl,
+        materialType,
+      }
     );
-    setSaving(false);
-    const hadError = !!useRoadmapBuilderStore.getState().error;
-    if (!hadError) onClose();
+
+    onClose();
+  };
+
+  const revertAndClose = async () => {
+    if (material) {
+      await updateMaterial(
+        phaseId,
+        topicId,
+        material._localId,
+        {
+          title: originalTitle,
+          url: originalUrl,
+          materialType: originalMaterialType,
+        }
+      );
+    }
+
+    onClose();
   };
 
   return (
-    <ModalBase
-      open={open}
-      onClose={onClose}
-      title="Edit Material"
-      maxWidth="max-w-[680px]"
-    >
+   <ModalBase
+  open={open}
+  onClose={onClose}
+  title={
+    readOnly
+      ? "Material Details"
+      : "Edit Material"
+  }
+  maxWidth="max-w-[680px]"
+>
       <div className="space-y-5">
-        {/* type + title */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* type */}
           <div>
             <label
               className="
@@ -100,10 +165,13 @@ export default function EditMaterialModal({
 
             <div className="relative">
               <select
-                value={materialType}
-                onChange={(e) =>
-                  setMaterialType(e.target.value as MaterialType)
-                }
+                  disabled={readOnly}
+                 value={materialType}
+                 onChange={(e) =>
+                  setMaterialType(
+                   e.target.value as MaterialType
+                         )
+                             }
                 className="
                   w-full h-12 rounded-2xl
                   bg-[#F3F5F9]
@@ -128,7 +196,6 @@ export default function EditMaterialModal({
             </div>
           </div>
 
-          {/* title */}
           <div className="md:col-span-2">
             <label
               className="
@@ -142,6 +209,8 @@ export default function EditMaterialModal({
             </label>
 
             <input
+            
+              disabled={readOnly}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Material title"
@@ -154,60 +223,107 @@ export default function EditMaterialModal({
           </div>
         </div>
 
-        {/* url */}
-        <div>
-          <label
-            className="
-              block text-xs font-bold
-              tracking-wide
-              text-[#475467]
-              mb-2
-            "
-          >
-            LINK
-          </label>
+<div>
+  <label
+    className="
+      block text-xs font-bold
+      tracking-wide
+      text-[#475467]
+      mb-2
+    "
+  >
+    LINK
+  </label>
 
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://..."
-            className="
-              w-full h-12 rounded-2xl
-              bg-[#F3F5F9]
-              px-4 outline-none
-            "
-          />
-        </div>
+  {readOnly ? (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="
+        block
+        w-full
+        rounded-2xl
+        bg-[#F3F5F9]
+        px-4 py-3
+        text-primary
+        underline
+        break-all
+      "
+    >
+      {url}
+    </a>
+  ) : (
+    <input
+      value={url}
+      onChange={(e) => {
+        setUrl(e.target.value);
+        setLinkError("");
+      }}
+      placeholder="https://..."
+      type="url"
+      className="
+        w-full h-12 rounded-2xl
+        bg-[#F3F5F9]
+        px-4 outline-none
+      "
+    />
+  )}
 
-        {/* footer */}
-        <div className="flex justify-end gap-4 pt-2">
-          <button
-            onClick={onClose}
-            className="
-              h-11 px-6 rounded-2xl
-              text-[#344054]
-              font-medium
-            "
-          >
-            Cancel
-          </button>
+  {linkError && (
+    <p className="mt-2 text-sm font-medium text-red-600">
+      {linkError}
+    </p>
+  )}
+</div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="
-              h-12 px-7 rounded-2xl
-              bg-primary text-white
-              font-semibold
-              shadow-lg shadow-primary/20
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-            "
-          >
-            {saving ? "Saving…" : "Save Changes"}
-          </button>
-        </div>
-      </div>
-    </ModalBase>
+       <div className="flex justify-end gap-4 pt-2">
+
+  {readOnly ? (
+    <button
+      onClick={onClose}
+      className="
+        h-11 px-6 rounded-2xl
+        bg-primary
+        text-white
+        font-medium
+      "
+    >
+      Close
+    </button>
+  ) : (
+    <>
+      <button
+        onClick={() => {
+          void revertAndClose();
+        }}
+        className="
+          h-11 px-6 rounded-2xl
+          text-[#344054]
+          font-medium
+        "
+      >
+        Cancel
+      </button>
+
+      <button
+        onClick={() => {
+          void handleSaveChanges();
+        }}
+        className="
+          h-11 px-6 rounded-2xl
+          bg-primary
+          text-white
+          font-medium
+        "
+      >
+        Save Changes
+      </button>
+    </>
+  )}
+
+</div> 
+</div>  {/* space-y-5 */}
+</ModalBase>
   );
 }

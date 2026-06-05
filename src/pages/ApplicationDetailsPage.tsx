@@ -4,30 +4,31 @@ import {
   Clock,
   Heart,
   MessageSquare,
-  Bookmark,
   Share2,
     Link,
 
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import api from "../config/api";
 
 import Layout from "../shared/components/Layout";
 import ApplyQuestionsModal
 from "../components/application/ApplyQuestionsModal";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getProgramView,
     toggleProgramLike,
-  toggleProgramSave,
     getProgramQuestions,
   applyToProgram,
     withdrawApplication,
     getProgramComments,
 addProgramComment,
+  canApply,
 
  } from "../services/programService";
+import { toast } from 'react-hot-toast';
 
 import type { ProgramViewDto
   
@@ -58,6 +59,20 @@ const [program, setProgram] =
 const [loading, setLoading] =
   useState(true);
 
+  const resolveImageUrl = (url?: string | null) => {
+    if (!url) return undefined;
+    // already absolute
+    if (/^https?:\/\//i.test(url)) return url;
+    // derive host base from axios instance
+    try {
+      const base = String(api.defaults.baseURL || "").replace(/\/api\/?$/, "");
+      if (!base) return url;
+      return url.startsWith("/") ? base + url : base + "/" + url;
+    } catch {
+      return url;
+    }
+  };
+
 const [error, setError] =
   useState<string | null>(null);
 
@@ -74,6 +89,20 @@ const [submittingApplication, setSubmittingApplication] =
   useState(false);
   const [showLevelMismatchModal, setShowLevelMismatchModal] =
   useState(false);
+const [isCheckingCanApply, setIsCheckingCanApply] =
+  useState(false);
+const canApplyRequestRef = useRef(0);
+const openFlowRequestRef = useRef(0);
+const [eligibilityGate, setEligibilityGate] = useState<{
+  programId: number | null;
+  approved: boolean;
+  checkedAt: number;
+}>({
+  programId: null,
+  approved: false,
+  checkedAt: 0,
+});
+const ELIGIBILITY_CACHE_TTL_MS = 15_000;
 
   useEffect(() => {
   
@@ -117,6 +146,16 @@ console.log(data.roadmap);
   loadProgram();
 }, [id]);
 
+useEffect(() => {
+  // Invalidate stale modal/gate state on program route changes.
+  setShowApplyModal(false);
+  setQuestions([]);
+  setAnswers({});
+  setEligibilityGate({ programId: null, approved: false, checkedAt: 0 });
+  canApplyRequestRef.current += 1;
+  openFlowRequestRef.current += 1;
+}, [id]);
+
 
   const handleToggleLike = async () => {
   if (!program) return;
@@ -153,49 +192,54 @@ console.log(data.roadmap);
     });
   }
 };
-const handleToggleSave = async () => {
-  if (!program) return;
-
-  const previousSaved =
-    program.isSaved;
-
-  setProgram({
-    ...program,
-    isSaved: !program.isSaved,
-  });
-
-  try {
-    await toggleProgramSave(
-      program.programId
-    );
-  } catch (error) {
-    console.error(error);
-
-    // rollback
-    setProgram({
-      ...program,
-      isSaved: previousSaved,
-    });
-  }
-};
 
 const handleDirectApply = async () => {
   if (!program) return;
 
+  const approved = await verifyCanApplyStrict(program.programId, { allowCache: true });
+  if (!approved) {
+    setShowApplyModal(false);
+    return;
+  }
+
   try {
     setSubmittingApplication(true);
 
-    await applyToProgram(
+    const res: any = await applyToProgram(
       program.programId,
       {
         answers: [],
       }
     );
 
+    // Backend may return { success: false, data: false } with 200 OK.
+    if (res && res.success === false && (res.data === false || res.data === null)) {
+      console.debug("applyToProgram response (not qualified):", res);
+      // show toast in addition to modal for visibility
+      try {
+        const msg = typeof res.message === 'string' && res.message.length > 0 ? res.message : "You are not qualified for this program.";
+        toast.error(msg);
+      } catch (e) {
+        /* ignore */
+      }
+      setShowLevelMismatchModal(true);
+      return;
+    }
+
     setProgram({
       ...program,
       isApplied: true,
     });
+
+    try {
+      // show success toast (user requested exact wording)
+      const msg = 'your application has sent sucessfuly';
+      console.log('about to call toast.success', msg);
+      toast.success(msg);
+      // fallback to plain toast in case success style is hidden
+      try { toast(msg); } catch {}
+      console.log('called toast.success');
+    } catch (e) { console.warn('toast failed', e); }
 
   } catch (error: any) {
   console.error(error);
@@ -212,53 +256,149 @@ const handleDirectApply = async () => {
   }
 };
 
-const handleSubmitApplication =
-  async () => {
+  // Helper to handle API bodies that indicate non-qualification
+  const handleNotQualifiedBody = (body: any) => {
+    if (!body) return false;
+    const msg = typeof body.message === 'string' && body.message.length > 0 ? body.message : "You are not qualified for this program.";
+    const indicatesLevelMismatch = /not\s+qualified|fit\s+your\s+level|fit\s+your\s+current\s+skills/i.test(msg);
+    if (body.data === false || body.data === null || indicatesLevelMismatch) {
+      try {
+        toast.error(msg);
+      } catch (e) {
+        // fallback: avoid showing raw HTML from server in an alert
+        console.warn("Could not show toast, message:", msg);
+      }
+      setShowLevelMismatchModal(true);
+      return true;
+    }
+    return false;
+  };
 
-    if (!program) return;
+  const verifyCanApplyStrict = async (
+    programId: number,
+    options?: { allowCache?: boolean }
+  ): Promise<boolean> => {
+    const allowCache = options?.allowCache ?? false;
+    const now = Date.now();
+
+    if (
+      allowCache &&
+      eligibilityGate.programId === programId &&
+      eligibilityGate.approved &&
+      now - eligibilityGate.checkedAt <= ELIGIBILITY_CACHE_TTL_MS
+    ) {
+      return true;
+    }
+
+    const requestId = ++canApplyRequestRef.current;
+    setIsCheckingCanApply(true);
 
     try {
-      setSubmittingApplication(true);
+      const can = await canApply(programId);
 
-      const formattedAnswers =
-        questions.map((question) => ({
-          questionId:
-            question.programQuestionId,
-
-          questionAnswer:
-            answers[
-              question.programQuestionId
-            ] || "",
-        }));
-
-      await applyToProgram(
-        program.programId,
-        {
-          answers: formattedAnswers,
-        }
-      );
-
-      setProgram({
-        ...program,
-        isApplied: true,
-      });
-
-      setShowApplyModal(false);
-
-    } catch (error: any) {
-
-      console.error(error);
-
-      if (
-        error?.response?.data?.message ===
-        "This Program may not fit your Level"
-      ) {
-        setShowLevelMismatchModal(true);
+      if (requestId !== canApplyRequestRef.current) {
+        return false;
       }
 
+      const approved = !!can && can.success === true && can.data === true;
+      if (!approved) {
+        setEligibilityGate({ programId, approved: false, checkedAt: Date.now() });
+        handleNotQualifiedBody(can);
+        return false;
+      }
+
+      setEligibilityGate({ programId, approved: true, checkedAt: Date.now() });
+      return true;
+    } catch (error: any) {
+      if (requestId !== canApplyRequestRef.current) {
+        return false;
+      }
+      setEligibilityGate({ programId, approved: false, checkedAt: Date.now() });
+      // Build a more detailed error message for debugging
+      const status = error?.response?.status;
+      const body = error?.response?.data;
+      const shortMessage = String(
+        body?.message ||
+          error?.message ||
+          "Could not verify eligibility right now. Please try again."
+      );
+
+      let detailMsg = `Eligibility check failed${status ? ` (status ${status})` : ""}: ${shortMessage}` + (body ? ` | body: ${JSON.stringify(body)}` : "");
+
+      // Friendly message for 403 Forbidden (user not in Mentee role)
+      if (status === 403) {
+        detailMsg = "You are not allowed to apply to programs. Please make sure your account is registered as a Mentee and you have completed your mentee profile.";
+      }
+
+      // log full error to console for developer debugging
+      console.error("verifyCanApplyStrict error:", error);
+      try {
+        toast.error(detailMsg);
+      } catch {
+        console.warn('Error showing toast', detailMsg);
+      }
+
+      return false;
     } finally {
-      setSubmittingApplication(false);
+      if (requestId === canApplyRequestRef.current) {
+        setIsCheckingCanApply(false);
+      }
     }
+  };
+
+const handleSubmitApplication = async () => {
+  if (!program) return;
+
+  const approved = await verifyCanApplyStrict(program.programId, { allowCache: true });
+  if (!approved) {
+    setShowApplyModal(false);
+    return;
+  }
+
+  try {
+    setSubmittingApplication(true);
+
+    const formattedAnswers = questions.map((question) => ({
+      questionId: question.programQuestionId,
+      questionAnswer: answers[question.programQuestionId] || "",
+    }));
+
+    const res: any = await applyToProgram(program.programId, { answers: formattedAnswers });
+
+    if (res && res.success === false && (res.data === false || res.data === null)) {
+      console.debug("applyToProgram (questions) response (not qualified):", res);
+      try {
+        const msg = typeof res.message === 'string' && res.message.length > 0 ? res.message : "You are not qualified for this program.";
+        toast.error(msg);
+      } catch (e) {
+        console.warn('Error showing toast', e);
+      }
+      setShowLevelMismatchModal(true);
+      return;
+    }
+
+    setProgram({ ...program, isApplied: true });
+    setShowApplyModal(false);
+
+    try {
+      toast.success('your application has sent sucessfuly');
+    } catch (e) {
+      console.warn('toast failed', e);
+    }
+
+  } catch (error: any) {
+    console.error(error);
+    if (handleNotQualifiedBody(error?.response?.data)) return;
+    if (error?.response?.data?.message) {
+      try {
+        toast.error(String(error.response.data.message));
+      } catch (e) {
+        console.warn('Error showing toast, message:', String(error?.response?.data?.message));
+      }
+    }
+  } finally {
+    setSubmittingApplication(false);
+  }
 };
 
 const handleWithdrawApplication =
@@ -278,6 +418,14 @@ const handleWithdrawApplication =
         isApplied: false,
       });
 
+      try {
+        const msg = 'Application withdrawn successfully';
+        console.log('about to call toast.success (withdraw)', msg);
+        toast.success(msg);
+        try { toast(msg); } catch {}
+        console.log('called toast.success (withdraw)');
+      } catch (e) { console.warn('toast failed', e); }
+
     } catch (error) {
       console.error(error);
     } finally {
@@ -286,24 +434,33 @@ const handleWithdrawApplication =
 };
 
 const handleOpenApplyModal = async () => {
-  if (!program) return;
+  if (!program || submittingApplication || isCheckingCanApply) return;
+
+  // Strict gate: close/reset modal state before any new eligibility attempt.
+  setShowApplyModal(false);
+  setQuestions([]);
+  setAnswers({});
+
+  const flowId = ++openFlowRequestRef.current;
 
   try {
-    const data =
-      await getProgramQuestions(
-        program.programId
-      );
+    // Single source of truth gate: must pass before any modal/open action.
+    const approved = await verifyCanApplyStrict(program.programId, { allowCache: false });
+    if (flowId !== openFlowRequestRef.current) return;
+    if (!approved) {
+      return;
+    }
+
+    const data = await getProgramQuestions(program.programId);
+    if (flowId !== openFlowRequestRef.current) return;
 
     if (!data || data.length === 0) {
-  await handleDirectApply();
-  return;
-}
+      await handleDirectApply();
+      return;
+    }
 
-
-
-setQuestions(data);
-
-setShowApplyModal(true);
+    setQuestions(data);
+    setShowApplyModal(true);
   } catch (error) {
     console.error(error);
   }
@@ -416,7 +573,7 @@ if (error || !program) {
 
               <img
 src={
-  program.programImageUrl ||
+  resolveImageUrl(program.programImageUrl) ||
   "https://via.placeholder.com/150"
 }                className="w-24 h-24 rounded-2xl object-cover"
               />
@@ -478,60 +635,10 @@ src={
 {/* ACTIONS */}
 <div className="flex flex-wrap items-center gap-8 text-[15px]">
 
-  {/* LIKE */}
-  <div
-    onClick={handleToggleLike}
-    className={`
-      flex items-center gap-2 cursor-pointer transition
-
-      ${
-        program.isLiked
-          ? "text-red-500"
-          : "text-[#64748B] hover:text-red-500"
-      }
-    `}
-  >
-    <Heart
-      size={20}
-      fill={
-        program.isLiked
-          ? "currentColor"
-          : "none"
-      }
-    />
-
-    {program.likesCount}
-  </div>
-
-
 
 
   {/* SAVE */}
-  <div
-    onClick={handleToggleSave}
-    className={`
-      flex items-center gap-2 cursor-pointer transition
-
-      ${
-        program.isSaved
-          ? "text-[#6D5DD3]"
-          : "text-[#64748B] hover:text-[#6D5DD3]"
-      }
-    `}
-  >
-    <Bookmark
-      size={20}
-      fill={
-        program.isSaved
-          ? "currentColor"
-          : "none"
-      }
-    />
-
-    {program.isSaved
-      ? "Saved"
-      : "Save"}
-  </div>
+  {/* Save removed per request */}
 {/* SHARE */}
 <div className="relative">
 
@@ -664,7 +771,7 @@ src={
       ? handleWithdrawApplication
       : handleOpenApplyModal
   }
-  disabled={submittingApplication}
+  disabled={submittingApplication || isCheckingCanApply}
   className={`
     px-8 py-3 rounded-2xl font-medium text-[15px]
     h-fit self-start sm:self-center transition
@@ -676,15 +783,17 @@ src={
     }
 
     ${
-      submittingApplication
+      submittingApplication || isCheckingCanApply
         ? "opacity-60 cursor-not-allowed"
         : ""
     }
   `}
 >
-  {submittingApplication
+  {submittingApplication || isCheckingCanApply
     ? program.isApplied
       ? "Cancelling..."
+      : isCheckingCanApply
+      ? "Checking..."
       : "Applying..."
     : program.isApplied
     ? "Withdraw Application"
@@ -768,7 +877,7 @@ src={
     
     <img
       src={
-        program.profilePictureUrl ||
+        resolveImageUrl(program.profilePictureUrl) ||
         "https://via.placeholder.com/100"
       }
       className="w-14 h-14 rounded-full object-cover shrink-0"
@@ -970,7 +1079,13 @@ navigate("/search-mentorship?tab=programs");
 
  {/* APPLY MODAL */}
     <ApplyQuestionsModal
-      open={showApplyModal}
+      open={
+        showApplyModal &&
+        !!program &&
+        eligibilityGate.programId === program.programId &&
+        eligibilityGate.approved &&
+        !isCheckingCanApply
+      }
       onClose={() =>
         setShowApplyModal(false)
       }
@@ -978,7 +1093,7 @@ navigate("/search-mentorship?tab=programs");
       answers={answers}
       setAnswers={setAnswers}
       onSubmit={handleSubmitApplication}
-      submitting={submittingApplication}
+      submitting={submittingApplication || isCheckingCanApply}
     />
 
     </Layout>

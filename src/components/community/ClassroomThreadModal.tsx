@@ -37,6 +37,20 @@ interface ClassroomThread {
   authorRole?: string;
 }
 
+const resolveClassroomAvatar = (url?: string | null, fullName?: string) => {
+  const raw = (url ?? '').trim();
+  if (raw) {
+    const normalized = raw.replace(/\\/g, '/');
+    if (/^https?:\/\//i.test(normalized)) {
+      return normalized;
+    }
+    const apiBase = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
+    return `${apiBase}${normalized.startsWith('/') ? normalized : `/${normalized}`}`;
+  }
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}`;
+};
+
 function modalOwnerCanEdit(
   uid: string | undefined,
   t: ClassroomThread,
@@ -109,6 +123,8 @@ interface ThreadModalProps {
 
   currentUserId?: string;
 
+  currentUserAvatar?: string;
+
   programId: number;
 
   currentUserRole?:
@@ -131,16 +147,37 @@ export const ClassroomThreadModal: React.FC<ThreadModalProps> = ({
   onThreadDelete,
   isLoadingComment = false,
   currentUserId = 'current-user',
+  currentUserAvatar,
   programId ,
   
 }
 ) => {
+  const formatClassroomTimestamp = (timestamp: string): string => {
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) {
+      return timestamp;
+    }
+    return parsed.toLocaleString('ar-EG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  };
+
   const [commentInput, setCommentInput] = useState('');
 
 const [localComments, setLocalComments] =
   useState<ThreadComment[]>(
     thread.comments || []
   );
+
+  const getCommentsTotal = useCallback((comments: ThreadComment[]): number => {
+    return comments.reduce((total, comment) => {
+      const replies = comment.replies ?? [];
+      return total + 1 + getCommentsTotal(replies);
+    }, 0);
+  }, []);
+
+  const totalCommentsCount = getCommentsTotal(localComments);
 
 
   const [threadMenuOpen, setThreadMenuOpen] = useState(false);
@@ -239,11 +276,10 @@ useEffect(() => {
             comment.author.fullName,
 
           authorAvatar:
-            comment.author.profilePictureUrl ||
-
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            resolveClassroomAvatar(
+              comment.author.profilePictureUrl,
               comment.author.fullName
-            )}`,
+            ),
 
           content:
             comment.content,
@@ -436,30 +472,6 @@ const handleLocalDelete =
     <Modal isOpen={isOpen} onClose={onClose}>
       {threadOwnerMenuPortal}
       <div className="w-full max-w-full max-h-[90vh] overflow-y-auto">
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
-          {showThreadOwnerMenu && (
-            <button
-              ref={threadMenuTriggerRef}
-              type="button"
-              onClick={openThreadMenu}
-              aria-expanded={threadMenuOpen}
-              aria-haspopup="menu"
-              aria-label="Post actions"
-              className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            >
-              <MoreHorizontal size={22} />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Close modal"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
         {/* Thread Content */}
         <div className="mb-6">
           {/* Author Info */}
@@ -468,6 +480,12 @@ const handleLocalDelete =
               src={thread.authorAvatar}
               alt={thread.authorName}
               className="h-12 w-12 rounded-full object-cover"
+              onError={(event) => {
+                const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.authorName || 'User')}`;
+                if (event.currentTarget.src !== fallback) {
+                  event.currentTarget.src = fallback;
+                }
+              }}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -478,8 +496,12 @@ const handleLocalDelete =
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500">{formatTimestamp(thread.timestamp)}</p>
+              <p className="text-sm text-gray-500">{formatClassroomTimestamp(thread.timestamp)}</p>
             </div>
+          </div>
+
+          <div className="whitespace-pre-wrap text-base leading-relaxed text-gray-800">
+            {thread.content?.trim() || 'No post content'}
           </div>
 
 
@@ -507,7 +529,7 @@ const handleLocalDelete =
             : 'none'
         }
       />
-      <span>{thread.likes}</span>
+      {thread.likes > 0 && <span>{thread.likes}</span>}
     </button>
 
     <button
@@ -525,7 +547,7 @@ const handleLocalDelete =
       className="flex items-center gap-1.5 text-gray-600 transition hover:text-blue-600"
     >
       <MessageCircle size={16} />
-      <span>{thread.commentCount}</span>
+      {totalCommentsCount > 0 && <span>{totalCommentsCount}</span>}
     </button>
 
   </div>
@@ -538,7 +560,7 @@ const handleLocalDelete =
         <div id="thread-comments">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900">
-Comments ({localComments.length})
+Comments{totalCommentsCount > 0 ? ` (${totalCommentsCount})` : ''}
             </h3>
           </div>
 
@@ -546,9 +568,15 @@ Comments ({localComments.length})
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-3">
               <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser"
+                src={resolveClassroomAvatar(currentUserAvatar, 'You')}
                 alt="Your avatar"
                 className="h-8 w-8 rounded-full object-cover"
+                onError={(event) => {
+                  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent('You')}`;
+                  if (event.currentTarget.src !== fallback) {
+                    event.currentTarget.src = fallback;
+                  }
+                }}
               />
               <div>
                 <p className="text-sm font-medium text-gray-900">You</p>
@@ -594,7 +622,9 @@ Comments ({localComments.length})
                  onEdit={handleLocalEdit}
 onDelete={handleLocalDelete}
                   currentUserId={currentUserId}
-                  variant="community"
+                  variant="classroom"
+                  showCommentLike={false}
+                  showReplyAction={false}
                 />
               ))}
             </div>

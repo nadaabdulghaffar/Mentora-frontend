@@ -182,6 +182,8 @@ const MessagesPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesContainerRef =
+  useRef<HTMLDivElement>(null);
   const activeContactIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef(currentUserId);
   const handleIncomingMessageRef = useRef<
@@ -195,6 +197,18 @@ const MessagesPage = () => {
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
+
+  useEffect(() => {
+  const container =
+    messagesContainerRef.current;
+
+  if (!container) return;
+
+  container.scrollTo({
+    top: container.scrollHeight,
+    behavior: "smooth",
+  });
+}, [activeMessages]);
 
   const loadActiveMessages = useCallback(
     async (conversationId: string, options?: { showLoading?: boolean }) => {
@@ -611,7 +625,7 @@ const MessagesPage = () => {
             </div>
           </aside>
 
-          <section className="flex min-w-0 flex-col">
+          <section className="flex min-w-0 min-h-0 flex-col">
             {activeContact ? (
               <>
                 <header className="flex items-center border-b border-[#E2E5EE] bg-[#F8F9FD] px-6 py-4">
@@ -632,7 +646,15 @@ const MessagesPage = () => {
                   </div>
                 </header>
 
-                <div className="flex-1 space-y-4 overflow-y-auto px-6 py-7">
+                <div
+  ref={messagesContainerRef}
+  className="
+    flex-1
+    space-y-4
+    overflow-y-auto
+    px-6 py-7
+  "
+>
                   {isLoadingMessages ? (
                     <p className="text-center text-sm text-[#878EA2]">Loading messages...</p>
                   ) : activeMessages.length === 0 ? (

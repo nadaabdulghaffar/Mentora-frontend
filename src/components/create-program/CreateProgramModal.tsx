@@ -6,6 +6,7 @@ FILE: src/components/create-program/CreateProgramModal.tsx
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { Formik } from "formik";
+import { toast } from "react-hot-toast";
 
 import BaseModal from "../modals/BaseModal";
 
@@ -39,7 +40,11 @@ type Props = {
     message?: string,
     updatedProgram?: Record<string, unknown>
   ) => void | Promise<void>;
+  initialStep?: number;
+  isInitialLoading?: boolean;
 };
+
+const PENDING_CREATE_PROGRAM_DRAFT_KEY = "mentora:create-program-draft";
 
 function goToStepWithErrors(errors: any, setStep: (n: number) => void) {
   if (
@@ -84,30 +89,47 @@ function findFirstMcqMissingOptions(
   return -1;
 }
 
-export default function CreateProgramModal({ isOpen, onClose, programId = null, initialValues = null, onSuccess }: Props) {
-  const [step, setStep] = useState(1);
+export default function CreateProgramModal({
+  isOpen,
+  onClose,
+  programId = null,
+  initialValues = null,
+  onSuccess,
+  initialStep = 1,
+  isInitialLoading = false,
+}: Props) {
+
+
+  const [step, setStep] = useState(initialStep);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [currentAction, setCurrentAction] = useState<"draft" | "publish" | null>(null);
+const [currentAction, setCurrentAction] =
+  useState<"draft" | "publish" | null>(null);
+    const [validationStep, setValidationStep] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setSubmitError(null);
+      setValidationStep(null);
     }
   }, [isOpen]);
+
+  const showValidationErrors = validationStep === step;
 
   const progress = (step / 3) * 100;
 
   const nextStep = async (
-    validateForm: () => Promise<Record<string, unknown>>,
-    values: CreateProgramFormData
+    validateForm: () => Promise<Record<string, unknown>>
   ) => {
     const errors = await validateForm();
     if (Object.keys(errors).length > 0) {
+      setValidationStep(step);
       onInvalid(errors);
       return;
     }
     if (step < 3) {
+      setValidationStep(null);
       setStep((prev) => prev + 1);
     }
   };
@@ -122,6 +144,8 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
     resetForm();
     setStep(1);
     setSubmitError(null);
+    setValidationStep(null);
+    sessionStorage.removeItem(PENDING_CREATE_PROGRAM_DRAFT_KEY);
     onClose();
   };
   const runCreateProgram = async (
@@ -155,6 +179,7 @@ export default function CreateProgramModal({ isOpen, onClose, programId = null, 
 
     if (kind === "publish" || (kind === "save" && programId && programId > 0)) {
       if (technologiesSanitized.length === 0) {
+        setValidationStep(2);
         if (rawTechnologies.length > 0) {
           setFieldError(
             "technologies",
@@ -253,6 +278,19 @@ if (data.image) {
         res.message || "Program saved successfully",
         programId && programId > 0 ? updatedProgram : undefined
       );
+      window.dispatchEvent(new Event("mentora:programs-updated"));
+      toast.success(
+        programId && programId > 0
+          ? "Program updated successfully"
+          : kind === "publish"
+            ? "Program published successfully"
+            : "Program draft saved successfully"
+      );
+      resetForm();
+      setStep(1);
+      setSubmitError(null);
+      setValidationStep(null);
+      sessionStorage.removeItem(PENDING_CREATE_PROGRAM_DRAFT_KEY);
       onClose();
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -344,7 +382,6 @@ if (data.image) {
       : step === 2
         ? "Set requirements and expectations for applicants."
         : "Customize application questions.";
-
   const width = step === 1 ? "lg:max-w-5xl" : "lg:max-w-3xl";
   const mergedInitialValues: CreateProgramFormData = {
     domainId: 0,
@@ -371,9 +408,8 @@ if (data.image) {
   return (
     <Formik
       enableReinitialize
-      validateOnChange={false}
-  validateOnBlur={false}
-
+      validateOnBlur={true}
+      validateOnChange={true}
       initialValues={mergedInitialValues}
       validate={async (values) => {
         try {
@@ -406,6 +442,26 @@ if (data.image) {
     >
       {(formik) => {
         const values = formik.values as CreateProgramFormData;
+
+        if (isInitialLoading) {
+          return (
+            <BaseModal
+              isOpen={isOpen}
+              onClose={onClose}
+              onDiscard={() => handleDiscard(formik.resetForm)}
+              title="Edit Mentorship Program"
+              subtitle="Loading saved application data..."
+              width={width}
+              hasChanges={false}
+              footer={null}
+              headerExtra={headerExtra}
+            >
+              <div className="flex min-h-[320px] items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
+              </div>
+            </BaseModal>
+          );
+        }
 
         const hasChanges =
           values.title?.trim().length > 0 ||
@@ -458,7 +514,7 @@ if (data.image) {
                 <button
                   type="button"
                   disabled={isSubmitting}
-                  onClick={() => void nextStep(formik.validateForm, values)}
+                  onClick={() => void nextStep(formik.validateForm)}
                   className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
                 >
                   Next

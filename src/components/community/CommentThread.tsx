@@ -20,6 +20,8 @@ interface CommentThreadProps {
   currentUserId?: string;
   depth?: number;
   variant?: 'community' | 'classroom';
+  showCommentLike?: boolean;
+  showReplyAction?: boolean;
 }
 
 function commentAllowsEdit(currentUserId: string | undefined, c: ThreadComment): boolean {
@@ -51,8 +53,28 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   currentUserId,
   depth = 0,
   variant = 'community',
+  showCommentLike = true,
+  showReplyAction = true,
 }) => {
   const isCommunity = variant === 'community';
+
+  const formatCommentTimestamp = (timestamp: string): string => {
+    if (variant !== 'classroom') {
+      return formatTimestamp(timestamp);
+    }
+
+    const parsed = new Date(timestamp);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return timestamp;
+    }
+
+    return parsed.toLocaleString('ar-EG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  };
+
   const [showReplyInput, setShowReplyInput] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [showReplies, setShowReplies] = useState(false);
@@ -112,7 +134,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
 
   const showEdit = Boolean(onEdit && commentAllowsEdit(currentUserId, comment));
   const showDelete = Boolean(onDelete && commentAllowsDelete(currentUserId, comment));
-  const showOverflowMenu = (showEdit || showDelete) && !isEditing;
+  const showOverflowMenu = variant === 'community' && (showEdit || showDelete) && !isEditing;
 
   const openMenu = () => {
     if (menuOpen) {
@@ -228,6 +250,12 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
           name={comment.authorName}
           alt={comment.authorName}
           className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+          onError={(event) => {
+            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.authorName || 'User')}`;
+            if (event.currentTarget.src !== fallback) {
+              event.currentTarget.src = fallback;
+            }
+          }}
         />
 
         <div className="flex-1 min-w-0">
@@ -246,7 +274,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                 {comment.authorRole}
               </span>
             )}
-            <span className="text-xs text-gray-500">{formatTimestamp(comment.timestamp)}</span>
+            <span className="text-xs text-gray-500">{formatCommentTimestamp(comment.timestamp)}</span>
           </div>
 
           {isEditing ? (
@@ -399,7 +427,9 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                       onDelete={onDelete}
                       currentUserId={currentUserId}
                       depth={depth + 1}
-                      variant={_variant}
+                      variant={variant}
+                      showCommentLike={showCommentLike}
+                      showReplyAction={showReplyAction}
                     />
                   ))}
                   <button

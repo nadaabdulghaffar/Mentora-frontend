@@ -840,6 +840,11 @@ export const getProgramQuestions = async (
   return response.data.data;
 };
 
+export const canApply = async (programId: number) => {
+  const response = await api.get(`/ProgramMentee/${programId}/can-apply`);
+  return response.data as ApiResponse<boolean>;
+};
+
 export const applyToProgram = async (
   programId: number,
   payload: {

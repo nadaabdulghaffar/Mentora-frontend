@@ -256,10 +256,6 @@ export const ExtraProgramCard: React.FC<
         {isMentor && (
           <div className="flex flex-wrap gap-4 text-sm text-[#7D89A3] font-medium mb-3">
             <span>
-              {applicantsCount} Applicants
-            </span>
-
-            <span>
               Deadline: {deadline}
             </span>
           </div>
@@ -433,34 +429,17 @@ export const ExtraProgramCard: React.FC<
                 {primaryButtonText}
               </button>
 
-              <div className="relative">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuOpen(!menuOpen);
-                  }}
-                  className="h-11 w-11 flex items-center justify-center rounded-xl border border-[#E0E4EC] hover:bg-[#F5F7FB]"
-                >
-                  ⋮
-                </button>
-
-                {menuOpen && (
-                  <div
-                    className="absolute right-0 bottom-12 w-48 bg-white border border-[#E0E4EC] rounded-xl shadow-lg z-50"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => {
-                        onCancelApplying?.();
-                        setMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-[#F5F7FB]"
-                    >
-                      Cancel Applying
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={onSecondaryClick ?? onCancelApplying}
+                className={`h-11 px-4 rounded-xl border text-sm font-semibold transition ${
+                  (secondaryButtonText || "").toLowerCase().includes("withdraw")
+                    ? "border-red-200 text-red-600 hover:bg-red-50"
+                    : "border-[#C4CAD7] text-[#2E3547] hover:bg-[#F5F7FB]"
+                }`}
+              >
+                {secondaryButtonText}
+              </button>
             </div>
           )}
 

@@ -1,8 +1,22 @@
-import { Image, Paperclip, Smile, Calendar } from 'lucide-react';
+
+import { Calendar } from 'lucide-react';
 import Feed, { type FeedPostProps } from '../Feed';
+
+type ClassroomUpcomingSessionCard = {
+  title: string;
+  dateLabel: string;
+  timeLabel: string;
+  meetingLink?: string;
+  isJoinable?: boolean;
+};
 
 type ClassroomOverviewSectionProps = {
   isMentor?: boolean;
+  currentUserName?: string;
+  currentUserAvatarUrl?: string;
+  progressPercent?: number;
+  upcomingSession?: ClassroomUpcomingSessionCard | null;
+  activeMissionTitle?: string | null;
   onSubmitTask: () => void;
   onAddPost: () => void;
   onReviewNow?: () => void;
@@ -16,9 +30,6 @@ type ClassroomOverviewSectionProps = {
   onToggleLikePost?: (
     postId: string
   ) => void;
-  onLoadComments?: (
-  postId: string
-) => Promise<void>;
 
 onOpenPostDetails?: (
   post: FeedPostProps
@@ -29,6 +40,11 @@ onOpenPostDetails?: (
 
 const ClassroomOverviewSection = ({
   isMentor = false,
+  currentUserName = 'Designer',
+  currentUserAvatarUrl,
+  progressPercent = 0,
+  upcomingSession = null,
+  activeMissionTitle = null,
   onSubmitTask,
   onAddPost,
   onReviewNow,
@@ -39,27 +55,36 @@ const ClassroomOverviewSection = ({
   onRequestPostEdit,
   onPostDelete,
   onToggleLikePost,
-  onLoadComments,
   onOpenPostDetails,
 }: ClassroomOverviewSectionProps) => {
+  const progressValue = Number.isFinite(progressPercent)
+    ? Math.max(0, Math.min(100, Math.round(progressPercent)))
+    : 0;
+
+  const avatarUrl =
+    currentUserAvatarUrl?.trim() ||
+    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(currentUserName)}`;
+
   return (
     <section className="space-y-5">
       <div>
-        <h1 className="text-3xl font-bold leading-tight text-[#1E2330]">Welcome back, Designer</h1>
-        <p className="text-base text-[#555D71]">Continue your mastery journey in User Experience.</p>
+        <h1 className="text-3xl font-bold leading-tight text-[#1E2330]">
+          Welcome back, {currentUserName}
+        </h1>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-[#E6E9F2] bg-white px-4 py-5">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-[#2C3243]">My Progress</p>
-            <span className="text-sm font-bold text-[#5A49C8]">85%</span>
+            <span className="text-sm font-bold text-[#5A49C8]">{progressValue}%</span>
           </div>
           <div className="mt-4 h-2 rounded-full bg-[#DDE1EB]">
-            <div className="h-2 w-[85%] rounded-full bg-gradient-to-r from-[#6250CB] to-[#21C0BC]" />
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-[#6250CB] to-[#21C0BC]"
+              style={{ width: `${progressValue}%` }}
+            />
           </div>
-          <p className="mt-5 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#6A7286]">Remaining Tasks</p>
-          <p className="text-xl font-semibold leading-none text-[#1E2330]">2 Left</p>
         </div>
 
         <div className="flex min-h-[140px] items-center rounded-2xl border border-[#E6E9F2] bg-white px-4 py-5">
@@ -70,11 +95,24 @@ const ClassroomOverviewSection = ({
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8092]">Upcoming Session</p>
-                <p className="text-lg font-semibold leading-none text-[#242B3B]">Tomorrow, 4:00 PM</p>
-                <p className="mt-1 text-[13px] text-[#7A8092]">Mentorship Circle</p>
+                <p className="text-lg font-semibold leading-none text-[#242B3B]">
+                  {upcomingSession ? `${upcomingSession.dateLabel}, ${upcomingSession.timeLabel}` : 'No upcoming session'}
+                </p>
+                <p className="mt-1 text-[13px] text-[#7A8092]">
+                  {upcomingSession?.title || 'A new session will appear here once it is scheduled.'}
+                </p>
               </div>
             </div>
-            <button type="button" className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm">
+            <button
+              type="button"
+              disabled={!upcomingSession?.isJoinable || !upcomingSession?.meetingLink}
+              onClick={() => {
+                if (upcomingSession?.meetingLink) {
+                  window.open(upcomingSession.meetingLink, '_blank', 'noopener,noreferrer');
+                }
+              }}
+              className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
               Join Call
             </button>
           </div>
@@ -91,7 +129,7 @@ const ClassroomOverviewSection = ({
                   {isMentor ? 'Pending Review' : 'Active Mission'}
                 </p>
                 <p className="text-lg font-semibold leading-none text-[#242B3B]">
-                  {isMentor ? `${pendingReviewCount} submissions` : 'Module 4: User Journey Mapping'}
+                  {isMentor ? `${pendingReviewCount} submissions` : activeMissionTitle || 'No tasks for now'}
                 </p>
               </div>
             </div>
@@ -106,8 +144,9 @@ const ClassroomOverviewSection = ({
             ) : (
               <button
                 type="button"
+                disabled={!activeMissionTitle}
                 onClick={onSubmitTask}
-                className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm"
+                className="h-10 whitespace-nowrap rounded-xl bg-[#5E4BC5] px-5 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Submit Task
               </button>
@@ -119,37 +158,22 @@ const ClassroomOverviewSection = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-2xl font-bold leading-none text-[#1F2432]">Program Feed</p>
-          <div className="flex items-center gap-5 text-base">
-            <button type="button" className="border-b-2 border-[#5E4BC5] pb-1 font-semibold text-[#5E4BC5]">Latest</button>
-            <button type="button" className="pb-1 text-[#4A546A]">Announcement</button>
-          </div>
         </div>
 
         <div className="rounded-2xl border border-[#E6E9F2] bg-white px-6 pt-8 pb-6">
-          <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={onAddPost}
+            className="flex w-full items-center gap-4 rounded-2xl bg-[#EFF1F5] px-4 py-3 text-left transition hover:bg-[#E9ECF2]"
+          >
             <img
-              src="https://api.dicebear.com/7.x/adventurer/svg?seed=Designer"
-              alt="Designer avatar"
+              src={avatarUrl}
+              alt={`${currentUserName} avatar`}
               className="h-10 w-10 rounded-full"
             />
-            <input
-              type="text"
-              placeholder="Share a thought or ask the atelier..."
-              className="h-12 w-full rounded-xl bg-[#EFF1F5] px-4 text-sm text-[#4F5668] outline-none placeholder:text-[#9AA1B1]"
-            />
-          </div>
-          <div className="mt-5 flex items-center justify-between">
-            <div className="flex items-center gap-4 text-[#5B647A]">
-              <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-[#F2F4F8]">
-                <Image size={17} />
-              </button>
-              <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-[#F2F4F8]">
-                <Paperclip size={17} />
-              </button>
-              <button type="button" className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-[#F2F4F8]">
-                <Smile size={17} />
-              </button>
-            </div>
+            <span className="text-sm text-[#9AA1B1]">Share a thought or ask the atelier...</span>
+          </button>
+          <div className="mt-5 flex justify-end">
             <button
               type="button"
               onClick={onAddPost}
@@ -159,6 +183,7 @@ const ClassroomOverviewSection = ({
             </button>
           </div>
         </div>
+
       </div>
 
       <div className="space-y-4">

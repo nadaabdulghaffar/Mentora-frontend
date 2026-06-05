@@ -1,46 +1,70 @@
+import { useEffect, useRef } from "react";
+
 interface QuestionRendererProps {
   question: any;
 
   value: string;
 
   onChange: (value: string) => void;
+
+  // optional validation error message to display
+  error?: string;
+
+  // if true, focus the input when mounted/updated
+  autoFocus?: boolean;
 }
 
 const QuestionRenderer = ({
   question,
   value,
   onChange,
+  error,
+  autoFocus,
 }: QuestionRendererProps) => {
+
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      try { (inputRef.current as HTMLElement).focus(); } catch { }
+    }
+  }, [autoFocus]);
 
   switch (question.answerType) {
 
     // TEXT QUESTION
-    case "Text":
+      case "Text":
+      case "Paragraph":
       return (
-        <textarea
-          rows={4}
-          placeholder="Write your answer here..."
-          value={value}
-          onChange={(e) =>
-            onChange(e.target.value)
-          }
-          className="
-            w-full rounded-2xl
-            border border-[#D0D5DD]
-            px-4 py-3 outline-none
-            focus:ring-2 focus:ring-[#6D5DD3]
-            resize-none
-          "
-        />
+        <div>
+          <textarea
+            ref={inputRef as any}
+            rows={4}
+            placeholder="Write your answer here..."
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={`
+              w-full rounded-2xl
+              border px-4 py-3 outline-none
+              focus:ring-2 focus:ring-[#6D5DD3]
+              resize-none
+              ${error ? "border-red-500" : "border-[#D0D5DD]"}
+            `}
+          />
+          {error && (
+            <p className="text-sm text-red-600 mt-1">{error}</p>
+          )}
+        </div>
       );
 
     // SINGLE CHOICE
     case "SingleChoice":
+    case "TrueFalse":
       return (
-        <div className="space-y-3">
+        <div>
+          <div className="space-y-3">
 
-          {question.options?.map(
-            (option: string) => (
+            {question.options?.map((option: string) => (
 
               <label
                 key={option}
@@ -50,22 +74,20 @@ const QuestionRenderer = ({
                 "
               >
                 <input
+                  ref={inputRef as any}
                   type="radio"
                   name={`question-${question.programQuestionId}`}
                   checked={value === option}
-                  onChange={() =>
-                    onChange(option)
-                  }
+                  onChange={() => onChange(option)}
                 />
 
-                <span>
-                  {option}
-                </span>
+                <span>{option}</span>
 
               </label>
-            )
-          )}
+            ))}
 
+          </div>
+          {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
         </div>
       );
 
@@ -78,13 +100,12 @@ const QuestionRenderer = ({
           : [];
 
       return (
-        <div className="space-y-3">
+        <div>
+          <div className="space-y-3">
 
-          {question.options?.map(
-            (option: string) => {
+            {question.options?.map((option: string) => {
 
-              const isSelected =
-                selectedValues.includes(option);
+              const isSelected = selectedValues.includes(option);
 
               return (
                 <label
@@ -95,20 +116,19 @@ const QuestionRenderer = ({
                   "
                 >
                   <input
+                    ref={inputRef as any}
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) => {
 
-                      let updated =
-                        [...selectedValues];
+                      let updated = [...selectedValues];
 
                       if (e.target.checked) {
 
                         // respect max selections
                         if (
                           question.maxSelections &&
-                          updated.length >=
-                          question.maxSelections
+                          updated.length >= question.maxSelections
                         ) {
                           return;
                         }
@@ -117,54 +137,50 @@ const QuestionRenderer = ({
 
                       } else {
 
-                        updated =
-                          updated.filter(
-                            (x) =>
-                              x !== option
-                          );
+                        updated = updated.filter((x) => x !== option);
                       }
 
-                      onChange(
-                        updated.join(",")
-                      );
+                      onChange(updated.join(","));
                     }}
                   />
 
-                  <span>
-                    {option}
-                  </span>
+                  <span>{option}</span>
 
                 </label>
               );
-            }
-          )}
+            })}
+
+          </div>
 
           {question.maxSelections && (
             <p className="text-xs text-[#64748B]">
-              Max selections:
-              {" "}
-              {question.maxSelections}
+              Max selections: {question.maxSelections}
             </p>
           )}
 
+          {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
         </div>
       );
 
     default:
       return (
-        <textarea
-          rows={4}
-          placeholder="Write your answer here..."
-          value={value}
-          onChange={(e) =>
-            onChange(e.target.value)
-          }
-          className="
-            w-full rounded-2xl
-            border border-[#D0D5DD]
-            px-4 py-3 outline-none
-          "
-        />
+        <div>
+          <textarea
+            ref={inputRef as any}
+            rows={4}
+            placeholder="Write your answer here..."
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={`
+              w-full rounded-2xl
+              border px-4 py-3 outline-none
+              focus:ring-2 focus:ring-[#6D5DD3]
+              resize-none
+              ${error ? "border-red-500" : "border-[#D0D5DD]"}
+            `}
+          />
+          {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+        </div>
       );
   }
 };

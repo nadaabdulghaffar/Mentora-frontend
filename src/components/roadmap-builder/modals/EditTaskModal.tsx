@@ -26,6 +26,7 @@ interface Props {
   task: LocalTask | null;
   phaseId: string;
   topicId: string;
+  readOnly?: boolean;
 }
 
 export default function EditTaskModal({
@@ -34,6 +35,7 @@ export default function EditTaskModal({
   task,
   phaseId,
   topicId,
+  readOnly = false,
 }: Props) {
 
   const updateTask = useRoadmapBuilderStore(
@@ -192,7 +194,11 @@ export default function EditTaskModal({
     <ModalBase
       open={open}
       onClose={onClose}
-      title="Edit Task"
+      title={
+  readOnly
+    ? "Task Details"
+    : "Edit Task"
+}
       maxWidth="max-w-[720px]"
     >
 
@@ -213,7 +219,8 @@ export default function EditTaskModal({
           </label>
 
           <input
-            value={title}
+  disabled={readOnly}
+  value={title}
             onChange={(e) => {
 
               setTitle(
@@ -266,8 +273,10 @@ export default function EditTaskModal({
           </label>
 
           <textarea
-            rows={5}
-            value={description}
+  rows={5}
+  disabled={readOnly}
+  value={description}
+  
             onChange={(e) => {
 
               setDescription(
@@ -326,10 +335,11 @@ export default function EditTaskModal({
 
           </label>
 
-          <input
-            type="date"
-            value={deadline}
-            onChange={(e) => {
+         <input
+  type="date"
+  disabled={readOnly}
+  value={deadline}
+  onChange={(e) => {
 
               setDeadline(
                 e.target.value
@@ -368,6 +378,8 @@ export default function EditTaskModal({
         </div>
 
         {/* attachment upload */}
+       {!readOnly && (
+
         <div>
 
           <label
@@ -528,49 +540,113 @@ export default function EditTaskModal({
           )}
 
         </div>
+)}
+{readOnly && (
+  <div>
 
-        {/* footer */}
-        <div
+    <label
+      className="
+        block text-xs font-bold
+        tracking-wide
+        text-[#475467]
+        mb-2
+      "
+    >
+      ATTACHMENT
+    </label>
+
+    {attachmentUrl ? (
+      <div
+        className="
+          rounded-2xl
+          border border-[#D0D5DD]
+          bg-white
+          px-4 py-4
+        "
+      >
+        <a
+          href={attachmentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           className="
-            flex justify-end
-            gap-4 pt-2
+            text-primary
+            underline
+            break-all
           "
         >
+          📎 {fileName || "View Attachment"}
+        </a>
+      </div>
+    ) : (
+      <div
+        className="
+          rounded-2xl
+          bg-[#F3F5F9]
+          px-4 py-4
+          text-[#98A2B3]
+        "
+      >
+        No attachment
+      </div>
+    )}
 
-          <button
-            onClick={onClose}
-            className="
-              h-11 px-6 rounded-2xl
-              text-[#344054]
-              font-medium
-            "
-          >
-            Cancel
-          </button>
+  </div>
+)}
+        {/* footer */}
+<div
+  className="
+    flex justify-end
+    gap-4 pt-2
+  "
+>
 
-          <button
-            onClick={handleSave}
-            disabled={
-              saving || uploadingFile
-            }
-            className="
-              h-12 px-7 rounded-2xl
-              bg-primary text-white
-              font-semibold
-              shadow-lg shadow-primary/20
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-            "
-          >
+  {readOnly ? (
+    <button
+      onClick={onClose}
+      className="
+        h-12 px-7 rounded-2xl
+        bg-primary
+        text-white
+        font-semibold
+      "
+    >
+      Close
+    </button>
+  ) : (
+    <>
+      <button
+        onClick={onClose}
+        className="
+          h-11 px-6 rounded-2xl
+          text-[#344054]
+          font-medium
+        "
+      >
+        Cancel
+      </button>
 
-            {saving
-              ? "Saving…"
-              : "Save Changes"}
+      <button
+        onClick={handleSave}
+        disabled={
+          saving || uploadingFile
+        }
+        className="
+          h-12 px-7 rounded-2xl
+          bg-primary text-white
+          font-semibold
+          shadow-lg shadow-primary/20
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+        "
+      >
+        {saving
+          ? "Saving…"
+          : "Save Changes"}
+      </button>
+    </>
+  )}
 
-          </button>
-
-        </div>
-
+</div>
       </div>
 
     </ModalBase>

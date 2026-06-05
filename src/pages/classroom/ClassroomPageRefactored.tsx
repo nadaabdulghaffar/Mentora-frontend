@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
 import authAPI from '../../services/authService';
 import { classroomService } from '../../services/classroomService';
@@ -18,6 +18,7 @@ import { classroomFeedService } from "../../services/classroomFeedService";
 import type {
   SubmissionLink
 } from "../../components/classroom/Modals/SubmitTaskModal";
+import { refreshOwnProfile } from '../profile/profileService';
 
 import ClassroomThreadModal 
 from "../../components/community/ClassroomThreadModal";
@@ -74,6 +75,64 @@ const mapSession = (session: any) => ({
   meetingLink: session.meetingLink,
   scheduledAt: session.scheduledAt,
 });
+
+const mapUpcomingSession = (session: any) => ({
+  title: session.title,
+  dateLabel: session.dateDisplay,
+  timeLabel: session.timeDisplay,
+  meetingLink: session.meetingLink,
+  isJoinable: Boolean(session.isJoinable),
+});
+
+const mapAttachmentPreview = (attachment: AddPostAttachment) => ({
+  id: attachment.id,
+  name: attachment.name,
+  type: attachment.type,
+  url: attachment.url,
+});
+
+const isImageAttachmentShape = (attachment: any): boolean => {
+  const type = String(attachment?.type ?? '').toLowerCase();
+  const mimeType = String(attachment?.mimeType ?? attachment?.contentType ?? '').toLowerCase();
+  const url = String(attachment?.url ?? '').toLowerCase();
+
+  if (type === 'image') return true;
+  if (mimeType.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url);
+};
+
+const mapApiAttachment = (attachment: any) => ({
+  id: String(attachment?.id ?? `attachment-${Date.now()}`),
+  name: attachment?.name || 'Attachment',
+  type: isImageAttachmentShape(attachment) ? 'image' : 'file',
+  url: resolveImageUrl(attachment?.url),
+});
+
+const resolveImageUrl = (url?: string | null) => {
+  if (!url?.trim()) {
+    return '';
+  }
+
+  const normalizedUrl = url.trim().replace(/\\/g, '/');
+
+  if (/^https?:\/\//i.test(normalizedUrl)) {
+    return normalizedUrl;
+  }
+
+  const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:5069/api') as string;
+  const backendOrigin = apiBase.replace(/\/api$/i, '').replace(/\/+$/, '');
+
+  return `${backendOrigin}${normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`}`;
+};
+
+const resolveProfileAvatar = (profilePictureUrl?: string | null, fullName?: string) => {
+  const resolved = resolveImageUrl(profilePictureUrl);
+  if (resolved) {
+    return resolved;
+  }
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}`;
+};
 
 
 
@@ -326,6 +385,7 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
   const user = authAPI.getCurrentUser();
   const role = user?.role?.toLowerCase?.()?.trim?.() || '';
   const isMentor = role === 'mentor';
+  const fallbackDisplayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || 'Designer';
 
   const tasksState = useTasksState(CONSTANTS.initialTasks);
   const { setTaskItems } = tasksState;
@@ -351,7 +411,7 @@ const [
   const [haveLoadedRoadmapTasks, setHaveLoadedRoadmapTasks] = useState(false);
 
   const mentorTasksState = useMentorTasksState();
-  const studentsState = useStudentsState(CONSTANTS.initialMentorStudents);
+  const studentsState = useStudentsState([]);
 
   const {
   setMentorStudents
@@ -363,6 +423,19 @@ const [feedPosts, setFeedPosts] =
 useState<FeedPostProps[]>(
   []
 );
+
+  const [currentUserProfile, setCurrentUserProfile] = useState({
+    displayName: fallbackDisplayName,
+    avatarUrl: '',
+  });
+
+  const [upcomingSession, setUpcomingSession] = useState<{
+    title: string;
+    dateLabel: string;
+    timeLabel: string;
+    meetingLink?: string;
+    isJoinable: boolean;
+  } | null>(null);
 
 
 
@@ -478,11 +551,10 @@ const fetchComments = useCallback(
               comment.author.fullName,
 
             authorAvatar:
-              comment.author.profilePictureUrl ||
-
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              resolveProfileAvatar(
+                comment.author.profilePictureUrl,
                 comment.author.fullName
-              )}`,
+              ),
 
             content:
               comment.content,
@@ -563,23 +635,36 @@ const fetchFeed = useCallback(
           classroomProgramId
         );
 
+      console.log('RAW POSTS FROM API', response?.data ?? response);
+
+      const postsFromApi = Array.isArray(response?.data?.posts)
+        ? response.data.posts
+        : Array.isArray(response?.posts)
+        ? response.posts
+        : [];
+
       const mappedPosts =
-        response.data.posts.map(
-          (post: any) => ({
+        postsFromApi.map(
+          (post: any) => {
+            console.log('Classroom feed post.attachments:', post.attachments);
+            return ({
             id: String(post.postId),
             authorId: post.author.userId,
             authorName: post.author.fullName,
             authorAvatar:
-              post.author.profilePictureUrl ||
-
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              resolveProfileAvatar(
+                post.author.profilePictureUrl,
                 post.author.fullName
-              )}`,
+              ),
             content: post.content,
             timestamp: new Date(
               post.createdAt
             ).toLocaleString(),
-            attachments: [],
+            attachments: Array.isArray(post.attachments)
+              ? post.attachments
+                  .map(mapApiAttachment)
+                  .filter((a: any) => Boolean(a.url))
+              : [],
             likes: post.likesCount,
             likedByMe: post.likedByMe,
             commentCount:
@@ -594,7 +679,8 @@ const fetchFeed = useCallback(
             canDelete:
               post.author.userId ===
               user?.userId,
-          })
+          });
+          }
         );
 
       setFeedPosts(mappedPosts);
@@ -666,6 +752,88 @@ useState<MentorTaskPhaseView[]>([]);
 const [mentorRegistryRows, setMentorRegistryRows] =
 useState<MentorRegistryRow[]>([]);
 
+const taskOrderByRoadmap = useMemo(() => {
+  const orderMap = new Map<string, number>();
+  const sortedPhases = [...phases].sort(
+    (a, b) => (a.order ?? 0) - (b.order ?? 0)
+  );
+
+  let order = 0;
+
+  sortedPhases.forEach((phase) => {
+    const sortedTopics = [...(phase.topics ?? [])].sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0)
+    );
+
+    sortedTopics.forEach((topic) => {
+      (topic.tasks ?? []).forEach((task) => {
+        if (task.taskId && !orderMap.has(String(task.taskId))) {
+          orderMap.set(String(task.taskId), order);
+          order += 1;
+        }
+      });
+    });
+  });
+
+  return orderMap;
+}, [phases]);
+
+const sortTasksByLearningOrder = useCallback(
+  (items: ClassroomTask[]) => {
+    const parseDeadline = (value?: string) => {
+      if (!value) {
+        return Number.MAX_SAFE_INTEGER;
+      }
+
+      const timestamp = new Date(value).getTime();
+      return Number.isFinite(timestamp)
+        ? timestamp
+        : Number.MAX_SAFE_INTEGER;
+    };
+
+    return [...items].sort((a, b) => {
+      const roadmapOrderA = taskOrderByRoadmap.get(a.id);
+      const roadmapOrderB = taskOrderByRoadmap.get(b.id);
+
+      if (
+        roadmapOrderA !== undefined &&
+        roadmapOrderB !== undefined &&
+        roadmapOrderA !== roadmapOrderB
+      ) {
+        return roadmapOrderA - roadmapOrderB;
+      }
+
+      if (roadmapOrderA !== undefined) {
+        return -1;
+      }
+
+      if (roadmapOrderB !== undefined) {
+        return 1;
+      }
+
+      const deadlineDiff = parseDeadline(a.deadline) - parseDeadline(b.deadline);
+      if (deadlineDiff !== 0) {
+        return deadlineDiff;
+      }
+
+      const numericIdA = Number(a.id);
+      const numericIdB = Number(b.id);
+
+      if (Number.isFinite(numericIdA) && Number.isFinite(numericIdB)) {
+        return numericIdA - numericIdB;
+      }
+
+      return a.id.localeCompare(b.id);
+    });
+  },
+  [taskOrderByRoadmap]
+);
+
+const activeMissionTask = useMemo(() => {
+  const orderedTasks = sortTasksByLearningOrder(tasksState.taskItems);
+  return orderedTasks.find((task) => task.status === 'todo') ?? null;
+}, [sortTasksByLearningOrder, tasksState.taskItems]);
+
 
 
 
@@ -684,9 +852,22 @@ useState<MentorRegistryRow[]>([]);
 
         const data = await classroomService.getSessions(classroomProgramId);
         console.log("Sessions Response:", data);
-        setSessions(data.data.map(mapSession));
+
+        const sessionItems = Array.isArray(data?.data) ? data.data : [];
+
+        setSessions(sessionItems.map(mapSession));
+
+        const latestSession = [...sessionItems].sort((left, right) => {
+          const leftCreatedAt = new Date(left.createdAt ?? 0).getTime();
+          const rightCreatedAt = new Date(right.createdAt ?? 0).getTime();
+
+          return rightCreatedAt - leftCreatedAt;
+        })[0];
+
+        setUpcomingSession(latestSession ? mapUpcomingSession(latestSession) : null);
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
+        setUpcomingSession(null);
       } finally {
         setSessionsLoading(false);
       }
@@ -735,8 +916,12 @@ useState<MentorRegistryRow[]>([]);
       setDashboardData(
         response.data
       );
+      const studentsFromApi = Array.isArray(response.data?.students)
+        ? response.data.students
+        : [];
+
       const mappedStudents =
-  response.data.students.map(
+  studentsFromApi.map(
     (student: any) => ({
 
       id:
@@ -803,6 +988,8 @@ setMentorStudents(
       error
     );
 
+    setMentorStudents([]);
+
   } finally {
 
     setIsDashboardLoading(
@@ -813,10 +1000,28 @@ setMentorStudents(
 
 };
 
+    const fetchCurrentProfile = async () => {
+      try {
+        const profile = await refreshOwnProfile();
+
+        if (!profile) {
+          return;
+        }
+
+        setCurrentUserProfile({
+          displayName: profile.displayName?.trim() || fallbackDisplayName,
+          avatarUrl: resolveImageUrl(profile.avatarUrl),
+        });
+      } catch (error) {
+        console.error('Failed to fetch current profile', error);
+      }
+    };
+
     fetchSessions();
     fetchClassroom();
     fetchFeed();
     fetchDashboard();
+    fetchCurrentProfile();
   }, [classroomProgramId,
      fetchFeed
   ]);
@@ -1175,6 +1380,7 @@ useEffect(() => {
             task.taskDescription,
 
           category:
+            task.phaseName ||
             "Roadmap Task",
 
           deadline:
@@ -1295,9 +1501,7 @@ revisionGrade:
         })
       );
 
-      setTaskItems(
-        mappedTasks
-      );
+      setTaskItems(sortTasksByLearningOrder(mappedTasks));
 
       setHaveLoadedRoadmapTasks(
         true
@@ -1325,6 +1529,7 @@ revisionGrade:
   phases,
   haveLoadedRoadmapTasks,
   setTaskItems,
+  sortTasksByLearningOrder,
   isMentor,
 ]);
 
@@ -1448,12 +1653,6 @@ console.error('Failed to cancel session:', error);
 
 
  
-
-  const isAllStudentsSelected =
-    studentsState.mentorStudents.length > 0 && studentsState.selectedStudentIds.length === studentsState.mentorStudents.length;
-
-
-
 
 const handleOpenMentorSubmissions =
   async (
@@ -1932,9 +2131,8 @@ const handleConfirmTaskSubmission =
   };
 
   const handleOverviewSubmitTask = () => {
-    const firstTodoTask = tasksState.taskItems.find((task) => task.status === 'todo');
-    if (firstTodoTask) {
-      handleSubmitTask(firstTodoTask.id);
+    if (activeMissionTask) {
+      handleSubmitTask(activeMissionTask.id);
     }
   };
 
@@ -1957,6 +2155,7 @@ const handleConfirmTaskSubmission =
   const handleCreatePost = useCallback(
   async ({
     content,
+    attachments,
   }: {
     content: string;
     attachments: AddPostAttachment[];
@@ -1964,12 +2163,64 @@ const handleConfirmTaskSubmission =
 
     try {
 
-      await classroomFeedService.createPost(
+      const attachmentPayload = attachments
+        .map(mapAttachmentPreview)
+        .filter((a) => Boolean(a.url?.trim()) && !a.url.startsWith('blob:'));
+
+      const createResponse = await classroomFeedService.createPost(
         classroomProgramId,
-        content
+        content,
+        attachmentPayload
       );
 
-      await fetchFeed();
+      const createdPost = createResponse?.data;
+
+      if (createdPost) {
+        setFeedPosts((current) => [
+          {
+            id: String(createdPost.postId),
+            authorId: createdPost.author?.userId,
+            authorName: createdPost.author?.fullName || currentUserProfile.displayName,
+            authorAvatar:
+              resolveImageUrl(createdPost.author?.profilePictureUrl) ||
+              currentUserProfile.avatarUrl ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserProfile.displayName)}`,
+            content: createdPost.content,
+            timestamp: new Date(createdPost.createdAt).toLocaleString(),
+            attachments: Array.isArray(createdPost.attachments)
+              ? createdPost.attachments.map(mapApiAttachment).filter((a: any) => Boolean(a.url))
+              : [],
+            likes: createdPost.likesCount ?? 0,
+            likedByMe: createdPost.likedByMe ?? false,
+            comments: [],
+            variant: 'classroom',
+            canEdit: true,
+            canDelete: true,
+          },
+          ...current,
+        ]);
+      } else {
+        setFeedPosts((current) => [
+          {
+            id: `temp-${Date.now()}`,
+            authorId: user?.userId ? String(user.userId) : 'current-user',
+            authorName: currentUserProfile.displayName,
+            authorAvatar:
+              currentUserProfile.avatarUrl ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserProfile.displayName)}`,
+            content,
+            timestamp: 'Just now',
+            attachments: attachmentPayload,
+            likes: 0,
+            likedByMe: false,
+            comments: [],
+            variant: 'classroom',
+            canEdit: true,
+            canDelete: true,
+          },
+          ...current,
+        ]);
+      }
 
       closeAddPostModal();
 
@@ -2489,12 +2740,6 @@ const handleSubmitMentorReview = async (
     );
   };
 
-  const handleDeleteSelectedStudents = () => {
-    studentsState.selectedStudentIds.forEach((studentId) => {
-      studentsState.deleteStudentById(studentId);
-    });
-  };
-
   const handleRequestDeleteStudent = (student: MentorStudent) => {
     studentsState.setPendingDeleteStudent(student);
   };
@@ -2650,9 +2895,13 @@ const handleResubmitTask = async (
               onReviewNow={() => setActiveTab('tasks')}
             pendingReviewCount={tasksState.taskItems.filter((task) => task.status === 'submitted').length}
             currentUserId={user?.userId ?? 'current-user'}
+            currentUserName={currentUserProfile.displayName}
+            currentUserAvatarUrl={currentUserProfile.avatarUrl}
+            progressPercent={dashboardData?.averageRoadmapCompletion ?? 0}
+            upcomingSession={upcomingSession}
+            activeMissionTitle={activeMissionTask?.title ?? null}
             onRequestPostEdit={handleRequestPostEdit}
             onPostDelete={handleDeleteFeedPost}
-            onLoadComments={fetchComments}
             onOpenPostDetails={
   handleOpenPostDetails
 }
@@ -2770,7 +3019,12 @@ const handleResubmitTask = async (
          <ClassroomRoadmapSection
   roadmapId={roadmapId}
   isMentor={isMentor}
-/>
+  programId={classroomProgramId}
+  onRoadmapAttached={(id) => {
+    setRoadmapId(id);
+    loadForView(id);
+  }}
+  />
         )}
 {activeTab === 'students' && isMentor && (
   <ClassroomStudentsSection
@@ -2789,12 +3043,6 @@ const handleResubmitTask = async (
       activeStudents:
         dashboardData?.students?.length ?? 0,
     }}
-
-    selectedStudentIds={studentsState.selectedStudentIds}
-    isAllStudentsSelected={isAllStudentsSelected}
-    onToggleSelectAllStudents={studentsState.toggleSelectAllStudents}
-    onToggleStudentSelection={studentsState.toggleStudentSelection}
-    onDeleteSelectedStudents={handleDeleteSelectedStudents}
 onOpenMentorSubmissionsForStudent={
   handleOpenMentorSubmissionsForStudent
 }
@@ -2961,6 +3209,8 @@ onOpenMentorSubmissionsForStudent={
           onClose={closeAddPostModal}
           onPost={handleCreatePost}
           onUpdatePost={handleUpdatePostFromModal}
+          authorAvatarUrl={currentUserProfile.avatarUrl}
+          authorName={currentUserProfile.displayName}
           editDraft={addPostEditDraft}
         />
 
@@ -3020,12 +3270,16 @@ onCancelSession={handleCancelSession}
 
     <ClassroomThreadModal
       isOpen={showThreadModal}
-      onClose={() =>
-        setShowThreadModal(false)
-      }
+      onClose={() => {
+        setShowThreadModal(false);
+        void fetchFeed();
+      }}
       thread={selectedFeedPost}
       currentUserId={
         user?.userId
+      }
+      currentUserAvatar={
+        currentUserProfile.avatarUrl
       }
       programId={
         classroomProgramId

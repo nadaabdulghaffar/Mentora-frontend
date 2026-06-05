@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Paperclip,
   Circle,
+  Eye,
 } from "lucide-react";
 
 import type { LocalTask } from "../../../types/roadmap";
@@ -37,6 +38,8 @@ export default function TaskItem({
 
   const [openEdit, setOpenEdit] =
     useState(false);
+  const [openView, setOpenView] =
+  useState(false);
 
   const formatDate = (
     date?: string
@@ -140,39 +143,53 @@ export default function TaskItem({
         </div>
 
         {/* actions */}
-        {!readonly && (
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setOpenEdit(true)}
-              className="
-                text-[#667085]
-                hover:text-primary
-                transition
-              "
-            >
-              <Pencil size={17} />
-            </button>
+<div className="flex items-center gap-3 shrink-0">
 
-            <button
-              onClick={() =>
-                deleteTask(
-                  phaseId,
-                  topicId,
-                  task._localId
-                )
-              }
-              className="
-                text-[#667085]
-                hover:text-red-500
-                transition
-              "
-            >
-              <Trash2 size={17} />
-            </button>
-          </div>
-        )}
-      </div>
+  <button
+    onClick={() => setOpenView(true)}
+    className="
+      text-[#667085]
+      hover:text-primary
+      transition
+    "
+  >
+    <Eye size={17} />
+  </button>
 
+  {!readonly && (
+    <>
+      <button
+        onClick={() => setOpenEdit(true)}
+        className="
+          text-[#667085]
+          hover:text-primary
+          transition
+        "
+      >
+        <Pencil size={17} />
+      </button>
+
+      <button
+        onClick={() =>
+          deleteTask(
+            phaseId,
+            topicId,
+            task._localId
+          )
+        }
+        className="
+          text-[#667085]
+          hover:text-red-500
+          transition
+        "
+      >
+        <Trash2 size={17} />
+      </button>
+    </>
+  )}
+
+</div>
+</div>
       {!readonly && (
         <EditTaskModal
           open={openEdit}
@@ -182,6 +199,14 @@ export default function TaskItem({
           topicId={topicId}
         />
       )}
+      <EditTaskModal
+  open={openView}
+  onClose={() => setOpenView(false)}
+  task={task}
+  phaseId={phaseId}
+  topicId={topicId}
+  readOnly
+/>
     </>
   );
 }
