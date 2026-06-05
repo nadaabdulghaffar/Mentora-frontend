@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   Pencil,
   Trash2,
+  Eye,
   FileText,
   Video,
   File,
@@ -38,6 +39,9 @@ export default function MaterialItem({
 
   const [openEdit, setOpenEdit] =
     useState(false);
+  
+  const [openView, setOpenView] =
+  useState(false);
 
   const getIcon = () => {
     switch (
@@ -118,38 +122,54 @@ export default function MaterialItem({
         </div>
 
         {/* actions */}
-        {!readonly && (
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setOpenEdit(true)}
-              className="
-                text-[#667085]
-                hover:text-primary
-                transition
-              "
-            >
-              <Pencil size={17} />
-            </button>
+ <div className="flex items-center gap-3 shrink-0">
 
-            <button
-              onClick={() =>
-                deleteMaterial(
-                  phaseId,
-                  topicId,
-                  material._localId
-                )
-              }
-              className="
-                text-[#667085]
-                hover:text-red-500
-                transition
-              "
-            >
-              <Trash2 size={17} />
-            </button>
-          </div>
-        )}
-      </div>
+  <button
+    onClick={() => setOpenView(true)}
+    className="
+      text-[#667085]
+      hover:text-primary
+      transition
+    "
+  >
+    <Eye size={17} />
+  </button>
+
+  {!readonly && (
+    <>
+      <button
+        onClick={() => setOpenEdit(true)}
+        className="
+          text-[#667085]
+          hover:text-primary
+          transition
+        "
+      >
+        <Pencil size={17} />
+      </button>
+
+      <button
+        onClick={() =>
+          deleteMaterial(
+            phaseId,
+            topicId,
+            material._localId
+          )
+        }
+        className="
+          text-[#667085]
+          hover:text-red-500
+          transition
+        "
+      >
+        <Trash2 size={17} />
+      </button>
+    </>
+  )}
+
+</div>
+</div>
+
 
       {!readonly && (
         <EditMaterialModal
@@ -160,6 +180,14 @@ export default function MaterialItem({
           topicId={topicId}
         />
       )}
+      <EditMaterialModal
+  open={openView}
+  onClose={() => setOpenView(false)}
+  material={material}
+  phaseId={phaseId}
+  topicId={topicId}
+  readOnly
+/>
     </>
   );
 }

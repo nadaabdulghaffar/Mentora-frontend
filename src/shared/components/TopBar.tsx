@@ -1,11 +1,14 @@
 import { Menu, X, Home, Mail, Users, FileText, BookOpen, Compass, Search } from "lucide-react";
 import { useEffect, useRef, useState, Suspense, lazy } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { NotificationBell } from "../../notifications";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
+import type { CreateProgramFormData } from "../../components/create-program/types";
 
 const CreateProgramModal = lazy(() => import("../../components/create-program/CreateProgramModal"));
+
+const PENDING_CREATE_PROGRAM_DRAFT_KEY = "mentora:create-program-draft";
 
 function CreateProgramFallback() {
   return (
@@ -21,13 +24,57 @@ function CreateProgramFallback() {
 
 const TopBar = () => {
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [isCreateProgramOpen, setIsCreateProgramOpen] = useState(false);
+const location = useLocation();
+const [menuOpen, setMenuOpen] = useState(false);
+const [isCreateProgramOpen, setIsCreateProgramOpen] = useState(false);
+
+const [pendingCreateProgramValues, setPendingCreateProgramValues] =
+  useState<Partial<CreateProgramFormData> | null>(null);
+
+const [pendingCreateProgramStep, setPendingCreateProgramStep] = useState(1);
+
+const [shouldHydrateCreateProgramDraft, setShouldHydrateCreateProgramDraft] =
+  useState(false);
+
   const menuRef = useRef<HTMLDivElement>(null);
   const [showModal, setShowModal] = useState(false);
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [headerSearch, setHeaderSearch] = useState("");
+
+
+
+
+
+  useEffect(() => {
+    const shouldReopenCreateProgram = Boolean((location.state as { reopenCreateProgram?: boolean } | null)?.reopenCreateProgram);
+
+    if (!shouldReopenCreateProgram) {
+      return;
+    }
+
+    const rawDraft = sessionStorage.getItem(PENDING_CREATE_PROGRAM_DRAFT_KEY);
+
+    if (rawDraft) {
+      try {
+        const draft = JSON.parse(rawDraft) as Partial<CreateProgramFormData> & { currentStep?: number };
+        const { currentStep: storedStep, ...rest } = draft;
+        setPendingCreateProgramValues(rest);
+        setPendingCreateProgramStep(draft.currentStep && draft.currentStep > 0 ? draft.currentStep : 3);
+      } catch {
+        setPendingCreateProgramValues(null);
+        setPendingCreateProgramStep(3);
+      }
+    } else {
+      setPendingCreateProgramValues(null);
+      setPendingCreateProgramStep(3);
+    }
+
+    setShouldHydrateCreateProgramDraft(true);
+    setIsCreateProgramOpen(true);
+  }, [location.state]);
+
+
 
   // load current user to determine role
   useEffect(() => {
@@ -164,7 +211,15 @@ const TopBar = () => {
 
       {isCreateProgramOpen && (
         <Suspense fallback={<CreateProgramFallback />}>
-          <CreateProgramModal isOpen={isCreateProgramOpen} onClose={() => setIsCreateProgramOpen(false)} />
+          <CreateProgramModal
+            isOpen={isCreateProgramOpen}
+            onClose={() => {
+              setIsCreateProgramOpen(false);
+              setShouldHydrateCreateProgramDraft(false);
+            }}
+            initialValues={shouldHydrateCreateProgramDraft ? pendingCreateProgramValues : null}
+            initialStep={shouldHydrateCreateProgramDraft ? pendingCreateProgramStep : 1}
+          />
         </Suspense>
       )}
     </div>

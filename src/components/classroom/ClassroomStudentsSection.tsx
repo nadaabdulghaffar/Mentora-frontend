@@ -22,13 +22,7 @@ type ClassroomStudentsSectionProps = {
     averageRoadmapCompletion: number;
     activeStudents: number;
   };
-  
-  selectedStudentIds: string[];
-  isAllStudentsSelected: boolean;
-  
-  onToggleSelectAllStudents: () => void;
-  onToggleStudentSelection: (studentId: string) => void;
-  onDeleteSelectedStudents: () => void;
+
   onOpenMentorSubmissionsForStudent: (studentId: string) => void;
   onMessageStudent: (studentId: string) => void;
   messagingStudentId: string | null;
@@ -37,12 +31,7 @@ type ClassroomStudentsSectionProps = {
 
 export default function ClassroomStudentsSection({
   mentorStudents,
-  selectedStudentIds,
   dashboardStats,
-  isAllStudentsSelected,
-  onToggleSelectAllStudents,
-  onToggleStudentSelection,
-  onDeleteSelectedStudents,
   onOpenMentorSubmissionsForStudent,
   onMessageStudent,
   messagingStudentId,
@@ -114,23 +103,7 @@ export default function ClassroomStudentsSection({
       </div>
 
       <div className="rounded-2xl border border-[#E6E9F2] bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[#7A8094]">Cohort Data View</p>
-            <button type="button" className="rounded-lg bg-[#10131A] px-3 py-1 text-xs font-semibold text-white">All</button>
-            <button type="button" className="rounded-lg px-3 py-1 text-xs font-semibold text-[#5C647A]">Attention Required</button>
-            <button type="button" className="rounded-lg px-3 py-1 text-xs font-semibold text-[#5C647A]">Top Performers</button>
-            {selectedStudentIds.length > 1 && (
-              <button
-                type="button"
-                onClick={onDeleteSelectedStudents}
-                className="ml-2 rounded-lg bg-[#FFE9E9] px-3 py-1 text-xs font-semibold text-[#B33A3A] transition"
-              >
-                Delete Selected ({selectedStudentIds.length})
-              </button>
-            )}
-          </div>
-
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
           <div className="relative w-full max-w-[260px]">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8891A7]" />
             <input
@@ -144,18 +117,6 @@ export default function ClassroomStudentsSection({
           <table className="w-full min-w-[780px]">
             <thead>
               <tr className="border-b border-[#ECEFF6] text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A91A5]">
-                <th className="px-3 py-3">
-                  <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#6B7388]">
-                    <input
-                      type="checkbox"
-                      checked={isAllStudentsSelected}
-                      onChange={onToggleSelectAllStudents}
-                      className="h-4 w-4 rounded border-[#C9D2E5] text-[#6E56CF]"
-                      aria-label="Select all students"
-                    />
-                    <span>all</span>
-                  </label>
-                </th>
                 <th className="px-3 py-3">Student</th>
                 <th className="px-3 py-3">Status / Module</th>
                 <th className="px-3 py-3">Progress</th>
@@ -164,7 +125,13 @@ export default function ClassroomStudentsSection({
               </tr>
             </thead>
             <tbody>
-              {mentorStudents.map((student) => {
+              {mentorStudents.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-3 py-10 text-center text-sm font-medium text-[#7A8094]">
+                    no student in this classroom yet
+                  </td>
+                </tr>
+              ) : mentorStudents.map((student) => {
                 const statusToneClasses =
                   student.statusTone === 'feedback'
                     ? 'bg-[#EFEAFF] text-[#5E49C3]'
@@ -174,15 +141,6 @@ export default function ClassroomStudentsSection({
 
                 return (
                   <tr key={student.id} className="border-b border-[#F1F3F8] last:border-b-0">
-                    <td className="px-3 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedStudentIds.includes(student.id)}
-                        onChange={() => onToggleStudentSelection(student.id)}
-                        className="h-4 w-4 rounded border-[#C9D2E5] text-[#6E56CF]"
-                        aria-label={`Select ${student.name}`}
-                      />
-                    </td>
                     <td className="px-3 py-4">
                       <p className="font-semibold text-[#1F2432]">{student.name}</p>
                       <p className="text-xs text-[#8A91A5]">
@@ -241,7 +199,7 @@ export default function ClassroomStudentsSection({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#7A8094]">
-          <p>Displaying {mentorStudents.length} records per page • {mentorStudents.length * 5 - 1} total students</p>
+          <p>Displaying {mentorStudents.length} records per page • {mentorStudents.length} total students</p>
           <div className="flex items-center gap-2">
             <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">&lt;</button>
             <button type="button" className="h-8 w-8 rounded-md bg-[#6E56CF] text-white">1</button>

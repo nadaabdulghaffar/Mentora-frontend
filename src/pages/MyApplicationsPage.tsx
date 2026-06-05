@@ -12,13 +12,17 @@ import {
   mapProgramResponseToFormData,
   resolveProgramImageUrl,
   unpublishProgram,
+  getMyApplications,
+  withdrawApplication,
 } from "../services/programService";
 
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
+import { toast } from "react-hot-toast";
 
 type MyApplicationItem = {
   id: string;
+  programId?: number;
   title: string;
   description: string;
   image?: string;
@@ -56,6 +60,7 @@ const formatDeadline = (deadline?: string) => {
   return new Date(deadline).toLocaleDateString();
 };
 
+
 const mapPublishedProgramToItem = (
   p: Record<string, unknown>
 ): MyApplicationItem => ({
@@ -70,6 +75,17 @@ const mapPublishedProgramToItem = (
   status: getProgramStatus(String(p.deadline ?? p.Deadline ?? "")),
 });
 
+const normalizeMenteeStatus = (
+  raw?: string
+): "Accepted" | "Under Review" | "Rejected" => {
+  const normalized = String(raw || "").toLowerCase();
+  if (normalized === "accepted") return "Accepted";
+  if (normalized === "rejected") return "Rejected";
+  return "Under Review";
+};
+
+
+
 const ManageApplicantsPage = () => {
   const navigate = useNavigate();
 
@@ -78,57 +94,93 @@ const ManageApplicantsPage = () => {
   const [mentorApplications, setMentorApplications] = useState<MyApplicationItem[]>([]);
   const [menteeApplications, setMenteeApplications] = useState<MyApplicationItem[]>([]);
   const [pageAlert, setPageAlert] = useState<PageAlert | null>(null);
+const [isEditOpen, setIsEditOpen] = useState(false);
+const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
+const [editingInitialValues, setEditingInitialValues] =
+  useState<Partial<CreateProgramFormData> | null>(null);
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
-  const [editingInitialValues, setEditingInitialValues] = useState<Partial<CreateProgramFormData> | null>(null);
-  const [editLoading, setEditLoading] = useState(false);
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+const [editLoading, setEditLoading] = useState(false);
+const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  const userRole = String(user?.role || "").toLowerCase();
-  const isMentee = userRole === "mentee";
-  const applications = isMentee ? menteeApplications : mentorApplications;
+const [withdrawTargetId, setWithdrawTargetId] = useState<string | null>(null);
+const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const mentorName = user
-    ? `${user.firstName} ${user.lastName ?? ""}`
-    : "Mentor";
 
-  const loadMentorPrograms = useCallback(async () => {
-    const programsRes = await getMyPublishedPrograms();
+const resolveImageUrl = (url?: string | null) => {
+  if (!url) return undefined;
+  if (/^https?:\/\//i.test(url)) return url;
 
-    if (programsRes.success && programsRes.data) {
-      const rawItems =
-        programsRes.data.items ??
-        programsRes.data.Items ??
-        [];
-      const mapped = (rawItems as Record<string, unknown>[]).map(
-        mapPublishedProgramToItem
-      );
+  const apiBase = (
+    import.meta.env.VITE_API_URL ?? "http://localhost:5069/api"
+  ).replace(/\/api\/?$/, "");
 
-      setMentorApplications(mapped);
-    }
-  }, []);
+  return url.startsWith("/")
+    ? `${apiBase}${url}`
+    : `${apiBase}/${url}`;
+};
+
+const loadMentorPrograms = useCallback(async () => {
+  const programsRes = await getMyPublishedPrograms();
+
+  if (programsRes.success && programsRes.data) {
+    const rawItems =
+      programsRes.data.items ??
+      programsRes.data.Items ??
+      [];
+
+    const mapped = (rawItems as Record<string, unknown>[]).map(
+      mapPublishedProgramToItem
+    );
+
+    setMentorApplications(mapped);
+  }
+}, []);
+
+const refreshApplications = async (mounted = true) => {
+  const local = authAPI.getCurrentUser();
+
+  if (local && mounted) {
+    setUser(local);
+  }
+
+  const res = await authAPI.getMe();
+
+  if (!(res.success && res.data && mounted)) {
+    return;
+  }
+
+  setUser(res.data);
+
+  const role = String(res.data.role).toLowerCase();
+
+  if (role === "mentee") {
+    const appsRes = await getMyApplications(1, 100);
+    const items = appsRes?.data?.items ?? [];
+
+    const mapped = items.map((a: any) => ({
+      id: String(a.applicationId ?? a.programId ?? Math.random()),
+      programId: a.programId != null ? Number(a.programId) : undefined,
+      title: String(a.programTitle ?? "Untitled Program"),
+      description: String(a.programDescription ?? ""),
+      image: resolveImageUrl(a.programImageUrl),
+      status: normalizeMenteeStatus(a.status),
+    })) as MyApplicationItem[];
+
+    setMenteeApplications(mapped);
+    return;
+  }
+
+  if (role === "mentor") {
+    await loadMentorPrograms();
+  }
+};
 
   useEffect(() => {
     let mounted = true;
 
-    const loadUser = async () => {
+    const loadData = async () => {
       try {
-        const local = authAPI.getCurrentUser();
-
-        if (local && mounted) {
-          setUser(local);
-        }
-
-        const res = await authAPI.getMe();
-
-        if (res.success && res.data && mounted) {
-          setUser(res.data);
-
-          if (String(res.data.role).toLowerCase() === "mentor") {
-            await loadMentorPrograms();
-          }
-        }
+        await refreshApplications(mounted);
       } catch (error) {
         console.error(error);
       } finally {
@@ -138,20 +190,42 @@ const ManageApplicantsPage = () => {
       }
     };
 
-    loadUser();
+    loadData();
+
+    const handleProgramsUpdated = () => {
+      if (!mounted) {
+        return;
+      }
+
+      void refreshApplications(mounted);
+    };
+
+    window.addEventListener("mentora:programs-updated", handleProgramsUpdated);
 
     return () => {
       mounted = false;
+      window.removeEventListener("mentora:programs-updated", handleProgramsUpdated);
     };
   }, [loadMentorPrograms]);
 
-  const goToApplicationDetails = (id: string) =>
-    navigate(`/applications/${id}`, {
-      state: {
-        mentorName,
-        programId: id,
-      },
-    });
+const mentorName = user
+  ? `${user.firstName} ${user.lastName ?? ""}`
+  : "Mentor";
+
+const userRole = String(user?.role || "").toLowerCase();
+const isMentee = userRole === "mentee";
+
+const applications = isMentee
+  ? menteeApplications
+  : mentorApplications;
+
+const goToApplicationDetails = (id: string) =>
+  navigate(`/applications/${id}`, {
+    state: {
+      mentorName,
+      programId: id,
+    },
+  });
 
   const goToManageApplicants = (id: string) =>
     navigate(`/applications/${id}/manage`, {
@@ -161,53 +235,97 @@ const ManageApplicantsPage = () => {
       },
     });
 
-  const goToClassroom = () => navigate("/classroom");
+  const goToClassroom = (programId: string) =>
+    navigate(`/classroom/${programId}`);
 
   const goToProgramView = (id: string) => navigate(`/applications/${id}`);
 
-  const handleCancelApplying = (id: string) => {
-    setMenteeApplications((current) => current.filter((item) => item.id !== id));
-  };
-
-  const openEditModal = async (programId: string) => {
-    setEditingProgramId(Number(programId));
-    setEditingInitialValues(null);
-    setIsEditOpen(true);
-    setEditLoading(true);
+  const handleCancelApplying = async (id: string): Promise<boolean> => {
+    const target = menteeApplications.find((item) => item.id === id);
+    if (!target?.programId) {
+      toast.error("Program details are not available yet. Please refresh or restart backend.");
+      return false;
+    }
 
     try {
-      const res = await fetchProgramById(Number(programId));
-
-      if (res?.success && res.data) {
-        setEditingInitialValues(
-          mapProgramResponseToFormData(res.data as Record<string, unknown>)
-        );
-      } else {
-        setPageAlert({
-          type: "error",
-          message: res?.message || "Could not load program details for editing.",
-        });
-        setIsEditOpen(false);
-        setEditingProgramId(null);
-      }
-    } catch (err) {
-      console.error("Failed to load program for editing", err);
-      setPageAlert({
-        type: "error",
-        message: "Could not load program details for editing.",
-      });
-      setIsEditOpen(false);
-      setEditingProgramId(null);
-    } finally {
-      setEditLoading(false);
+      await withdrawApplication(target.programId);
+      setMenteeApplications((current) =>
+        current.filter((item) => item.id !== id)
+      );
+      toast.success("withdawr succefully");
+      return true;
+    } catch (error) {
+      console.error("Failed to withdraw application", error);
+      toast.error("Could not withdraw application");
+      return false;
     }
   };
 
-  const closeEditModal = () => {
+  const handleConfirmWithdraw = async () => {
+    if (!withdrawTargetId || isWithdrawing) return;
+
+    setIsWithdrawing(true);
+    const ok = await handleCancelApplying(withdrawTargetId);
+    setIsWithdrawing(false);
+
+    if (ok) {
+      setWithdrawTargetId(null);
+    }
+  };
+
+
+const openEditModal = async (programId: string) => {
+  setEditingProgramId(Number(programId));
+  setEditingInitialValues(null);
+
+  setIsEditOpen(true);
+  setEditLoading(true);
+
+  try {
+    const res = await fetchProgramById(Number(programId));
+
+    if (res?.success && res.data) {
+      setEditingInitialValues(
+        mapProgramResponseToFormData(
+          res.data as Record<string, unknown>
+        )
+      );
+    } else {
+      setPageAlert({
+        type: "error",
+        message:
+          res?.message ||
+          "Could not load program details for editing.",
+      });
+
+      setIsEditOpen(false);
+      setEditingProgramId(null);
+    }
+  } catch (err) {
+    console.error(err);
+
+    setPageAlert({
+      type: "error",
+      message:
+        "Could not load program details for editing.",
+    });
+
     setIsEditOpen(false);
     setEditingProgramId(null);
-    setEditingInitialValues(null);
-  };
+  } finally {
+    setEditLoading(false);
+  }
+};
+
+
+
+const closeEditModal = () => {
+  setIsEditOpen(false);
+  setEditingProgramId(null);
+  setEditingInitialValues(null);
+  setEditLoading(false);
+};
+
 
   const handleEditSuccess = async (
     message?: string,
@@ -312,68 +430,140 @@ const ManageApplicantsPage = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start max-w-full">
-            {applications.map((item) => (
-              <ExtraProgramCard
-                key={item.id}
-                variant={isMentee ? "mentee-application-card" : "mentor-application-card"}
-                title={item.title}
-                description={item.description}
-                image={item.image}
-                applicantsCount={item.applicantsCount}
-                deadline={formatDeadline(item.deadline)}
-                status={item.status}
-                className="w-full"
-                primaryButtonText={
-                  isMentee
-                    ? item.status === "Accepted"
-                      ? "Join Classroom"
-                      : "View Program"
-                    : actionLoadingId === item.id
-                      ? "Working…"
-                      : "Manage Applicants"
-                }
-                onPrimaryClick={() => {
-                  if (isMentee) {
-                    if (item.status === "Accepted") {
-                      goToClassroom();
-                    } else {
-                      goToProgramView(item.id);
-                    }
-                  } else {
-                    goToManageApplicants(item.id);
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start max-w-full">
+              {applications.map(
+              (item) => (
+                <ExtraProgramCard
+                  key={item.id}
+                  
+
+                  variant={isMentee ? "mentee-application-card" : "mentor-application-card"}
+                  title={item.title}
+                  description={
+                    item.description
                   }
-                }}
-                onViewApplicants={() => goToApplicationDetails(item.id)}
-                onEdit={() => openEditModal(item.id)}
-                onUnpublish={() => handleUnpublish(item.id)}
-                onCancelApplying={() => handleCancelApplying(item.id)}
-              />
-            ))}
+                  image={item.image}
+                  applicantsCount={item.applicantsCount}
+deadline={formatDeadline(item.deadline)}
+                  status={item.status}
+                  className="w-full"
+primaryButtonText={
+  isMentee
+    ? item.status === "Accepted"
+      ? "Join Classroom"
+      : "View Details"
+    : actionLoadingId === item.id
+      ? "Working…"
+      : "Manage Applicants"
+}
+
+                  secondaryButtonText={
+                    isMentee
+                      ? item.status === "Accepted"
+                        ? "View Details"
+                        : "Withdraw"
+                      : "Details"
+                  }
+
+                  onPrimaryClick={() => {
+                    if (isMentee) {
+                      if (item.status === "Accepted") {
+                        if (!item.programId) {
+                          toast.error("Program details are not available yet. Please refresh or restart backend.");
+                          return;
+                        }
+                        goToClassroom(String(item.programId));
+                      } else {
+                        if (!item.programId) {
+                          toast.error("Program details are not available yet. Please refresh or restart backend.");
+                          return;
+                        }
+                        goToProgramView(String(item.programId));
+                      }
+                    } else {
+                      goToManageApplicants(item.id);
+                    }
+                  }}
+
+                  onSecondaryClick={() => {
+                    if (!isMentee) {
+                      goToApplicationDetails(item.id);
+                      return;
+                    }
+
+                    if (item.status === "Accepted") {
+                      if (!item.programId) {
+                        toast.error("Program details are not available yet. Please refresh or restart backend.");
+                        return;
+                      }
+                      goToProgramView(String(item.programId));
+                      return;
+                    }
+
+                    setWithdrawTargetId(item.id);
+                  }}
+
+                  // 🟢 VIEW (dropdown)
+                  onViewApplicants={() => goToApplicationDetails(item.id)}
+
+                  onEdit={() => openEditModal(item.id)}
+
+                  onUnpublish={() => handleUnpublish(item.id)}
+
+                  onCancelApplying={() => {
+                    void handleCancelApplying(item.id);
+                  }}
+                />
+              )
+            )}
           </div>
         )}
 
-        {isEditOpen && (
-          <>
-            {editLoading && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
-                <div className="rounded-xl bg-white px-6 py-4 shadow-lg">
-                  Loading program details…
-                </div>
-              </div>
-            )}
+{isEditOpen && (
+  <CreateProgramModal
+    isOpen={isEditOpen}
+    onClose={closeEditModal}
+    programId={editingProgramId ?? undefined}
+    initialValues={editingInitialValues}
+    isInitialLoading={editLoading}  
+    onSuccess={handleEditSuccess}
 
-            {!editLoading && editingInitialValues && (
-              <CreateProgramModal
-                isOpen={isEditOpen}
-                onClose={closeEditModal}
-                programId={editingProgramId ?? undefined}
-                initialValues={editingInitialValues}
-                onSuccess={handleEditSuccess}
-              />
-            )}
-          </>
-        )}
+/>
+)}
+
+{isMentee && withdrawTargetId && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <h3 className="text-xl font-semibold text-[#1F2432']">
+        Confirm Withdraw
+      </h3>
+
+      <p className="mt-3 text-sm text-[#5D6A85]">
+        Are you sure you want to cancel apply for this program?
+      </p>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setWithdrawTargetId(null)}
+          disabled={isWithdrawing}
+          className="h-10 rounded-xl border border-[#C4CAD7] px-4 text-sm font-semibold text-[#2E3547] hover:bg-[#F5F7FB] disabled:opacity-60"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={handleConfirmWithdraw}
+          disabled={isWithdrawing}
+          className="h-10 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+        >
+          {isWithdrawing ? "Withdrawing..." : "Yes, Withdraw"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </Layout>
   );

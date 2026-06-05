@@ -274,7 +274,7 @@ export default function BasicInfoStep() {
             {/* Duration */}
             <div>
               <label className="block text-[15px] font-medium text-[#2A3042] mb-3">
-                Duration (weeks)
+                Duration (Months)
               </label>
 
               <input
@@ -328,7 +328,7 @@ export default function BasicInfoStep() {
           {/* Target Audience */}
           <div>
             <label className="block text-[13px] font-semibold uppercase tracking-wide text-[#4B5565] mb-5">
-              TARGET AUDIENCE (OPTIONAL)
+              TARGET AUDIENCE
               {isLoadingExperienceLevels && <Spinner />}
             </label>
 

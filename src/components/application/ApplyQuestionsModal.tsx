@@ -1,4 +1,5 @@
 import QuestionRenderer from "./QuestionRenderer";
+import { useEffect, useState } from "react";
 
 interface ApplyQuestionsModalProps {
   open: boolean;
@@ -30,7 +31,82 @@ const ApplyQuestionsModal = ({
   submitting,
 }: ApplyQuestionsModalProps) => {
 
+  const [errors, setErrors] = useState<Record<number, string>>({});
+  const [focusQuestionId, setFocusQuestionId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setErrors({});
+      setFocusQuestionId(null);
+    }
+  }, [open]);
+
+  // when focusQuestionId is set, scroll it into view and show a toast
+  useEffect(() => {
+    if (!focusQuestionId) return;
+
+    try {
+      const el = document.getElementById(`question-${focusQuestionId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch {}
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const toast = require("react-hot-toast").toast;
+      toast.error("Please answer the highlighted required question(s).");
+    } catch {}
+  }, [focusQuestionId]);
+
   if (!open) return null;
+
+  const validateAnswers = () => {
+    console.log("validateAnswers: questions count", questions.length, "answers", answers);
+    const nextErrors: Record<number, string> = {};
+    let firstInvalid: number | null = null;
+    
+    questions.forEach((question) => {
+      console.log("question", question.programQuestionId, question.answerType);
+      const id = question.programQuestionId;
+      const raw = answers[id] || "";
+      const val = String(raw).trim();
+      console.log("answer for", id, "->", val);
+
+      switch (question.answerType) {
+        case "Text":
+          if (!val) nextErrors[id] = "This question is required";
+          break;
+        case "SingleChoice":
+          if (!val) nextErrors[id] = "Please choose an option";
+          break;
+        case "MultipleChoice":
+          if (!val) nextErrors[id] = "Please select at least one option";
+          break;
+        default:
+          if (!val) nextErrors[id] = "This question is required";
+      }
+
+      if (!firstInvalid && nextErrors[id]) {
+        firstInvalid = id;
+      }
+    });
+
+    setErrors(nextErrors);
+    setFocusQuestionId(firstInvalid ?? null);
+
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleLocalSubmit = () => {
+    console.log("handleLocalSubmit called", { submitting });
+    // prevent double submit while parent submitting
+    if (submitting) return;
+    console.log("running validateAnswers");
+    const ok = validateAnswers();
+    console.log("validate result", ok);
+    if (!ok) return;
+
+    onSubmit();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
@@ -63,9 +139,8 @@ const ApplyQuestionsModal = ({
             (question, index) => (
 
               <div
-                key={
-                  question.programQuestionId
-                }
+                key={question.programQuestionId}
+                id={`question-${question.programQuestionId}`}
                 className="space-y-4"
               >
 
@@ -78,20 +153,25 @@ const ApplyQuestionsModal = ({
 
                 <QuestionRenderer
                   question={question}
-                  value={
-                    answers[
-                      question.programQuestionId
-                    ] || ""
-                  }
-                  onChange={(value) =>
+                  value={answers[question.programQuestionId] || ""}
+                  error={errors[question.programQuestionId]}
+                  autoFocus={focusQuestionId === question.programQuestionId}
+                  onChange={(value) => {
                     setAnswers({
                       ...answers,
-
-                      [
-                        question.programQuestionId
-                      ]: value,
-                    })
-                  }
+                      [question.programQuestionId]: value,
+                    });
+                    // clear error for this question on change
+                    setErrors((prev) => {
+                      if (!prev || !prev[question.programQuestionId]) return prev;
+                      const copy = { ...prev };
+                      delete copy[question.programQuestionId];
+                      return copy;
+                    });
+                    if (focusQuestionId === question.programQuestionId) {
+                      setFocusQuestionId(null);
+                    }
+                  }}
                 />
 
               </div>
@@ -117,7 +197,7 @@ const ApplyQuestionsModal = ({
           </button>
 
           <button
-            onClick={onSubmit}
+            onClick={handleLocalSubmit}
             disabled={submitting}
             className="
               px-8 py-3 rounded-2xl

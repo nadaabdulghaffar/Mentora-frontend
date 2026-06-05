@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom"
+import { Toaster } from "react-hot-toast"
 import Login from "./pages/auth/login"
 import Signup from "./pages/auth/signup"
 import VerifyEmail from "./pages/auth/verify-email"
@@ -42,6 +43,23 @@ function App() {
   return (
     <>
     <NotificationRealtimeBridge />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            borderRadius: "12px",
+            background: "#111827",
+            color: "#fff",
+          },
+          success: {
+            style: {
+              background: "#16a34a",
+              color: "#fff",
+            },
+          },
+        }}
+      />
     <Routes>
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
@@ -262,10 +280,9 @@ function App() {
           </ProtectedRoute>
         }
       />
-    </Routes>
+        </Routes>
     </>
   )
 }
 
 export default App
-

@@ -308,7 +308,7 @@ const subDomains =
                 {basicInfo.status}
                 </div>
 
-                {/* save */}
+                {/* save 
                 <button
                   className="
                     inline-flex items-center
@@ -329,7 +329,7 @@ const subDomains =
 
                   Save Roadmap
 
-                </button>
+                </button>*/}
 
               </div>
 

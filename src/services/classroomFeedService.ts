@@ -11,16 +11,31 @@ export const classroomFeedService = {
 
 async createPost(
   programId: number,
-  content: string
+  content: string,
+  attachments?: Array<{ id?: string; url: string; name?: string; mimeType?: string; type?: string }>
 ) {
 
-  const response =
-    await apiClient.post(
-      `/classroom/program/${programId}/feed/posts`,
-      {
-        content,
-      }
-    );
+  const payload: any = { content };
+  if (attachments && attachments.length > 0) {
+    const normalized = attachments
+      .map((attachment, index) => ({
+        id: attachment.id || `attachment-${Date.now()}-${index}`,
+        url: attachment.url,
+        name: attachment.name || 'Attachment',
+        mimeType: attachment.mimeType,
+        type: attachment.type === 'image' ? 'image' : 'file',
+      }))
+      .filter((attachment) => Boolean(attachment.url?.trim()) && !attachment.url.startsWith('blob:'));
+
+    if (normalized.length > 0) {
+      payload.attachments = normalized;
+    }
+  }
+
+  const response = await apiClient.post(
+    `/classroom/program/${programId}/feed/posts`,
+    payload
+  );
 
   return response.data;
 },

@@ -17,7 +17,16 @@ import {
 
 import ExtraProgramCard from "../ExtraProgramCard";
 
-export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?: boolean }) {
+
+type Props = {
+  isEditMode?: boolean;
+  showValidationErrors?: boolean;
+};
+
+export default function ProgramBasicsStep({
+  isEditMode = false,
+  showValidationErrors = false,
+}: Props) {
   const { values, setFieldValue, errors } = useFormikContext<CreateProgramFormData>();
 
   const [domains, setDomains] = useState<Option[]>([]);
@@ -32,6 +41,20 @@ export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?:
   const title = values.title;
   const description = values.description;
   const existingImageUrl = values.existingImageUrl;
+
+  useEffect(() => {
+    if (!values.image) {
+      setPreviewImage("");
+      return;
+    }
+
+    const imageUrl = URL.createObjectURL(values.image);
+    setPreviewImage(imageUrl);
+
+    return () => {
+      URL.revokeObjectURL(imageUrl);
+    };
+  }, [values.image]);
 
   /* Load current mentor */
   useEffect(() => {
@@ -147,14 +170,17 @@ export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?:
               options={domains}
               disabled={isEditMode}
             />
-            {isEditMode && (
-              <p className="text-xs text-amber-600 mt-1">
-                Domain cannot be changed. Create a new program if you need a different domain.
-              </p>
-            )}
-            {getIn(errors, "domainId") && (
-              <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "domainId"))}</p>
-            )}
+{isEditMode && (
+  <p className="text-xs text-amber-600 mt-1">
+    Domain cannot be changed. Create a new program if you need a different domain.
+  </p>
+)}
+
+{showValidationErrors && getIn(errors, "domainId") && (
+  <p className="text-sm text-red-500 mt-1">
+    {String(getIn(errors, "domainId"))}
+  </p>
+)}
           </InputGroup>
 
           <InputGroup label={isEditMode ? "Sub Domain (Cannot be changed)" : "Sub Domain"} htmlFor="subDomain">
@@ -165,14 +191,17 @@ export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?:
               options={subDomains}
               disabled={isEditMode}
             />
-            {isEditMode && (
-              <p className="text-xs text-amber-600 mt-1">
-                Sub Domain cannot be changed. Create a new program if you need a different sub domain.
-              </p>
-            )}
-            {getIn(errors, "subDomainId") && (
-              <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "subDomainId"))}</p>
-            )}
+{isEditMode && (
+  <p className="text-xs text-amber-600 mt-1">
+    Sub Domain cannot be changed. Create a new program if you need a different sub domain.
+  </p>
+)}
+
+{showValidationErrors && getIn(errors, "subDomainId") && (
+  <p className="text-sm text-red-500 mt-1">
+    {String(getIn(errors, "subDomainId"))}
+  </p>
+)}
           </InputGroup>
         </div>
 
@@ -185,7 +214,7 @@ export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?:
             placeholder="e.g. UX Research Fundamentals"
           />
 
-          {getIn(errors, "title") && <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "title"))}</p>}
+          {showValidationErrors && getIn(errors, "title") && <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "title"))}</p>}
         </InputGroup>
 
         <InputGroup label="Description" htmlFor="description">
@@ -197,7 +226,7 @@ export default function ProgramBasicsStep({ isEditMode = false }: { isEditMode?:
             placeholder="Describe the goals, curriculum, and expectations..."
           />
 
-          {getIn(errors, "description") && (
+          {showValidationErrors && getIn(errors, "description") && (
             <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "description"))}</p>
           )}
         </InputGroup>

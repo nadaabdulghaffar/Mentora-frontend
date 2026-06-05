@@ -91,6 +91,18 @@ async deleteStudent(
   return response.data;
 },
 
+async attachRoadmapToProgram(
+  programId: number,
+  roadmapId: number
+) {
+  const response = await api.patch(
+    `/ProgramMentor/${programId}/update`,
+    { roadmapId }
+  );
+
+  return response.data;
+},
+
 
 
 

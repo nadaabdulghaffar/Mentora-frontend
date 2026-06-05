@@ -8,6 +8,7 @@ import type { AuthUser } from "../types/api";
 import {
   getMyPublishedPrograms,
   getMyApplications,
+  getProgramView,
 } from "../services/programService";
 
 
@@ -18,10 +19,25 @@ type MyProgramItem = {
   description: string;
   tag: string;
   phases: string;
+  subDomainName?: string;
   image?: string;
   mentorName?: string;
   mentorAvatar?: string;
   progress?: number;
+};
+
+const apiRoot = (import.meta.env.VITE_API_URL ?? "http://localhost:5069/api").replace(/\/api\/?$/, "");
+
+const resolveImageUrl = (rawUrl?: string | null): string | undefined => {
+  if (!rawUrl || typeof rawUrl !== "string") {
+    return undefined;
+  }
+
+  if (rawUrl.startsWith("http")) {
+    return rawUrl;
+  }
+
+  return `${apiRoot}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
 };
 
 
@@ -54,10 +70,7 @@ if (localUser && isMounted) {
           localStorage.setItem("user", JSON.stringify(response.data));
           if (isMounted) {
             setUser(response.data);
-            const role =
-  String(response.data.role).toLowerCase();
-  console.log("ROLE =", role);
-console.log("USER =", response.data);
+            const role = String(response.data.role).toLowerCase();
 
 if (role === "mentor") {
   const programsRes =
@@ -67,7 +80,6 @@ if (role === "mentor") {
     programsRes.success &&
     programsRes.data
   ) {
-          const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
           const mapped =
       programsRes.data.items.map(
         (p: any) => ({
@@ -82,11 +94,18 @@ if (role === "mentor") {
             p.domainName?.toUpperCase?.() ??
             "PROGRAM",
 
-          phases: "8 Phases",
+          phases:
+            p.subDomainName ??
+            p.SubDomainName ??
+            p.subdomainName ??
+            "SUB-DOMAIN",
 
-          image: p.programImageUrl
-            ? (p.programImageUrl.startsWith('http') ? p.programImageUrl : `${apiRoot}${p.programImageUrl.startsWith('/') ? p.programImageUrl : '/' + p.programImageUrl}`)
-            : undefined,
+          subDomainName:
+            p.subDomainName ??
+            p.SubDomainName ??
+            p.subdomainName,
+
+          image: resolveImageUrl(p.programImageUrl),
 
           progress: 0,
         })
@@ -99,7 +118,6 @@ if (role === "mentor") {
 } else {
   const appsRes =
     await getMyApplications();
-    console.log("APPLICATIONS RESPONSE", appsRes);
 
   if (
     appsRes.success &&
@@ -111,34 +129,48 @@ if (role === "mentor") {
           a.status === "Accepted"
       );
 
-    const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(/\/api\/?$/, '');
-    const mapped =
-      accepted.map((a: any) => ({
-        id: String(a.applicationId),
+    const mapped = await Promise.all(
+      accepted.map(async (a: any) => {
+        const programId = Number(a.programId ?? 0);
 
-        title: a.programTitle,
+        let subDomainName =
+          a.subDomainName ?? a.SubDomainName ?? a.subdomainName;
+        let mentorName = a.mentorName;
+        let mentorAvatar = a.mentorProfilePicture;
+        let image = resolveImageUrl(a.programImageUrl);
 
-        description:
-          a.programDescription,
+        // Use ProgramView as source of truth for My Programs card metadata.
+        if (programId > 0) {
+          try {
+            const view = await getProgramView(programId);
+            subDomainName = view?.subDomainName || subDomainName;
+            mentorName = view?.mentorName || mentorName;
+            mentorAvatar = view?.profilePictureUrl || mentorAvatar;
+            image = resolveImageUrl(view?.programImageUrl) || image;
+          } catch {
+            // Keep fallback values from my-applications response.
+          }
+        }
 
-        tag:
-          a.mentorDomain?.toUpperCase?.() ??
-          "PROGRAM",
+        const compactDescription = String(a.programDescription ?? "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 110);
 
-        phases: "8 Phases",
-
-        image: a.programImageUrl
-          ? (a.programImageUrl.startsWith('http') ? a.programImageUrl : `${apiRoot}${a.programImageUrl.startsWith('/') ? a.programImageUrl : '/' + a.programImageUrl}`)
-          : undefined,
-
-        mentorName:
-          a.mentorName,
-
-        mentorAvatar:
-          a.mentorProfilePicture,
-
-        progress: 0,
-      }));
+        return {
+          id: String(programId > 0 ? programId : a.applicationId),
+          title: a.programTitle,
+          description: compactDescription,
+          tag: a.mentorDomain?.toUpperCase?.() ?? "PROGRAM",
+          phases: subDomainName ?? "SUB-DOMAIN",
+          subDomainName,
+          image,
+          mentorName,
+          mentorAvatar: resolveImageUrl(mentorAvatar),
+          progress: 0,
+        };
+      })
+    );
 
     if (isMounted) {
       setPrograms(mapped);
@@ -203,13 +235,14 @@ if (role === "mentor") {
             </p>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-10 md:gap-10">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 lg:gap-5">
             {programs.map((program) => (
               <ProgramCard
                 key={program.id}
                 variant="simple-button"
                 tag={program.tag}
                 phases={program.phases}
+                image={program.image}
                 title={program.title}
                 description={program.description}
                 progress={program.progress}
@@ -224,7 +257,7 @@ if (role === "mentor") {
                     : undefined
                 }
                 primaryButtonText="Join classroom"
-                className="w-full max-w-[340px] md:max-w-[360px]"
+                className="w-full max-w-none"
                 onPrimaryClick={() => {
                 navigate(`/classroom/${program.id}`, {
   state: {

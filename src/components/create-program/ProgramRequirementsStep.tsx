@@ -19,7 +19,11 @@ type TechOption = {
   name: string;
 };
 
-export default function ProgramRequirementsStep() {
+type Props = {
+  showValidationErrors?: boolean;
+};
+
+export default function ProgramRequirementsStep({ showValidationErrors = false }: Props) {
   const { values, setFieldValue, errors } = useFormikContext<CreateProgramFormData>();
   const subDomainId = values.subDomainId;
 
@@ -107,7 +111,7 @@ export default function ProgramRequirementsStep() {
           </select>
           <p className={hintStyle}>
           </p>
-          {getIn(errors, "educationLevel") && <p className={errorStyle}>{String(getIn(errors, "educationLevel"))}</p>}
+          {showValidationErrors && getIn(errors, "educationLevel") && <p className={errorStyle}>{String(getIn(errors, "educationLevel"))}</p>}
         </div>
 
         <div>
@@ -125,7 +129,7 @@ export default function ProgramRequirementsStep() {
           </select>
           <p className={hintStyle}>
           </p>
-          {getIn(errors, "targetLevel") && <p className={errorStyle}>{String(getIn(errors, "targetLevel"))}</p>}
+          {showValidationErrors && getIn(errors, "targetLevel") && <p className={errorStyle}>{String(getIn(errors, "targetLevel"))}</p>}
         </div>
       </div>
 
@@ -208,7 +212,7 @@ export default function ProgramRequirementsStep() {
                       )}
                     </div>
 
-                    {techFieldErrors?.requiredExperienceLevel && (
+                    {showValidationErrors && techFieldErrors?.requiredExperienceLevel && (
                       <p className={`${errorStyle} px-3 pb-2 -mt-1`}>{String(techFieldErrors.requiredExperienceLevel)}</p>
                     )}
                   </li>
@@ -220,7 +224,7 @@ export default function ProgramRequirementsStep() {
           </ul>
         </div>
 
-        {getIn(errors, "technologies")?.message && <p className={errorStyle}>{String(getIn(errors, "technologies").message)}</p>}
+        {showValidationErrors && getIn(errors, "technologies")?.message && <p className={errorStyle}>{String(getIn(errors, "technologies").message)}</p>}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,7 +238,7 @@ export default function ProgramRequirementsStep() {
             placeholder="5"
             className={inputStyle}
           />
-          {getIn(errors, "capacity") && <p className={errorStyle}>{String(getIn(errors, "capacity"))}</p>}
+          {showValidationErrors && getIn(errors, "capacity") && <p className={errorStyle}>{String(getIn(errors, "capacity"))}</p>}
         </div>
 
        <div>
@@ -251,7 +255,7 @@ Application deadline
     className={inputStyle}
   />
 
-  {getIn(errors, "deadline") && (
+  {showValidationErrors && getIn(errors, "deadline") && (
     <p className={errorStyle}>
       {String(getIn(errors, "deadline"))}
     </p>
@@ -263,8 +267,12 @@ Application deadline
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={labelStyle}>  Program duration (Optional)
-</label>
+          <div className="mb-2 flex items-center gap-2">
+            <label className={labelStyle}>Program duration</label>
+            <span className="rounded-full bg-[#F1F3F8] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">
+              Optional
+            </span>
+          </div>
           <select
             value={values.duration}
             onChange={(e) => setFieldValue("duration", e.target.value)}
@@ -277,13 +285,16 @@ Application deadline
             <option value="3 Months">3 Months</option>
             <option value="6 Months">6 Months</option>
           </select>
-          {getIn(errors, "duration") && <p className={errorStyle}>{String(getIn(errors, "duration"))}</p>}
+          {showValidationErrors && getIn(errors, "duration") && <p className={errorStyle}>{String(getIn(errors, "duration"))}</p>}
         </div>
 
         <div>
-          <label className={labelStyle}>
-  Your availability (Optional)
-          </label>
+          <div className="mb-2 flex items-center gap-2">
+            <label className={labelStyle}>Your availability</label>
+            <span className="rounded-full bg-[#F1F3F8] px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">
+              Optional
+            </span>
+          </div>
           <select
             value={values.availability}
             onChange={(e) => setFieldValue("availability", e.target.value)}
@@ -294,7 +305,7 @@ Application deadline
             <option value="Weekends">Weekends</option>
             <option value="Flexible">Flexible</option>
           </select>
-          {getIn(errors, "availability") && <p className={errorStyle}>{String(getIn(errors, "availability"))}</p>}
+          {showValidationErrors && getIn(errors, "availability") && <p className={errorStyle}>{String(getIn(errors, "availability"))}</p>}
         </div>
       </div>
 

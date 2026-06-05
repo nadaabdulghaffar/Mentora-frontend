@@ -1,10 +1,11 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
-import RoadmapNotice from "../shared/RoadmapNotice";
+import { classroomService } from "../../../services/classroomService";
 
 export default function BuilderFooter() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const mode = useRoadmapBuilderStore((state) => state.mode);
 
@@ -40,6 +41,10 @@ export default function BuilderFooter() {
     (state) => state.publishRoadmap
   );
 
+  const roadmapId = useRoadmapBuilderStore(
+    (state) => state.roadmapId
+  );
+
   const isSaving = useRoadmapBuilderStore(
     (state) => state.isSaving
   );
@@ -50,14 +55,6 @@ export default function BuilderFooter() {
 
   const isDirty = useRoadmapBuilderStore(
     (state) => state.isDirty
-  );
-
-  const error = useRoadmapBuilderStore(
-    (state) => state.error
-  );
-
-  const dismissError = useRoadmapBuilderStore(
-    (state) => state.dismissError
   );
 
   /* ========================================
@@ -84,26 +81,39 @@ export default function BuilderFooter() {
   setCurrentStep(2);
 };
 
-  /** "Save Draft" */
-  const handleSaveDraft = async () => {
-    if (currentStep === 1) {
-      if (mode === "edit") {
-        await saveDraft();
-        return;
-      }
-
-      await saveBasicInfo();
-      return;
-    }
-
-    await saveDraft();
-  };
-
   /** Publish */
   const handlePublish = async () => {
     const ok = await publishRoadmap();
 
     if (ok) {
+      const searchParams = new URLSearchParams(location.search);
+      const returnTo = searchParams.get("returnTo");
+      const programId = Number(searchParams.get("programId"));
+
+      if (roadmapId && Number.isInteger(programId) && programId > 0) {
+        try {
+          await classroomService.attachRoadmapToProgram(programId, roadmapId);
+          navigate(returnTo || `/classroom/${programId}`, {
+            replace: true,
+            state: { initialTab: "roadmap" },
+          });
+          return;
+        } catch (error) {
+          console.error("Failed to link roadmap to classroom", error);
+        }
+      }
+
+      if (returnTo) {
+        navigate(returnTo, {
+          replace: true,
+          state: {
+            reopenCreateProgram: true,
+            pendingRoadmapId: roadmapId ?? null,
+          },
+        });
+        return;
+      }
+
       navigate("/roadmap");
     }
   };
@@ -126,16 +136,6 @@ export default function BuilderFooter() {
         z-50
       "
     >
-      {error ? (
-        <div className="px-4 lg:px-10 pt-3 max-w-[1100px] mx-auto w-full">
-          <RoadmapNotice
-            message={error}
-            splitMessageToList
-            onDismiss={dismissError}
-          />
-        </div>
-      ) : null}
-
       {/* Buttons row */}
       <div className="h-[76px] px-4 lg:px-10 flex items-center justify-between">
         {mode === "edit" ? (
@@ -191,7 +191,7 @@ export default function BuilderFooter() {
                 Cancel
               </button>
 
-              {/* Save Changes */}
+              {/* Save Changes 
               <button
                 id="builder-edit-save"
                 disabled={anyBusy}
@@ -217,8 +217,8 @@ export default function BuilderFooter() {
                   ? "Saving…"
                   : "Save Changes"}
               </button>
-
-              {/* Publish */}
+*/}
+               {/* Publish */}
               {roadmapStatus !== "Published" && (
                 <button
                   id="builder-edit-publish"
@@ -282,26 +282,6 @@ export default function BuilderFooter() {
 
             {/* RIGHT SIDE */}
             <div className="flex items-center gap-3">
-              {/* Save Draft */}
-              <button
-                id="builder-save-draft"
-                disabled={anyBusy}
-                onClick={handleSaveDraft}
-                className="
-                  h-11 px-6 rounded-2xl
-                  border-2 border-primary
-                  text-primary
-                  text-sm font-semibold
-                  hover:bg-primary hover:text-white
-                  transition
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                "
-              >
-                {isSaving
-                  ? "Saving…"
-                  : "Save Draft"}
-              </button>
-
               {/* Step 2 → Publish */}
               {currentStep === 2 ? (
                 <button

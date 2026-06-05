@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react-swc'
 export default defineConfig({
   plugins: [react()],
   server: {
+    hmr: {
+      overlay: false,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5069',

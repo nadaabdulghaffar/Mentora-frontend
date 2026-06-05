@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Image, Paperclip, Smile } from 'lucide-react';
+import { messagingService, isImageAttachment } from '../../../services/messagingService';
 
 export type AddPostAttachment = {
   id: string;
@@ -7,18 +8,30 @@ export type AddPostAttachment = {
   type: 'image' | 'file';
   sizeLabel?: string;
   url: string;
+  // Optional original File object for upload
+  file?: File;
 };
 
 type AddPostModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onPost: (payload: { content: string; attachments: AddPostAttachment[] }) => void;
-  onUpdatePost?: (postId: string, payload: { content: string; attachments: AddPostAttachment[] }) => void;
+  onPost: (payload: { content: string; attachments: AddPostAttachment[] }) => void | Promise<void>;
+  onUpdatePost?: (postId: string, payload: { content: string; attachments: AddPostAttachment[] }) => void | Promise<void>;
+  authorAvatarUrl?: string;
+  authorName?: string;
   /** When set, modal behaves as edit with prefilled content and attachments */
   editDraft?: { postId: string; content: string; attachments: AddPostAttachment[] } | null;
 };
 
-const AddPostModal = ({ isOpen, onClose, onPost, onUpdatePost, editDraft = null }: AddPostModalProps) => {
+const AddPostModal = ({
+  isOpen,
+  onClose,
+  onPost,
+  onUpdatePost,
+  authorAvatarUrl,
+  authorName = 'You',
+  editDraft = null,
+}: AddPostModalProps) => {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<AddPostAttachment[]>([]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -51,6 +64,10 @@ const AddPostModal = ({ isOpen, onClose, onPost, onUpdatePost, editDraft = null 
     return null;
   }
 
+  const resolvedAvatar =
+    authorAvatarUrl?.trim() ||
+    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(authorName)}`;
+
   const resetAndClose = () => {
     setContent('');
     setAttachments([]);
@@ -70,6 +87,7 @@ const AddPostModal = ({ isOpen, onClose, onPost, onUpdatePost, editDraft = null 
       type,
       sizeLabel: type === 'image' ? 'Image' : 'File',
       url: URL.createObjectURL(file),
+      file,
     }));
 
     setAttachments((current) => [...current, ...nextAttachments]);
@@ -80,16 +98,52 @@ const AddPostModal = ({ isOpen, onClose, onPost, onUpdatePost, editDraft = null 
     setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
   };
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!canPost) {
       return;
     }
 
-    const payload = { content: content.trim(), attachments };
+    // Upload files first, then send only persistent URLs to post creation.
+    const resolvedAttachments: AddPostAttachment[] = [];
+    try {
+      const uploads = await Promise.all(
+        attachments.map(async (att) => {
+          if (att.file) {
+            const upl = await messagingService.uploadAttachment(att.file);
+            if (!upl.fileUrl?.trim()) {
+              throw new Error('Missing uploaded file URL');
+            }
+            const isImage = isImageAttachment(upl.contentType, upl.fileName);
+            return {
+              id: att.id,
+              name: upl.fileName || att.name,
+              type: isImage ? 'image' : 'file',
+              sizeLabel: att.sizeLabel,
+              url: upl.fileUrl,
+            } as AddPostAttachment;
+          }
+          if (!att.url?.trim() || att.url.startsWith('blob:')) {
+            throw new Error('Attachment URL is not persistent');
+          }
+          return {
+            ...att,
+            name: att.name || 'Attachment',
+            type: att.type === 'image' ? 'image' : 'file',
+          };
+        })
+      );
+
+      resolvedAttachments.push(...uploads);
+    } catch (err) {
+      console.error('Failed to upload attachments', err);
+      return;
+    }
+
+    const payload = { content: content.trim(), attachments: resolvedAttachments };
     if (isEditMode && editDraft && onUpdatePost) {
-      onUpdatePost(editDraft.postId, payload);
+      await onUpdatePost(editDraft.postId, payload);
     } else {
-      onPost(payload);
+      await onPost(payload);
     }
     resetAndClose();
   };
@@ -122,7 +176,7 @@ const AddPostModal = ({ isOpen, onClose, onPost, onUpdatePost, editDraft = null 
         <div className="space-y-5">
           <div className="flex items-start gap-4 rounded-2xl border border-[#E6E9F2] bg-[#FCFCFE] p-4">
             <img
-              src="https://api.dicebear.com/7.x/adventurer/svg?seed=Designer"
+              src={resolvedAvatar}
               alt="Your avatar"
               className="h-10 w-10 rounded-full object-cover"
             />

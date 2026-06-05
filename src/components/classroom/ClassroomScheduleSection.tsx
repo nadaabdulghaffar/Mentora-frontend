@@ -39,12 +39,7 @@ export default function ClassroomScheduleSection({
       My Upcoming Sessions
     </h1>
 
-    <p className="mt-1 text-base text-[#5E48C3]">
-      Active Phase:{' '}
-      <span className="text-[#495164]">
-        {activePhase}
-      </span>
-    </p>
+    
   </div>
 
  {isMentor && (
@@ -102,10 +97,7 @@ export default function ClassroomScheduleSection({
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-[#6E758A]">{session.dateLabel}</p>
                 <p className="text-xl font-semibold leading-tight text-[#202737]">{session.title}</p>
-                <p className="mt-1 inline-flex items-center gap-1 text-sm text-[#6F7689]">
-                  <Clock3 size={14} />
-                  {session.duration}
-                </p>
+                
                 <div
   className={`mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
     session.live

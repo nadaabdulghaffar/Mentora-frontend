@@ -94,7 +94,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
         </h3>
 
         <p
-          className={`mt-1.5 text-[#5D6A85] ${isProgressVariant || isSimpleButtonVariant ? 'text-sm' : 'text-[15px]'} ${
+          className={`mt-1.5 whitespace-pre-wrap break-words text-[#5D6A85] ${isProgressVariant || isSimpleButtonVariant ? 'text-sm' : 'text-[15px]'} ${
             variant === 'dual-buttons' ? 'min-h-[52px]' : ''
           }`}
         >

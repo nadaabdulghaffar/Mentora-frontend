@@ -1,6 +1,7 @@
 import { PlusCircle, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFormikContext, getIn } from "formik";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import type { CreateProgramFormData } from "./types";
 import {
@@ -10,9 +11,16 @@ import {
 
 const answerHintStyle =
   "mt-1 text-xs text-[#64748B] leading-snug";
+const PENDING_CREATE_PROGRAM_DRAFT_KEY = "mentora:create-program-draft";
 
-export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMode?: boolean }) {
+export default function ProgramQuestionsStep({
+  isEditMode = false,
+}: {
+  isEditMode?: boolean;
+}) {
   const { values, setFieldValue, errors } = useFormikContext<CreateProgramFormData>();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const subDomainId = values.subDomainId;
 
@@ -62,6 +70,22 @@ export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMod
     ]);
   };
 
+  const handleCreateNewRoadmap = () => {
+    const { image: _image, ...serializableValues } = values;
+
+    sessionStorage.setItem(
+      PENDING_CREATE_PROGRAM_DRAFT_KEY,
+      JSON.stringify({
+        ...serializableValues,
+        image: undefined,
+        currentStep: 3,
+      })
+    );
+
+    const currentPath = `${location.pathname}${location.search}`;
+    navigate(`/roadmap/create?returnTo=${encodeURIComponent(currentPath)}`);
+  };
+
   return (
     <div className="space-y-5">
       {/* Roadmap */}
@@ -73,6 +97,7 @@ export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMod
 
           <button
             type="button"
+            onClick={handleCreateNewRoadmap}
             className="text-sm font-medium text-primary hover:underline text-left"
           >
             + Create New Roadmap
@@ -155,7 +180,7 @@ export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMod
           </div>
         ) : (
           <div className="space-y-4">
-            {questions.map((q, index) => {
+            {questions.map((_, index) => {
               const answerType = questions?.[index]?.answerType;
               const qErrors = getIn(errors, `questions.${index}`) as any;
 
@@ -202,7 +227,10 @@ export default function ProgramQuestionsStep({ isEditMode = false }: { isEditMod
                         onChange={(e) => {
                           if (isEditMode) return;
                           const newQs = [...questions];
-                          newQs[index] = { ...newQs[index], answerType: e.target.value };
+                          newQs[index] = {
+                            ...newQs[index],
+                            answerType: e.target.value as CreateProgramFormData["questions"][number]["answerType"],
+                          };
                           setFieldValue("questions", newQs);
                         }}
                         disabled={isEditMode}
