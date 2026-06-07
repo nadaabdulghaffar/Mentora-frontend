@@ -1046,43 +1046,4 @@ interface TaskAnalytics {
 }
 ```
 
-**Frontend Notes**
-- **React Query Key:** `["analytics", "tasks", programId]`
-- **Type:** Query
-- **Caching:** Can cache longer (static data)
 
----
-
-## 🚨 CRITICAL MISSING INFORMATION
-
-| Item | Issue |
-|------|-------|
-| **Error Schema** | What's the standard error response format? |
-| **JWT/Token** | How is auth passed? (Bearer, Cookie?) |
-| **Validation Errors** | What does a 400 validation error look like? |
-| **Rate Limiting** | Any rate limits to consider? |
-| **Status Codes** | List of all HTTP status codes by endpoint |
-| **No Submission Response** | When getting "my submission" with no data, return 404 or null? |
-| **Unique Constraints** | Can a mentee submit multiple times per task? |
-| **Soft Delete** | Should deleted posts/comments return in queries? |
-| **Feed Order** | When pinned posts tie, what's secondary sort? |
-| **Reply Depth** | Are nested replies supported (replies to replies)? |
-| **Comment Pagination** | Should full comment thread be paginated? |
-| **Session Validation** | Constraints on scheduledAt format/timezone? |
-| **Link Validation** | URL format validation rules? |
-
----
-
-## ✅ READY FOR IMPLEMENTATION
-
-**Frontend Stack:**
-- React Query v5+ (useQuery, useMutation, useInfiniteQuery)
-- TypeScript strict mode
-- Suggested keys provided for all endpoints
-- Optimistic update guidance included
-
-**Next Steps:**
-1. Confirm all missing information with backend
-2. Create typed React Query hooks
-3. Implement with abort controllers for cancellation
-4. Add error boundary + toast notifications
