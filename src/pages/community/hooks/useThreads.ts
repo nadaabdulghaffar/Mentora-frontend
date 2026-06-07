@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { CommunityThread, ThreadComment, FeedFilter } from '../types';
+import type { CommunityThread, ThreadComment, FeedFilter } from '../types';
 import {
   sortThreads,
   filterThreadsByCategory,

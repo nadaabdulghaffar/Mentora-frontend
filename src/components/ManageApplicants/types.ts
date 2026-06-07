@@ -22,6 +22,8 @@ export interface ApplicantListItemDto {
   programName: string;
 
   status: string;
+
+  isNotified: boolean;
 }
 
 export interface ProgramApplicantsResponseDto {

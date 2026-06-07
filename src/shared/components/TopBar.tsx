@@ -42,9 +42,16 @@ const [shouldHydrateCreateProgramDraft, setShouldHydrateCreateProgramDraft] =
   const [user, setUser] = useState<AuthUser | null>(null);
   const [headerSearch, setHeaderSearch] = useState("");
 
+  // ── Render diagnostics ────────────────────────────────────
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log(`[TopBar] RENDER #${renderCountRef.current}`);
 
-
-
+  useEffect(() => {
+    console.log("[TopBar] MOUNT");
+    return () => { console.log("[TopBar] UNMOUNT"); };
+  }, []);
+  // ───────────────────────────────────────────────────
 
   useEffect(() => {
     const shouldReopenCreateProgram = Boolean((location.state as { reopenCreateProgram?: boolean } | null)?.reopenCreateProgram);

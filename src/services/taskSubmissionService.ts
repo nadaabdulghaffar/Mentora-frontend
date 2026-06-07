@@ -30,6 +30,8 @@ export const taskSubmissionService = {
         url: string;
         label: string;
       }[];
+      classroomTaskId?: number;
+      topicTaskId?: number;
     }
   ) {
 

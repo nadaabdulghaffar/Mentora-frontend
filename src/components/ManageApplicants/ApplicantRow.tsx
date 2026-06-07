@@ -1,5 +1,5 @@
 import { ChevronRight, ChevronDown } from "lucide-react";
-import { Applicant } from "./types";
+import type { Applicant } from "./types";
 import { statusStyles, statusDot } from "./constants";
 
 type Props = {

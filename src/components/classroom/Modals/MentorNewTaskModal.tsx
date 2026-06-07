@@ -1,65 +1,129 @@
-import React from 'react';
-import { X, Plus, Calendar } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Calendar, Upload, X } from 'lucide-react';
+import {
+  extractErrorMessage,
+  uploadTaskAttachment,
+} from '../../../services/roadmapService';
 
-export type MentorNewTaskResourceRow = {
-  id: string;
+export type CreateClassroomTaskFormValues = {
   title: string;
-  url: string;
+  description: string;
+  deadline: string;
+  attachmentUrl?: string;
 };
 
 type MentorNewTaskModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
-  onTitleChange: (value: string) => void;
-  description: string;
-  onDescriptionChange: (value: string) => void;
-  deadline: string;
-  onDeadlineChange: (value: string) => void;
-  resources: MentorNewTaskResourceRow[];
-  onResourcesChange: (next: MentorNewTaskResourceRow[]) => void;
-  onPublish: () => void;
+  onPublish: (values: CreateClassroomTaskFormValues) => void;
+  isPublishing?: boolean;
 };
 
-const labelClass = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A91A5]';
+const labelClass =
+  'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8A91A5]';
 const inputClass =
   'w-full rounded-xl border border-[#E6E9F2] bg-[#F4F6FA] px-4 py-3 text-sm text-[#1F2432] outline-none transition placeholder:text-[#9AA1B1] focus:border-[#5E4BC5] focus:bg-white';
 
 export default function MentorNewTaskModal({
   isOpen,
   onClose,
-  title,
-  onTitleChange,
-  description,
-  onDescriptionChange,
-  deadline,
-  onDeadlineChange,
-  resources,
-  onResourcesChange,
   onPublish,
+  isPublishing = false,
 }: MentorNewTaskModalProps) {
-  if (!isOpen) return null;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [deadline, setDeadline] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [attachmentName, setAttachmentName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const addResource = () => {
-    onResourcesChange([
-      ...resources,
-      { id: `resource-${Date.now()}`, title: '', url: '' },
-    ]);
+  if (!isOpen) {
+    return null;
+  }
+
+  const resetForm = () => {
+    setTitle('');
+    setDescription('');
+    setDeadline('');
+    setAttachmentUrl('');
+    setAttachmentName('');
+    setUploadError(null);
+    setSubmitAttempted(false);
   };
 
-  const updateResource = (id: string, patch: Partial<MentorNewTaskResourceRow>) => {
-    onResourcesChange(resources.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const handleClose = () => {
+    resetForm();
+    onClose();
   };
 
-  const removeResource = (id: string) => {
-    if (resources.length <= 1) {
-      onResourcesChange([{ id: `resource-${Date.now()}`, title: '', url: '' }]);
+  const titleError = submitAttempted && !title.trim()
+    ? 'Title is required.'
+    : null;
+  const descriptionError = submitAttempted && !description.trim()
+    ? 'Description is required.'
+    : null;
+  const deadlineError = (() => {
+    if (!submitAttempted) {
+      return null;
+    }
+
+    if (!deadline) {
+      return 'Deadline is required.';
+    }
+
+    const parsed = new Date(`${deadline}T23:59:59`);
+    if (Number.isNaN(parsed.getTime())) {
+      return 'Enter a valid deadline.';
+    }
+
+    if (parsed <= new Date()) {
+      return 'Deadline must be in the future.';
+    }
+
+    return null;
+  })();
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
       return;
     }
-    onResourcesChange(resources.filter((r) => r.id !== id));
+
+    setUploading(true);
+    setUploadError(null);
+
+    try {
+      const url = await uploadTaskAttachment(file);
+      setAttachmentUrl(url);
+      setAttachmentName(file.name);
+    } catch (error) {
+      setUploadError(extractErrorMessage(error));
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const canPublish = title.trim().length > 0;
+  const handlePublish = () => {
+    setSubmitAttempted(true);
+
+    if (titleError || descriptionError || deadlineError || isPublishing || uploading) {
+      return;
+    }
+
+    onPublish({
+      title: title.trim(),
+      description: description.trim(),
+      deadline,
+      attachmentUrl: attachmentUrl.trim() || undefined,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4">
@@ -74,7 +138,7 @@ export default function MentorNewTaskModal({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-lg p-1.5 text-[#6F7689] transition hover:bg-[#F2F4F8]"
             aria-label="Close"
           >
@@ -91,10 +155,13 @@ export default function MentorNewTaskModal({
               id="mentor-new-task-title-input"
               type="text"
               value={title}
-              onChange={(e) => onTitleChange(e.target.value)}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Heuristic Review"
-              className={inputClass}
+              className={`${inputClass} ${titleError ? 'border-[#E4A4B0]' : ''}`}
             />
+            {titleError ? (
+              <p className="mt-1 text-xs text-[#AF2F4D]">{titleError}</p>
+            ) : null}
           </div>
 
           <div>
@@ -104,11 +171,14 @@ export default function MentorNewTaskModal({
             <textarea
               id="mentor-new-task-desc"
               value={description}
-              onChange={(e) => onDescriptionChange(e.target.value)}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide assignment details..."
               rows={4}
-              className={`${inputClass} min-h-[120px] resize-y`}
+              className={`${inputClass} min-h-[120px] resize-y ${descriptionError ? 'border-[#E4A4B0]' : ''}`}
             />
+            {descriptionError ? (
+              <p className="mt-1 text-xs text-[#AF2F4D]">{descriptionError}</p>
+            ) : null}
           </div>
 
           <div>
@@ -120,8 +190,8 @@ export default function MentorNewTaskModal({
                 id="mentor-new-task-deadline"
                 type="date"
                 value={deadline}
-                onChange={(e) => onDeadlineChange(e.target.value)}
-                className={`${inputClass} pr-11 [color-scheme:light]`}
+                onChange={(e) => setDeadline(e.target.value)}
+                className={`${inputClass} pr-11 [color-scheme:light] ${deadlineError ? 'border-[#E4A4B0]' : ''}`}
               />
               <Calendar
                 size={18}
@@ -129,83 +199,62 @@ export default function MentorNewTaskModal({
                 aria-hidden
               />
             </div>
+            {deadlineError ? (
+              <p className="mt-1 text-xs text-[#AF2F4D]">{deadlineError}</p>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-[#E6E9F2] bg-[#FCFCFE] p-4">
-            <div className="mb-4 flex items-center justify-between">
-              <span className={labelClass}>Task resources</span>
-              <button
-                type="button"
-                onClick={addResource}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE2EF] bg-white text-[#5E4BC5] transition hover:bg-[#F4F0FF]"
-                aria-label="Add resource"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
+            <span className={labelClass}>Attachment (optional)</span>
+            <p className="mb-3 text-xs text-[#667085]">
+              Upload a reference file for mentees. You can publish without an attachment.
+            </p>
 
-            <div className="space-y-4">
-              {resources.map((row, index) => (
-                <div key={row.id} className="space-y-3 rounded-lg border border-[#ECEFF6] bg-white p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#6F7689]">Resource {index + 1}</span>
-                    {resources.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeResource(row.id)}
-                        className="text-xs font-medium text-[#AF2F4D] hover:underline"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor={`res-title-${row.id}`}>
-                      Title
-                    </label>
-                    <input
-                      id={`res-title-${row.id}`}
-                      type="text"
-                      value={row.title}
-                      onChange={(e) => updateResource(row.id, { title: e.target.value })}
-                      placeholder="e.g. Design Thinking Handbook"
-                      className={inputClass}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor={`res-link-${row.id}`}>
-                      Link
-                    </label>
-                    <input
-                      id={`res-link-${row.id}`}
-                      type="url"
-                      value={row.url}
-                      onChange={(e) => updateResource(row.id, { url: e.target.value })}
-                      placeholder="https://..."
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={uploading || isPublishing}
+            />
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || isPublishing}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#DDE2EF] bg-white px-4 py-2.5 text-sm font-semibold text-[#5E4BC5] transition hover:bg-[#F4F0FF] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {uploading ? 'Uploading...' : 'Upload file'}
+            </button>
+
+            {attachmentName ? (
+              <p className="mt-2 text-xs font-medium text-[#0E7A5F]">
+                Attached: {attachmentName}
+              </p>
+            ) : null}
+
+            {uploadError ? (
+              <p className="mt-2 text-xs text-[#AF2F4D]">{uploadError}</p>
+            ) : null}
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-[#ECEFF6] px-6 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-xl px-4 py-2.5 text-sm font-semibold text-[#4D5670] transition hover:bg-[#F4F6FA]"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={!canPublish}
-            onClick={onPublish}
+            disabled={isPublishing || uploading}
+            onClick={handlePublish}
             className="rounded-xl bg-[#5E4BC5] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4F3DB0] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Publish Task
+            {isPublishing ? 'Publishing...' : 'Publish Task'}
           </button>
         </div>
       </div>

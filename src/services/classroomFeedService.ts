@@ -56,15 +56,26 @@ async deletePost(
 async updatePost(
   programId: number,
   postId: number,
-  content: string
+  content: string,
+  attachments?: Array<{ id?: string; url: string; name?: string; mimeType?: string; type?: string }>
 ) {
+  const payload: any = { content };
+  if (attachments) {
+    payload.attachments = attachments
+      .map((attachment, index) => ({
+        id: attachment.id || `attachment-${Date.now()}-${index}`,
+        url: attachment.url,
+        name: attachment.name || 'Attachment',
+        mimeType: attachment.mimeType,
+        type: attachment.type === 'image' ? 'image' : 'file',
+      }))
+      .filter((attachment) => Boolean(attachment.url?.trim()) && !attachment.url.startsWith('blob:'));
+  }
 
   const response =
     await apiClient.patch(
       `/classroom/program/${programId}/feed/posts/${postId}`,
-      {
-        content,
-      }
+      payload
     );
 
   return response.data;

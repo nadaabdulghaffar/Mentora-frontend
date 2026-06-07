@@ -5,7 +5,6 @@ import type {
   RoadmapPhase,
   MentorRoadmapPhase,
   MentorStudent,
-  MentorTaskPhase,
   MentorSubmissionRecord,
 } from './types';
 
@@ -28,6 +27,7 @@ export const classroomFeedPosts: FeedPostProps[] = [
       },
     ],
     likes: 24,
+    likedByMe: false,
     comments: [
       {
         id: 'feed-1-comment-1',
@@ -50,6 +50,7 @@ export const classroomFeedPosts: FeedPostProps[] = [
       "Has anyone found a good case study on the 'Zeigarnik Effect' applied to ed-tech dashboards? I want references for this week's mission.",
     timestamp: '5 hours ago',
     likes: 12,
+    likedByMe: false,
     comments: [
       {
         id: 'feed-2-comment-1',
@@ -90,70 +91,8 @@ export const sessions: SessionItem[] = [
   },
 ];
 
-// Initial Tasks
-export const initialTasks: ClassroomTask[] = [
-  {
-    id: 'task-1',
-    title: 'User Journey Mapping',
-    category: 'UX RESEARCH',
-    description: 'Synthesize interview data into a comprehensive journey map.',
-    status: 'todo',
-    badge: '1 Overdue',
-    badgeTone: 'danger',
-    summary:
-      "Analyze emotional states during onboarding for 'Atelier Mobile' to align with the 'Aspiring Craftsman' persona. Highlight the moments of confusion, hesitation, and confidence across each step, then translate these findings into practical UX opportunities that improve clarity and progression.",
-    deliverables: [
-      'End-to-end user journey map (PDF/Link)',
-      'Identification of 3 major onboarding friction points',
-      'Actionable design solutions for each pain point',
-    ],
-    attachedResources: [
-      {
-        id: 'task-1-resource-1',
-        title: 'Mapping_Template.pdf',
-        link: 'https://example.com/mapping-template.pdf',
-        type: 'pdf',
-        meta: '2.4 MB',
-      },
-      {
-        id: 'task-1-resource-2',
-        title: 'Competitor Analysis',
-        link: 'https://www.notion.so/atelier-competitor-analysis',
-        type: 'notion',
-        meta: 'Notion link',
-      },
-    ],
-  },
-  {
-    id: 'task-2',
-    title: 'Typography Systems',
-    category: 'VISUAL DESIGN',
-    description: 'Define the dual-type scale system for the Atelier brand identity.',
-    status: 'todo',
-    badge: 'Due in 2 days',
-    badgeTone: 'neutral',
-  },
-  {
-    id: 'task-3',
-    title: 'Sitemap & Information Architecture',
-    category: 'ARCHITECTURE',
-    description: 'Create structural map for the knowledge base resources.',
-    status: 'submitted',
-    badge: 'Under Review',
-    badgeTone: 'success',
-    submissionDate: 'Apr 17, 2026',
-  },
-  {
-    id: 'task-4',
-    title: 'The Digital Atelier Persona',
-    category: 'BRANDING',
-    description: 'Create persona narratives and behavior assumptions.',
-    status: 'reviewed',
-    badge: 'Completed',
-    badgeTone: 'success',
-    submissionDate: 'Apr 15, 2026',
-  },
-];
+// Initial Tasks — populated from API on page load
+export const initialTasks: ClassroomTask[] = [];
 
 // Mentor Students
 export const initialMentorStudents: MentorStudent[] = [

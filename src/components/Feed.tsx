@@ -9,8 +9,10 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Paperclip,
 } from 'lucide-react';
 import { validateCommentContent, validateThreadContent } from '../pages/community/utils/threadUtils';
+import { ClassroomUserLink } from './classroom/common/ClassroomUserLink';
 
 // Types
 export interface PostAttachment {
@@ -313,7 +315,11 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
         />
         <div className="min-w-0 flex-1">
           <div className="rounded-lg bg-gray-100 px-3 py-2">
-            <p className="text-sm font-semibold text-gray-900">{comment.authorName}</p>
+            <ClassroomUserLink
+              userId={comment.authorId}
+              name={comment.authorName}
+              className="text-sm font-semibold text-gray-900"
+            />
             {isEditing ? (
               <div className="mt-2 space-y-2">
                 <textarea
@@ -368,17 +374,6 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
               <span>{commentLikeCount}</span>
             </button>
             <div className="inline-flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowReplyInput((prev) => !prev);
-                  onReply?.(comment.id);
-                }}
-                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
-              >
-                <ReplyIcon size={12} />
-                Reply
-              </button>
               {showOverflowMenu && (
                 <button
                   ref={menuTriggerRef}
@@ -954,7 +949,15 @@ const postOwnerMenuPortal =
               className="h-10 w-10 rounded-full object-cover"
             />
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-gray-900">{authorName}</h3>
+              {variant === 'classroom' ? (
+                <ClassroomUserLink
+                  userId={authorId}
+                  name={authorName}
+                  className="font-semibold text-gray-900"
+                />
+              ) : (
+                <h3 className="font-semibold text-gray-900">{authorName}</h3>
+              )}
               {postTimestampLabel && (
                 <p className="text-sm text-gray-500">{postTimestampLabel}</p>
               )}
@@ -1011,28 +1014,36 @@ const postOwnerMenuPortal =
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">{content}</p>
         )}
 
-        {attachments.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {attachments.map((attachment) => (
-              <div key={attachment.id}>
-                {attachment.url ? (
-                  <img
-                    src={attachment.url}
-                    alt={attachment.name || 'attachment'}
-                    className="h-56 w-full rounded-xl object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                    <div className="text-2xl">📎</div>
-                    <div className="flex-1 truncate">
-                      <p className="truncate text-sm font-medium text-gray-700">{attachment.name}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+        {/* Attachment Image Preview */}
+        {attachments.filter(a => a.type === 'image').map((att) => (
+          <div key={att.id} className="mt-4" onClick={(e) => e.stopPropagation()}>
+            <a href={att.url} target="_blank" rel="noopener noreferrer">
+              <img
+                src={att.url}
+                alt={att.name || "attachment"}
+                className="max-h-[300px] w-full rounded-md object-contain bg-gray-50 border border-gray-100 cursor-pointer"
+              />
+            </a>
           </div>
-        )}
+        ))}
+
+        {/* Attachment File Link */}
+        {attachments.filter(a => a.type === 'file').map((att) => (
+          <div key={att.id} className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-[#F8FAFE] p-3" onClick={(e) => e.stopPropagation()}>
+            <Paperclip size={18} className="text-[#5E4BC5] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{att.name || 'Attachment'}</p>
+            </div>
+            <a
+              href={att.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-[#5E4BC5]/10 px-3 py-1.5 text-xs font-semibold text-[#5E4BC5] transition hover:bg-[#5E4BC5]/20"
+            >
+              Open/Download
+            </a>
+          </div>
+        ))}
       </div>
 
       <div className="border-t border-gray-100 px-4 py-3 sm:px-6">

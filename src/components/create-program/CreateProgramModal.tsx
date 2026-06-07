@@ -14,7 +14,7 @@ import ProgramBasicsStep from "./ProgramBasicsStep";
 import ProgramRequirementsStep from "./ProgramRequirementsStep";
 import ProgramQuestionsStep from "./ProgramQuestionsStep";
 
-import { createProgramSchema } from "./schema";
+import { getCreateProgramSchema } from "./schema";
 import type { CreateProgramFormData } from "./types";
 import {
   buildQuestionsPayload,
@@ -45,7 +45,6 @@ type Props = {
 };
 
 const PENDING_CREATE_PROGRAM_DRAFT_KEY = "mentora:create-program-draft";
-
 function goToStepWithErrors(errors: any, setStep: (n: number) => void) {
   if (
     errors.domainId ||
@@ -104,8 +103,7 @@ export default function CreateProgramModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-const [currentAction, setCurrentAction] =
-  useState<"draft" | "publish" | null>(null);
+
     const [validationStep, setValidationStep] = useState<number | null>(null);
 
   useEffect(() => {
@@ -339,14 +337,7 @@ if (data.image) {
     await runCreateProgram(values, "save", setFieldError, resetForm);
   };
 
-  const startDraft = async (validateForm: any, values: CreateProgramFormData, setFieldError: any, resetForm: any) => {
-    const errors = await validateForm();
-    if (Object.keys(errors).length > 0) {
-      onInvalid(errors);
-      return;
-    }
-    await runCreateProgram(values, "draft", setFieldError, resetForm);
-  };
+
 
 
   const startPublish = async (validateForm: any, values: CreateProgramFormData, setFieldError: any, resetForm: any) => {
@@ -413,7 +404,8 @@ if (data.image) {
       initialValues={mergedInitialValues}
       validate={async (values) => {
         try {
-          createProgramSchema.parse(values);
+          const schema = getCreateProgramSchema(isEditMode, initialValues?.deadline);
+          schema.parse(values);
           return {};
         } catch (e: any) {
           const out: any = {};
@@ -426,13 +418,6 @@ if (data.image) {
                 if (arr && arr.length > 0) out[k] = arr.join(", ");
               });
             }
-          }
-
-          if (
-            isEditMode &&
-            out.deadline === "Please choose a future application deadline"
-          ) {
-            delete out.deadline;
           }
 
           return out;
@@ -471,7 +456,7 @@ if (data.image) {
           values.educationLevel > 0 ||
           values.targetLevel > 0 ||
           values.capacity > 1 ||
-          (values.duration?.trim()?.length ?? 0) > 0 ||
+          (values.duration != null && String(values.duration).trim().length > 0) ||
           (values.availability?.trim()?.length ?? 0) > 0 ||
           (values.technologies && values.technologies.length > 0) ||
           values.questions?.length > 0 ||
@@ -495,21 +480,6 @@ if (data.image) {
             </div>
 
             <div className="grid grid-cols-2 sm:flex gap-3">
-              {!isEditMode && (
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={async () => {
-                    setCurrentAction("draft");
-                    await startDraft(formik.validateForm, values, formik.setFieldError, formik.resetForm);
-                    setCurrentAction(null);
-                  }}
-                  className="h-11 px-5 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {isSubmitting && currentAction === "draft" ? "Saving…" : "Draft"}
-                </button>
-              )}
-
               {step < 3 ? (
                 <button
                   type="button"
@@ -524,26 +494,22 @@ if (data.image) {
                   type="button"
                   disabled={isSubmitting}
                   onClick={async () => {
-                    setCurrentAction("publish");
                     await startSave(formik.validateForm, values, formik.setFieldError, formik.resetForm);
-                    setCurrentAction(null);
                   }}
                   className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
                 >
-                  {isSubmitting && currentAction === "publish" ? "Saving…" : "Save Changes"}
+                  {isSubmitting ? "Saving…" : "Save Changes"}
                 </button>
               ) : (
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={async () => {
-                    setCurrentAction("publish");
                     await startPublish(formik.validateForm, values, formik.setFieldError, formik.resetForm);
-                    setCurrentAction(null);
                   }}
                   className="h-11 px-6 rounded-xl bg-primary text-white hover:bg-primary-dark disabled:opacity-50"
                 >
-                  {isSubmitting && currentAction === "publish" ? "Publishing…" : "Publish"}
+                  {isSubmitting ? "Publishing…" : "Publish"}
                 </button>
               )}
             </div>
@@ -573,9 +539,9 @@ if (data.image) {
               </p>
             )}
 
-            {step === 1 && <ProgramBasicsStep isEditMode={isEditMode} />}
+            {step === 1 && <ProgramBasicsStep isEditMode={isEditMode} showValidationErrors={showValidationErrors} />}
 
-            {step === 2 && <ProgramRequirementsStep />}
+            {step === 2 && <ProgramRequirementsStep showValidationErrors={showValidationErrors} />}
 
             {step === 3 && <ProgramQuestionsStep isEditMode={isEditMode} />}
           </BaseModal>

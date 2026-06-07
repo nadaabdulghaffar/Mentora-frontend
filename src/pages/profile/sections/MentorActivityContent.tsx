@@ -35,6 +35,7 @@ import {
   extractApiData,
   extractPagedProgramItems,
   formatDeadline,
+  getProgramStatus,
   isApiSuccess,
   mapPublishedProgramToExploreStyle,
   mapPublishedProgramToMentorApplication,
@@ -305,28 +306,33 @@ export function MentorActivityContent({
         emptyMessage="No published programs yet"
       >
         {isOwner
-          ? ownerPrograms.map((item) => (
-              <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px]">
-                <ExtraProgramCard
-                  variant="mentor-application-card"
-                  title={item.title}
-                  description={item.description}
-                  image={item.image}
-                  applicantsCount={item.applicantsCount}
-                  deadline={formatDeadline(item.deadline)}
-                  status={item.status}
-                  className="h-full w-full"
-                  primaryButtonText={
-                    actionLoadingId === item.id ? 'Working…' : 'Manage Applicants'
-                  }
-                  onPrimaryClick={() => goToManageApplicants(item.id)}
-                  onViewApplicants={() => goToApplicationDetails(item.id)}
-                  onEdit={() => openEditModal(item.id)}
-                  onUnpublish={() => handleUnpublish(item.id)}
-                />
-              </div>
-            ))
-          : visitorPrograms.map((item) => (
+          ? ownerPrograms.map((item) => {
+              const isDeadlinePassed = item.status === 'Closed';
+              return (
+                <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px]">
+                  <ExtraProgramCard
+                    variant="mentor-application-card"
+                    title={item.title}
+                    description={item.description}
+                    image={item.image}
+                    applicantsCount={item.applicantsCount}
+                    deadline={formatDeadline(item.deadline)}
+                    status={item.status}
+                    className="h-full w-full"
+                    primaryButtonText={
+                      actionLoadingId === item.id ? 'Working…' : 'Manage Applicants'
+                    }
+                    onPrimaryClick={() => goToManageApplicants(item.id)}
+                    onViewApplicants={() => goToApplicationDetails(item.id)}
+                    onEdit={isDeadlinePassed ? undefined : () => openEditModal(item.id)}
+                    onUnpublish={isDeadlinePassed ? undefined : () => handleUnpublish(item.id)}
+                  />
+                </div>
+              );
+            })
+          : visitorPrograms.map((item) => {
+              const isClosed = getProgramStatus(item.deadline) === 'Closed';
+              return (
               <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px]">
                 <ProgramCard
                   variant="dual-buttons"
@@ -336,10 +342,10 @@ export function MentorActivityContent({
                   title={item.title}
                   description={item.description}
                   author={item.author}
-                  primaryButtonText={item.isApplied ? 'Join classroom' : 'Apply'}
+                  primaryButtonText={isClosed ? undefined : (item.isApplied ? 'Join classroom' : 'Apply')}
                   secondaryButtonText="Details"
                   className="h-full w-[320px] md:w-[340px]"
-                  onPrimaryClick={() => {
+                  onPrimaryClick={isClosed ? undefined : () => {
                     if (item.isApplied) {
                       navigate(`/classroom/${item.id}`);
                     } else {
@@ -349,7 +355,7 @@ export function MentorActivityContent({
                   onSecondaryClick={() => navigate(`/applications/${item.id}`)}
                 />
               </div>
-            ))}
+            )})}
       </ActivityScrollSection>
 
       <ActivityScrollSection

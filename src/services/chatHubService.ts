@@ -4,18 +4,37 @@ import type { MessageResponseDto } from "../types/messaging";
 
 export type ReceiveMessageHandler = (message: MessageResponseDto) => void;
 
+const LOG_PREFIX = "[SignalR][Chat]";
+let connectCallCount = 0;
+
 function getAccessToken(): string {
   return localStorage.getItem("accessToken") ?? "";
+}
+
+function logTokenPresence(context: string): void {
+  const token = getAccessToken();
+  console.log(
+    `${LOG_PREFIX} ${context} tokenPresent=${Boolean(token)} tokenLength=${token.length}`
+  );
 }
 
 function isNegotiationAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+function formatSignalRError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
 /** Normalize hub payload (camelCase or PascalCase) to MessageResponseDto. */
 export function normalizeMessageResponseDto(
   raw: Record<string, unknown>
 ): MessageResponseDto {
+  const rawSentAt = String(raw.sentAt ?? raw.SentAt ?? new Date().toISOString());
+
   return {
     messageId: String(raw.messageId ?? raw.MessageId ?? ""),
     conversationId: String(raw.conversationId ?? raw.ConversationId ?? ""),
@@ -31,7 +50,7 @@ export function normalizeMessageResponseDto(
       | string
       | null,
     isRead: Boolean(raw.isRead ?? raw.IsRead ?? false),
-    sentAt: String(raw.sentAt ?? raw.SentAt ?? new Date().toISOString()),
+    sentAt: rawSentAt.endsWith("Z") ? rawSentAt : rawSentAt + "Z",
   };
 }
 
@@ -43,11 +62,21 @@ class ChatHubService {
   private connectionEpoch = 0;
 
   async connect(): Promise<void> {
+    connectCallCount += 1;
+    console.log(
+      `${LOG_PREFIX} connect() called (#${connectCallCount}) state=${this.connection?.state ?? "none"} inFlight=${Boolean(this.connectPromise)}`
+    );
+    logTokenPresence("connect()");
+
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
+      console.log(
+        `${LOG_PREFIX} Already connected connectionId=${this.connection.connectionId ?? "unknown"}`
+      );
       return;
     }
 
     if (this.connectPromise) {
+      console.log(`${LOG_PREFIX} Reusing in-flight connect promise`);
       return this.connectPromise;
     }
 
@@ -62,22 +91,28 @@ class ChatHubService {
 
   private async startConnection(): Promise<void> {
     const epoch = this.connectionEpoch;
+    console.log(`${LOG_PREFIX} Creating connection epoch=${epoch}`);
 
     if (this.connection) {
+      console.log(`${LOG_PREFIX} Stopping existing connection before recreate`);
       try {
         await this.connection.stop();
-      } catch {
-        // ignore stop errors while replacing connection
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} Stop existing connection failed`, error);
       }
       this.connection = null;
     }
 
     if (epoch !== this.connectionEpoch) {
+      console.log(`${LOG_PREFIX} Start aborted — epoch changed before build`);
       return;
     }
 
+    const hubUrl = getChatHubUrl();
+    console.log(`${LOG_PREFIX} Building connection url=${hubUrl}`);
+
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(getChatHubUrl(), {
+      .withUrl(hubUrl, {
         accessTokenFactory: getAccessToken,
       })
       .withAutomaticReconnect()
@@ -86,34 +121,75 @@ class ChatHubService {
     this.connection = connection;
 
     connection.on("ReceiveMessage", (payload: Record<string, unknown>) => {
+      console.log(`${LOG_PREFIX} ReceiveMessage fired`);
       const message = normalizeMessageResponseDto(payload);
       this.receiveHandlers.forEach((handler) => handler(message));
     });
 
     connection.on("Error", (errorMessage: string) => {
-      console.error("[ChatHub] Error:", errorMessage);
+      console.error(`${LOG_PREFIX} Hub Error event:`, errorMessage);
+    });
+
+    connection.onreconnecting((error) => {
+      console.warn(
+        `${LOG_PREFIX} Reconnecting... reason=${error ? formatSignalRError(error) : "unknown"}`
+      );
+    });
+
+    connection.onreconnected((connectionId) => {
+      console.log(
+        `${LOG_PREFIX} Reconnected connectionId=${connectionId ?? connection.connectionId ?? "unknown"}`
+      );
+    });
+
+    connection.onclose((error) => {
+      if (error) {
+        console.error(`${LOG_PREFIX} Disconnected with error: ${formatSignalRError(error)}`);
+      } else {
+        console.log(`${LOG_PREFIX} Disconnected`);
+      }
     });
 
     if (epoch !== this.connectionEpoch) {
+      console.log(`${LOG_PREFIX} Start aborted — epoch changed after build`);
       await this.teardownConnection(connection);
       return;
     }
 
+    console.log(`${LOG_PREFIX} Starting connection`);
     try {
       await connection.start();
+      console.log(
+        `${LOG_PREFIX} Connected connectionId=${connection.connectionId ?? "unknown"}`
+      );
     } catch (error) {
       if (this.connection === connection) {
         this.connection = null;
       }
 
-      if (isNegotiationAbortError(error) || epoch !== this.connectionEpoch) {
+      if (isNegotiationAbortError(error)) {
+        console.warn(
+          `${LOG_PREFIX} Negotiation aborted (likely intentional teardown): ${formatSignalRError(error)}`
+        );
         return;
       }
 
+      if (epoch !== this.connectionEpoch) {
+        console.warn(
+          `${LOG_PREFIX} Start failed after epoch change: ${formatSignalRError(error)}`
+        );
+        return;
+      }
+
+      console.error(
+        `${LOG_PREFIX} Failed: ${formatSignalRError(error)}`,
+        error
+      );
       throw error;
     }
 
     if (epoch !== this.connectionEpoch) {
+      console.log(`${LOG_PREFIX} Teardown after successful start — epoch changed`);
       await this.teardownConnection(connection);
     }
   }
@@ -123,8 +199,8 @@ class ChatHubService {
   ): Promise<void> {
     try {
       await connection.stop();
-    } catch {
-      // ignore negotiation abort during intentional teardown
+    } catch (error) {
+      console.warn(`${LOG_PREFIX} Teardown stop failed`, error);
     }
 
     if (this.connection === connection) {
@@ -134,28 +210,30 @@ class ChatHubService {
 
   async disconnect(): Promise<void> {
     this.connectionEpoch += 1;
+    console.log(
+      `${LOG_PREFIX} disconnect() called epoch=${this.connectionEpoch} connectionId=${this.connection?.connectionId ?? "none"}`
+    );
 
     const inFlightConnect = this.connectPromise;
     const connection = this.connection;
     this.connection = null;
+    this.connectPromise = null;
 
     if (connection) {
       try {
         await connection.stop();
-      } catch {
-        // ignore abort while stopping during negotiation
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} disconnect stop failed`, error);
       }
     }
 
     if (inFlightConnect) {
       try {
         await inFlightConnect;
-      } catch {
-        // ignore aborted connect promise
+      } catch (error) {
+        console.warn(`${LOG_PREFIX} in-flight connect rejected during disconnect`, error);
       }
     }
-
-    this.connectPromise = null;
   }
 
   onReceiveMessage(handler: ReceiveMessageHandler): () => void {

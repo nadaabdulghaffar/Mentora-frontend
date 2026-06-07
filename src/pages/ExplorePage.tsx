@@ -38,6 +38,13 @@ import {
   type ExploreResourceTab,
   type ExploreTab,
 } from "./explore/exploreTypes";
+import {
+  useEffectRunDiagnostics,
+  usePageLifecycleDiagnostics,
+  withLoadingDiagnostics,
+} from "../utils/pageDiagnosticLogger";
+
+const PAGE_NAME = "ExplorePage";
 
 const TAB_LABELS: Record<ExploreTab, string> = {
   all: "All",
@@ -59,6 +66,8 @@ const PREVIEW_SECTION_ORDER: {
 
 const ExplorePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+
+  usePageLifecycleDiagnostics(PAGE_NAME);
 
   const activeTab = useMemo(
     () => parseExploreTab(searchParams.get("tab")),
@@ -134,19 +143,23 @@ const ExplorePage: React.FC = () => {
   );
 
   const handleTabChange = (tab: ExploreTab) => {
+    console.log(`[${PAGE_NAME}] Refresh trigger — tab change to ${tab}`);
     updateUrl({ tab, clearPage: true });
   };
 
   const handleFiltersChange = (next: ExploreFiltersState) => {
+    console.log(`[${PAGE_NAME}] Refresh trigger — filters change`);
     updateUrl({ filters: next, clearPage: true });
   };
 
   const handleClearFilters = () => {
+    console.log(`[${PAGE_NAME}] Refresh trigger — clear filters`);
     updateUrl({ filters: DEFAULT_EXPLORE_FILTERS, clearPage: true });
     setQuery("");
   };
 
   const handlePageChange = (page: number) => {
+    console.log(`[${PAGE_NAME}] Refresh trigger — page change to ${page}`);
     updateUrl({ page });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -186,6 +199,8 @@ const ExplorePage: React.FC = () => {
     [debouncedQuery, filters]
   );
 
+  useEffectRunDiagnostics(PAGE_NAME, "loadPreview", [activeTab, previewParams]);
+
   useEffect(() => {
     if (activeTab !== "all") return;
 
@@ -194,7 +209,11 @@ const ExplorePage: React.FC = () => {
     const loadPreview = async () => {
       setPreviewLoading(true);
       try {
-        const data = await explorePreview(previewParams);
+        const data = await withLoadingDiagnostics(
+          PAGE_NAME,
+          "preview",
+          () => explorePreview(previewParams)
+        );
 
         const programItems = await mapProgramsToExploreItems(
           data.programs.items
@@ -237,7 +256,7 @@ const ExplorePage: React.FC = () => {
           },
         ]);
       } catch (err) {
-        console.error("Failed to load explore preview", err);
+        console.error(`[${PAGE_NAME}] Failed to load explore preview`, err);
         if (mounted) {
           setPreviewData(null);
           setPreviewSections([]);
@@ -253,6 +272,8 @@ const ExplorePage: React.FC = () => {
     };
   }, [activeTab, previewParams]);
 
+  useEffectRunDiagnostics(PAGE_NAME, "loadTab", [activeTab, apiParams]);
+
   useEffect(() => {
     if (activeTab === "all") return;
 
@@ -260,6 +281,8 @@ const ExplorePage: React.FC = () => {
 
     const loadTab = async () => {
       setTabLoading(true);
+      console.log(`[${PAGE_NAME}] Loading tab=${activeTab}`);
+      const tabStart = performance.now();
       try {
         if (activeTab === "mentors") {
           const res = await exploreMentors(apiParams);
@@ -320,7 +343,7 @@ const ExplorePage: React.FC = () => {
           });
         }
       } catch (err) {
-        console.error(`Failed to load explore ${activeTab}`, err);
+        console.error(`[${PAGE_NAME}] Failed to load explore ${activeTab}`, err);
         if (mounted) {
           setTabItems([]);
           setPagination({
@@ -332,7 +355,12 @@ const ExplorePage: React.FC = () => {
           });
         }
       } finally {
-        if (mounted) setTabLoading(false);
+        if (mounted) {
+          console.log(
+            `[${PAGE_NAME}] Tab ${activeTab} loaded in ${Math.round(performance.now() - tabStart)}ms`
+          );
+          setTabLoading(false);
+        }
       }
     };
 

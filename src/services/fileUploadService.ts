@@ -38,3 +38,30 @@ export async function uploadCommunityCoverImage(
 ): Promise<string> {
   return uploadProgramImage(file);
 }
+
+export async function uploadChatAttachment(
+  file: File
+): Promise<{ fileUrl: string; fileName: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await apiClient.post<
+    ApiResponse<{ fileUrl: string; fileName: string }>
+  >("/File/upload-chat-attachment", formData, {
+    headers: {
+      "Content-Type": undefined,
+    },
+  });
+
+  if (
+    !response.data?.success ||
+    !response.data?.data?.fileUrl
+  ) {
+    throw new Error(
+      response.data?.message ||
+        "Failed to upload file."
+    );
+  }
+
+  return response.data.data;
+}

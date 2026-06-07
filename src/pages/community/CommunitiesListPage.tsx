@@ -45,6 +45,12 @@ import {
 import { mapFeedPostToThread } from './mappers/feedPost.mapper';
 import { resolveAuthorAvatar } from './utils/authorAvatar';
 import { ensureDomainsLoaded } from '../../utils/domainCache';
+import { refreshOwnProfile } from '../profile/profileService';
+import {
+  useEffectRunDiagnostics,
+  usePageLifecycleDiagnostics,
+  withLoadingDiagnostics,
+} from '../../utils/pageDiagnosticLogger';
 
 import type {
   Community,
@@ -52,6 +58,8 @@ import type {
   ThreadComment,
   CreateThreadPayload,
 } from './types';
+
+const PAGE_NAME = 'CommunitiesListPage';
 
 const CommunitiesListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -68,6 +76,44 @@ const CommunitiesListPage: React.FC = () => {
 
   const currentUserId =
     currentUser?.userId || '';
+
+  usePageLifecycleDiagnostics(PAGE_NAME);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser]);
+
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    displayName: string;
+    avatarUrl: string;
+  } | null>(null);
+
+useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      const profile = await withLoadingDiagnostics(
+        PAGE_NAME,
+        'profile',
+        () => refreshOwnProfile()
+      );
+
+      if (profile) {
+        setCurrentUserProfile({
+          displayName:
+            profile.displayName?.trim() ||
+            (currentUser
+              ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
+              : 'You'),
+          avatarUrl: profile.avatarUrl || '',
+        });
+      }
+    } catch (err) {
+      console.error(
+        `[${PAGE_NAME}] Failed to load user profile`,
+        err
+      );
+    }
+  };
+
+  fetchProfile();
+}, []); // <-- مؤقتاً للتشخيص
 
   const [
     isCreateCommunityOpen,
@@ -104,15 +150,20 @@ const CommunitiesListPage: React.FC = () => {
     try {
       setIsLoadingCommunities(true);
 
-      await ensureDomainsLoaded();
-
-      const response = await getMyCommunities();
+      const response = await withLoadingDiagnostics(
+        PAGE_NAME,
+        'my communities',
+        async () => {
+          await ensureDomainsLoaded();
+          return getMyCommunities();
+        }
+      );
       const mapped = mapCommunitiesResponse(response);
 
       setMyCommunities(mapped);
     } catch (error) {
       console.error(
-        'Failed to fetch communities',
+        `[${PAGE_NAME}] Failed to fetch communities`,
         error
       );
     } finally {
@@ -124,9 +175,13 @@ const CommunitiesListPage: React.FC = () => {
      FETCH COMMUNITIES
   ========================= */
 
+  useEffectRunDiagnostics(PAGE_NAME, 'loadMyCommunities', [loadMyCommunities]);
+
   useEffect(() => {
     void loadMyCommunities();
   }, [loadMyCommunities]);
+
+  useEffectRunDiagnostics(PAGE_NAME, 'loadFeed', []);
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -134,12 +189,16 @@ const CommunitiesListPage: React.FC = () => {
         setIsLoadingFeed(true);
         setFeedError(null);
 
-        const { items } = await getCommunityFeed();
+        const { items } = await withLoadingDiagnostics(
+          PAGE_NAME,
+          'feed',
+          () => getCommunityFeed()
+        );
         threads.setThreads(
           items.map(mapFeedPostToThread)
         );
       } catch (error) {
-        console.error('Failed to fetch community feed', error);
+        console.error(`[${PAGE_NAME}] Failed to fetch community feed`, error);
         setFeedError('Failed to load feed');
         threads.setThreads([]);
       } finally {
@@ -184,11 +243,14 @@ const CommunitiesListPage: React.FC = () => {
             content
           );
 
+          const authorName = currentUserProfile?.displayName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You');
+          const authorProfilePicture = currentUserProfile?.avatarUrl;
           const newComment: ThreadComment = {
             id: commentId,
             authorId: currentUserId,
-            authorName: 'You',
-            authorAvatar: resolveAuthorAvatar('You', null),
+            authorName,
+            authorProfilePicture,
+            authorAvatar: resolveAuthorAvatar(authorName, authorProfilePicture),
             content,
             timestamp: new Date().toISOString(),
             likes: 0,
@@ -207,6 +269,8 @@ const CommunitiesListPage: React.FC = () => {
         threads.selectedThread?.id,
         threads.addComment,
         currentUserId,
+        currentUserProfile,
+        currentUser,
       ]
     );
 
@@ -591,13 +655,13 @@ const CommunitiesListPage: React.FC = () => {
                 onCancel={
                   modalState.closeModal
                 }
-                authorAvatar={resolveAuthorAvatar(
+                authorAvatar={currentUserProfile?.avatarUrl || resolveAuthorAvatar(
                   currentUser
                     ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
                     : 'You',
                   null
                 )}
-                authorName="You"
+                authorName={currentUserProfile?.displayName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You')}
               />
             </div>
           </div>

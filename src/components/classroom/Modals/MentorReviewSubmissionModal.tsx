@@ -12,6 +12,7 @@ import {
 
 
 import type { MentorSubmissionSummary } from './MentorSubmissionsModal';
+import { ClassroomUserLink } from '../common/ClassroomUserLink';
 
 export type MentorSubmissionAttachment = {
   id: string;
@@ -95,8 +96,10 @@ const MentorReviewSubmissionModal = ({
     onClose();
   };
 
-  const isReviewed =
-  submission.reviewStatus === "reviewed";
+  const isReviewed = submission.reviewStatus === 'reviewed';
+  const isRevisionRequested =
+    submission.reviewStatus === 'revision_requested';
+  const isReadOnly = isReviewed || isRevisionRequested;
 
   const handleSubmit = (
   requestRevision: boolean
@@ -166,11 +169,11 @@ const MentorReviewSubmissionModal = ({
 
               <div>
 
-                <h2 className="text-2xl font-bold leading-none text-[#1F2432]">
-
-                  {submission.studentName}
-
-                </h2>
+                <ClassroomUserLink
+                  userId={submission.studentId}
+                  name={submission.studentName}
+                  className="text-2xl font-bold leading-none text-[#1F2432]"
+                />
 
                 <p className="text-sm text-[#6F7689]">
 
@@ -342,7 +345,7 @@ const MentorReviewSubmissionModal = ({
               </div>
 
               <textarea
-                disabled={isReviewed}
+                disabled={isReadOnly}
                 value={feedback}
                 onChange={(event) =>
                   setFeedback(event.target.value)
@@ -388,7 +391,7 @@ const MentorReviewSubmissionModal = ({
                     type="number"
                     min={0}
                     max={100}
-                    disabled={isReviewed}
+                    disabled={isReadOnly}
                     value={grade}
                     onChange={(event) => {
 
@@ -417,7 +420,7 @@ const MentorReviewSubmissionModal = ({
               </div>
 
             </div>
-            {!isReviewed && (
+            {!isReadOnly && (
   <>
 
             <button
@@ -453,6 +456,20 @@ const MentorReviewSubmissionModal = ({
 
     <p className="text-sm text-green-600">
       This submission has already been reviewed.
+    </p>
+
+  </div>
+)}
+
+            {isRevisionRequested && (
+  <div className="mt-6 rounded-xl border border-[#F5D0D8] bg-[#FFF5F7] p-4">
+
+    <p className="font-semibold text-[#AF2F4D]">
+      Revision Requested
+    </p>
+
+    <p className="text-sm text-[#8D3E52]">
+      The mentee has been asked to revise and resubmit this task.
     </p>
 
   </div>

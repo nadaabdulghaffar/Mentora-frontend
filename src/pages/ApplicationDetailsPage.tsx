@@ -3,10 +3,8 @@ import {
   Calendar,
   Clock,
   Heart,
-  MessageSquare,
   Share2,
     Link,
-
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../config/api";
@@ -26,14 +24,12 @@ import { getProgramView,
     getProgramComments,
 addProgramComment,
   canApply,
-
  } from "../services/programService";
+
 import { toast } from 'react-hot-toast';
 
-import type { ProgramViewDto
-  
- }
-from "../services/programService";
+import type { ProgramViewDto } from "../services/programService";
+
 
 const ApplicationDetailsPage = () => {
   const { id } = useParams();
@@ -58,6 +54,8 @@ const [program, setProgram] =
 
 const [loading, setLoading] =
   useState(true);
+
+
 
   const resolveImageUrl = (url?: string | null) => {
     if (!url) return undefined;
@@ -103,6 +101,8 @@ const [eligibilityGate, setEligibilityGate] = useState<{
   checkedAt: 0,
 });
 const ELIGIBILITY_CACHE_TTL_MS = 15_000;
+
+
 
   useEffect(() => {
   
@@ -156,6 +156,12 @@ useEffect(() => {
   openFlowRequestRef.current += 1;
 }, [id]);
 
+const userStr = localStorage.getItem("user");
+const user = userStr ? JSON.parse(userStr) : null;
+const userRoles = Array.isArray(user?.roles) ? user.roles : (Array.isArray(user?.Roles) ? user.Roles : []);
+const isMentorRole = userRoles.includes("Mentor");
+
+const hasDeadlinePassed = program ? new Date(program.deadline) < new Date() : false;
 
   const handleToggleLike = async () => {
   if (!program) return;
@@ -604,6 +610,11 @@ src={
                   <span className="px-3 py-1 text-sm rounded-full bg-[#FEF3C7] text-[#B45309] font-medium">
 {program.targetLevel}
                   </span>
+                  {program.educationLevel && (
+                    <span className="px-3 py-1 text-sm rounded-full bg-[#ECFCCB] text-[#4D7C0F] font-medium">
+                      {program.educationLevel}
+                    </span>
+                  )}
                 </div>
 
                 {/* META */}
@@ -611,7 +622,7 @@ src={
 
                   <div className="flex items-center gap-2">
                     <Users size={20} />
-                    <span>{program.menteesCount} Mentees</span>
+                    <span>{program.menteesCount} {program.capacity ? `/ ${program.capacity}` : ''} Mentees</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -632,11 +643,40 @@ src={
                 {/* DIVIDER */}
                 <div className="h-[1px] bg-[#EEF1F6] my-6" />
 
+                {program.technologies && program.technologies.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {program.technologies.map((tech: any) => {
+                      const EXPERIENCE_LEVELS: Record<number, string> = {
+                        1: "None",
+                        2: "Beginner",
+                        3: "Intermediate",
+                        4: "Advanced",
+                      };
+                      const levelName = EXPERIENCE_LEVELS[tech.requiredExperienceLevel] || tech.requiredExperienceLevel;
+                      const displayName = tech.technologyName || `Tech ${tech.technologyId}`;
+                      return (
+                        <span key={tech.technologyId} className="px-3 py-1 text-sm rounded-full bg-[#F3F4F6] text-[#374151] font-medium border border-[#E5E7EB]">
+                          {displayName} &mdash; {levelName}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
 {/* ACTIONS */}
 <div className="flex flex-wrap items-center gap-8 text-[15px]">
 
-
-
+  {/* LIKE */}
+  <button
+    type="button"
+    onClick={handleToggleLike}
+    className={`flex items-center gap-2 cursor-pointer transition ${
+      program.isLiked ? 'text-red-500 hover:text-red-600' : 'text-[#64748B] hover:text-[#6D5DD3]'
+    }`}
+  >
+    <Heart size={20} fill={program.isLiked ? "currentColor" : "none"} />
+    <span>{program.likesCount} Likes</span>
+  </button>
   {/* SAVE */}
   {/* Save removed per request */}
 {/* SHARE */}
@@ -765,40 +805,46 @@ src={
 </div>
               </div>
 
-            <button
-  onClick={
-    program.isApplied
-      ? handleWithdrawApplication
-      : handleOpenApplyModal
-  }
-  disabled={submittingApplication || isCheckingCanApply}
-  className={`
-    px-8 py-3 rounded-2xl font-medium text-[15px]
-    h-fit self-start sm:self-center transition
+            {!isMentorRole && (
+              <button
+                onClick={() => {
+                  if (program.isApplied) {
+                    handleWithdrawApplication();
+                  } else {
+                    handleOpenApplyModal();
+                  }
+                }}
+                disabled={submittingApplication || isCheckingCanApply || (program.applicationStatus !== 'Pending' && program.isApplied) || (!program.isApplied && hasDeadlinePassed)}
+                className={`
+                  px-8 py-3 rounded-2xl font-medium text-[15px]
+                  h-fit self-start sm:self-center transition
 
-    ${
-      program.isApplied
-        ? "bg-red-100 text-red-600 hover:bg-red-200"
-        : "bg-[#6D5DD3] text-white hover:opacity-90"
-    }
+                  ${
+                    program.isApplied
+                      ? "bg-red-100 text-red-600 hover:bg-red-200"
+                      : "bg-[#6D5DD3] text-white hover:opacity-90"
+                  }
 
-    ${
-      submittingApplication || isCheckingCanApply
-        ? "opacity-60 cursor-not-allowed"
-        : ""
-    }
-  `}
->
-  {submittingApplication || isCheckingCanApply
-    ? program.isApplied
-      ? "Cancelling..."
-      : isCheckingCanApply
-      ? "Checking..."
-      : "Applying..."
-    : program.isApplied
-    ? "Withdraw Application"
-    : "Apply to Program"}
-</button>
+                  ${
+                    submittingApplication || isCheckingCanApply || (program.applicationStatus !== 'Pending' && program.isApplied) || (!program.isApplied && hasDeadlinePassed)
+                      ? "opacity-60 cursor-not-allowed"
+                      : ""
+                  }
+                `}
+              >
+                {submittingApplication || isCheckingCanApply
+                  ? (program.isApplied ? "Cancelling..." : isCheckingCanApply ? "Checking..." : "Applying...")
+                  : program.applicationStatus === 'Accepted'
+                  ? "Already Accepted"
+                  : program.applicationStatus === 'Rejected'
+                  ? "Already Rejected"
+                  : program.isApplied
+                  ? "Withdraw Application"
+                  : hasDeadlinePassed
+                  ? "Applications Closed"
+                  : "Apply to Program"}
+              </button>
+            )}
             </div>
 
             {/* ABOUT */}
@@ -810,6 +856,13 @@ src={
               <p className="text-[15px] text-[#64748B] leading-7">
                {program.description}
               </p>
+
+              {program.availability && (
+                <>
+                  <h4 className="text-lg font-semibold text-[#1F2432] mt-6 mb-2">Availability</h4>
+                  <p className="text-[15px] text-[#64748B] leading-7">{program.availability}</p>
+                </>
+              )}
             </div>
 
             {/* ROADMAP */}
@@ -903,7 +956,7 @@ src={
   <button
     onClick={() => {
       navigate(
-        `/mentor/${program.mentorProfileId}`
+        `/profile/${program.mentorProfileId}`
       );
     }}
     className="text-sm text-[#6D5DD3] mt-4 cursor-pointer hover:underline"

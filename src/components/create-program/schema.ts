@@ -77,7 +77,7 @@ const questionSchema = z
     // This allows drafts with incomplete MCQ rows without blocking form submission
   });
 
-export const createProgramSchema = z
+export const getCreateProgramSchema = (isEditMode: boolean, initialDeadline?: string) => z
   .object({
     domainId: z.coerce
       .number()
@@ -145,7 +145,7 @@ export const createProgramSchema = z
       ),
 
     duration: z
-      .string()
+      .union([z.string(), z.number()])
       .optional(),
 
     availability:
@@ -179,22 +179,7 @@ technologies: z
 
 deadline: z
   .string()
-  .min(1, "Please select an application deadline")
-  .refine(
-    (value) => {
-      const selectedDate = new Date(value);
-      const today = new Date();
-
-      today.setHours(0, 0, 0, 0);
-      selectedDate.setHours(0, 0, 0, 0);
-
-      return selectedDate > today;
-    },
-    {
-      message:
-        "Please choose a future application deadline",
-    }
-  ),
+  .min(1, "Please select an application deadline"),
 
     questions: z
       .array(
@@ -241,6 +226,28 @@ deadline: z
           );
         }
       );
+
+      // Validate deadline only if we are not in edit mode with an unchanged deadline
+      if (data.deadline) {
+        const selectedDate = new Date(data.deadline);
+        const today = new Date();
+
+        today.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0);
+
+        if (isEditMode && initialDeadline && data.deadline === initialDeadline) {
+          // If editing and the deadline hasn't changed, skip validation
+          return;
+        }
+
+        if (selectedDate <= today) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["deadline"],
+            message: "Please choose a future application deadline",
+          });
+        }
+      }
     }
   );
 

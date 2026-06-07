@@ -27,6 +27,7 @@ export type ExploreStyleProgramItem = {
   phases?: string;
   isApplied?: boolean;
   author?: { avatar: string; name: string };
+  deadline?: string;
 };
 
 export type MyProgramStyleItem = {
@@ -101,6 +102,7 @@ export function mapPublishedProgramToExploreStyle(
         mentorDisplay.avatar ??
         `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(mentorDisplay.name)}`,
     },
+    deadline: (p.deadline ?? p.Deadline) as string | undefined,
   };
 }
 

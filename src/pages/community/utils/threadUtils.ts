@@ -3,7 +3,7 @@
  * Helper functions for thread operations, formatting, and data manipulation
  */
 
-import { CommunityThread, ThreadComment } from '../types';
+import type { CommunityThread, ThreadComment } from '../types';
 
 // ============================================
 // Thread Operations

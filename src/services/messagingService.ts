@@ -112,6 +112,14 @@ export const messagingService = {
     return unwrapMessagingEnvelope(response.data);
   },
 
+  async getUnreadCount(): Promise<number> {
+    const response = await apiClient.get<ApiResponse<number>>(
+      "/conversations/unread-count"
+    );
+
+    return unwrapMessagingEnvelope(response.data);
+  },
+
   async getMessages(conversationId: string): Promise<MessageResponseDto[]> {
     const response = await apiClient.get<ApiResponse<MessageResponseDto[]>>(
       `/conversations/${conversationId}/messages`

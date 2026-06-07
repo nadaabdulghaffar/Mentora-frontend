@@ -69,30 +69,38 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.currentTarget.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const url = event.target?.result as string;
-        const attachment: ThreadAttachment = {
-          id: `att-${Date.now()}`,
-          type: file.type.startsWith('image/') ? 'image' : 'file',
-          url,
-          name: file.name,
-          mimeType: file.type,
-        };
+    const file = files[0];
+    const isImage = file.type.startsWith('image/');
+    const type = isImage ? 'image' : 'file';
 
-        setAttachments((prev) => [...prev, attachment]);
-        if (attachment.type === 'image') {
-          setPreviewUrls((prev) => ({
-            ...prev,
-            [attachment.id]: url,
-          }));
-        }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+      const attachment: ThreadAttachment & { fileObj?: File } = {
+        id: `att-${Date.now()}-${type}`,
+        type,
+        url,
+        name: file.name,
+        mimeType: file.type,
+        fileObj: file,
       };
-      reader.readAsDataURL(file);
-    });
+
+      setAttachments((prev) => {
+        const filtered = prev.filter((a) => a.type !== type);
+        return [...filtered, attachment];
+      });
+
+      if (isImage) {
+        setPreviewUrls((prev) => ({
+          ...prev,
+          [attachment.id]: url,
+        }));
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const removeAttachment = (attachmentId: string) => {
@@ -222,7 +230,6 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({
             <input
               type="file"
               accept="image/*"
-              multiple
               onChange={handleFileChange}
               className="hidden"
               disabled={isLoading}
@@ -233,7 +240,6 @@ export const CreatePostForm: React.FC<CreatePostFormProps> = ({
             <span className="hidden sm:inline">File</span>
             <input
               type="file"
-              multiple
               onChange={handleFileChange}
               className="hidden"
               disabled={isLoading}

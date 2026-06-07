@@ -10,6 +10,7 @@ import { Heart, Reply as ReplyIcon, Pencil, Trash2, MoreHorizontal } from 'lucid
 import type { ThreadComment } from '../../pages/community/types';
 import { formatTimestamp, validateCommentContent } from '../../pages/community/utils/threadUtils';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
+import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
 
 interface CommentThreadProps {
   comment: ThreadComment;
@@ -56,8 +57,6 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   showCommentLike = true,
   showReplyAction = true,
 }) => {
-  const isCommunity = variant === 'community';
-
   const formatCommentTimestamp = (timestamp: string): string => {
     if (variant !== 'classroom') {
       return formatTimestamp(timestamp);
@@ -134,7 +133,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
 
   const showEdit = Boolean(onEdit && commentAllowsEdit(currentUserId, comment));
   const showDelete = Boolean(onDelete && commentAllowsDelete(currentUserId, comment));
-  const showOverflowMenu = variant === 'community' && (showEdit || showDelete) && !isEditing;
+  const showOverflowMenu = (showEdit || showDelete) && !isEditing;
 
   const openMenu = () => {
     if (menuOpen) {
@@ -260,7 +259,11 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900 text-sm">{comment.authorName}</span>
+            <ClassroomUserLink
+              userId={comment.authorId}
+              name={comment.authorName}
+              className="font-semibold text-gray-900 text-sm"
+            />
             {comment.authorRole && comment.authorRole !== 'member' && (
               <span
                 className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
@@ -319,7 +322,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
           )}
 
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            {!isCommunity && (
+            {showCommentLike && (
               <button
                 type="button"
                 onClick={() => {
@@ -341,7 +344,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             )}
 
             <div className="inline-flex items-center gap-0.5">
-              {!isCommunity && canNest && (
+              {showReplyAction && canNest && (
                 <button
                   type="button"
                   onClick={() => setShowReplyInput(!showReplyInput)}
@@ -367,7 +370,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </div>
           </div>
 
-          {!isCommunity && showReplyInput && (
+          {showReplyAction && showReplyInput && (
             <div className="mt-3 space-y-2">
               <textarea
                 value={replyContent}
@@ -405,7 +408,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </div>
           )}
 
-          {!isCommunity && (localReplies.length > 0 || comment.replies?.length) && (
+          {showReplyAction && (localReplies.length > 0 || comment.replies?.length) && (
             <div className="mt-3">
               {!showReplies ? (
                 <button

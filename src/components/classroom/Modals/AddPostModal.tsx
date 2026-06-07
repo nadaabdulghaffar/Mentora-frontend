@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Image, Paperclip, Smile } from 'lucide-react';
-import { messagingService, isImageAttachment } from '../../../services/messagingService';
+import { messagingService, isImageAttachment, toAbsoluteFileUrl } from '../../../services/messagingService';
 
 export type AddPostAttachment = {
   id: string;
@@ -81,16 +81,20 @@ const AddPostModal = ({
       return;
     }
 
-    const nextAttachments = selectedFiles.map((file, index) => ({
-      id: `${type}-${file.name}-${Date.now()}-${index}`,
+    const file = selectedFiles[0];
+    const newAttachment: AddPostAttachment = {
+      id: `${type}-${file.name}-${Date.now()}`,
       name: file.name,
       type,
       sizeLabel: type === 'image' ? 'Image' : 'File',
       url: URL.createObjectURL(file),
       file,
-    }));
+    };
 
-    setAttachments((current) => [...current, ...nextAttachments]);
+    setAttachments((current) => {
+      const filtered = current.filter((att) => att.type !== type);
+      return [...filtered, newAttachment];
+    });
     event.target.value = '';
   };
 
@@ -119,7 +123,7 @@ const AddPostModal = ({
               name: upl.fileName || att.name,
               type: isImage ? 'image' : 'file',
               sizeLabel: att.sizeLabel,
-              url: upl.fileUrl,
+              url: toAbsoluteFileUrl(upl.fileUrl),
             } as AddPostAttachment;
           }
           if (!att.url?.trim() || att.url.startsWith('blob:')) {
@@ -128,8 +132,11 @@ const AddPostModal = ({
           return {
             ...att,
             name: att.name || 'Attachment',
-            type: att.type === 'image' ? 'image' : 'file',
-          };
+            type: att.type === 'image'
+              ? ('image' as const)
+              : ('file' as const),
+            url: toAbsoluteFileUrl(att.url),
+          } satisfies AddPostAttachment;
         })
       );
 
@@ -197,23 +204,48 @@ const AddPostModal = ({
           {attachments.length > 0 && (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-[#1F2432]">Attachments</p>
-              <div className="flex flex-wrap gap-2">
-                {attachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center gap-2 rounded-full border border-[#DDE2EF] bg-[#F8FAFE] px-3 py-1.5 text-sm text-[#4A546A]"
-                  >
-                    <span className="font-medium">{attachment.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(attachment.id)}
-                      className="text-[#7A8094] hover:text-[#1F2432]"
-                      aria-label={`Remove ${attachment.name}`}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {attachments.map((attachment) => {
+                  const isImage = attachment.type === 'image';
+                  return (
+                    <div
+                      key={attachment.id}
+                      className="group relative flex items-center gap-3 rounded-2xl border border-[#DDE2EF] bg-[#F8FAFE] p-3 transition hover:border-[#5E4BC5]/40 hover:bg-[#F2F5FD]"
                     >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
+                      {isImage ? (
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ECEFF6] bg-white">
+                          <img
+                            src={attachment.url}
+                            alt={attachment.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-[#ECEFF6] bg-white text-[#5E4BC5]">
+                          <Paperclip size={20} />
+                        </div>
+                      )}
+                      
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#1F2432]">
+                          {attachment.name}
+                        </p>
+                        <p className="text-xs text-[#6F7689]">
+                          {attachment.sizeLabel || (isImage ? 'Image' : 'File')}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(attachment.id)}
+                        className="rounded-lg p-1 text-[#7A8094] hover:bg-white hover:text-red-500 shadow-sm transition"
+                        aria-label={`Remove ${attachment.name}`}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -249,14 +281,12 @@ const AddPostModal = ({
               ref={imageInputRef}
               type="file"
               accept="image/*"
-              multiple
               className="hidden"
               onChange={(event) => handleAddAttachment(event, 'image')}
             />
             <input
               ref={fileInputRef}
               type="file"
-              multiple
               className="hidden"
               onChange={(event) => handleAddAttachment(event, 'file')}
             />

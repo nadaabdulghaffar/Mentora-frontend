@@ -1,6 +1,7 @@
 import type { CommunityPostResponse } from '../../../services/communityService';
 import type { CommunityThread } from '../types';
 import { resolveAuthorAvatar } from '../utils/authorAvatar';
+import { toAbsoluteFileUrl } from '../../../services/messagingService';
 
 export function mapCommunityPostToThread(
   post: CommunityPostResponse,
@@ -21,14 +22,28 @@ export function mapCommunityPostToThread(
     commentCount: post.commentsCount,
     shareCount: post.sharesCount,
     comments: [],
-    attachments: post.imageUrl
+    attachments: (post.imageUrl || post.fileUrl)
       ? [
-          {
-            id: post.communityPostId,
-            type: 'image',
-            url: post.imageUrl,
-            name: 'Post image',
-          },
+          ...(post.imageUrl
+            ? [
+                {
+                  id: `${post.communityPostId}-image`,
+                  type: 'image' as const,
+                  url: toAbsoluteFileUrl(post.imageUrl),
+                  name: 'Post image',
+                },
+              ]
+            : []),
+          ...(post.fileUrl
+            ? [
+                {
+                  id: `${post.communityPostId}-file`,
+                  type: 'file' as const,
+                  url: toAbsoluteFileUrl(post.fileUrl),
+                  name: post.fileName || 'Attached file',
+                },
+              ]
+            : []),
         ]
       : undefined,
     isLiked: post.isLiked,

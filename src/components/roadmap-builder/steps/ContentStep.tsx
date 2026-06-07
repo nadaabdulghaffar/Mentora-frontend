@@ -128,7 +128,7 @@ export default function ContentStep() {
         <div className="mt-6">
           <RoadmapNotice
             variant="info"
-            message="This roadmap is live. You can add topics and edit content here; use Save draft to persist. Removing published topics or phases is not supported."
+            message="This roadmap is live."
             splitMessageToList={false}
           />
         </div>

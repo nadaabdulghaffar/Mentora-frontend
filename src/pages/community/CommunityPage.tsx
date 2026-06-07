@@ -22,10 +22,10 @@ import {
   CommunityFeedSection,
   CommunityMembersSection,
   CommunitySettingsSection,
-  CommunityTab,
 } from './sections';
+import type { CommunityTab } from './sections';
 import { useCommunityModal, useThreads, useCommunity, useCommunityMembers } from './hooks';
-import { MOCK_COMMUNITY, MOCK_COMMUNITY_THREADS, MOCK_MEMBERS, MOCK_MEMBER_REQUESTS, COMMUNITY_CATEGORIES } from './constants';
+import { MOCK_COMMUNITY, MOCK_MEMBERS, MOCK_MEMBER_REQUESTS } from './constants';
 import type {
   Community,
   CommunityThread,
@@ -40,6 +40,7 @@ import { resolveAuthorAvatar } from './utils/authorAvatar';
 import {
   messagingService,
   isValidUserGuid,
+  toAbsoluteFileUrl,
 } from '../../services/messagingService';
 import { toStorageCommunityImageUrl } from '../../utils/communityImageUrl';
 
@@ -64,12 +65,20 @@ import {
   extractErrorMessage,
 } from '../../services/communityService';
 
+import { uploadChatAttachment } from '../../services/fileUploadService';
+
 import {
   mapCommunityDetails,
 } from './mappers/communityDetails.mapper';
 import { mapCommunityPostToThread } from './mappers/communityPost.mapper';
 
 import authAPI from "../../services/authService";
+import { refreshOwnProfile } from '../profile/profileService';
+import {
+  useEffectRunDiagnostics,
+  usePageLifecycleDiagnostics,
+  withLoadingDiagnostics,
+} from '../../utils/pageDiagnosticLogger';
 
 
 
@@ -92,6 +101,8 @@ import authAPI from "../../services/authService";
  * - Community info sidebar
  * - Settings management
  */
+const PAGE_NAME = 'CommunityPage';
+
 const CommunityPage: React.FC = () => {
   // State Management
   const modalState = useCommunityModal();
@@ -127,6 +138,11 @@ const currentUserId =
   const [searchParams, setSearchParams] = useSearchParams();
   const sharedThreadId = searchParams.get('thread');
 
+  usePageLifecycleDiagnostics(PAGE_NAME);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser]);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchCommunity', [viewingCommunityId]);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchPosts', [viewingCommunityId]);
+
   const [
   backendCommunity,
   setBackendCommunity,
@@ -150,6 +166,32 @@ const [pageAlert, setPageAlert] = useState<{
   type: 'success' | 'error';
   message: string;
 } | null>(null);
+
+  const [currentUserProfile, setCurrentUserProfile] = useState<{
+    displayName: string;
+    avatarUrl: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const profile = await withLoadingDiagnostics(
+          PAGE_NAME,
+          'profile',
+          () => refreshOwnProfile()
+        );
+        if (profile) {
+          setCurrentUserProfile({
+            displayName: profile.displayName?.trim() || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You'),
+            avatarUrl: profile.avatarUrl || '',
+          });
+        }
+      } catch (err) {
+        console.error(`[${PAGE_NAME}] Failed to load user profile`, err);
+      }
+    };
+    fetchProfile();
+  }, [currentUser]);
 
   const {
     owners: communityOwners,
@@ -187,12 +229,14 @@ const [pageAlert, setPageAlert] = useState<{
           null
         );
 
-        await ensureDomainsLoaded();
-
-        const response =
-          await getCommunityById(
-            viewingCommunityId
-          );
+        const response = await withLoadingDiagnostics(
+          PAGE_NAME,
+          `community ${viewingCommunityId}`,
+          async () => {
+            await ensureDomainsLoaded();
+            return getCommunityById(viewingCommunityId);
+          }
+        );
 
         const mapped =
           mapCommunityDetails(
@@ -204,7 +248,7 @@ const [pageAlert, setPageAlert] = useState<{
         );
       } catch (error) {
         console.error(
-          "Failed to fetch community",
+          `[${PAGE_NAME}] Failed to fetch community`,
           error
         );
 
@@ -274,10 +318,11 @@ useEffect(() => {
   const fetchPosts =
     async () => {
       try {
-        const posts =
-          await getCommunityPosts(
-            viewingCommunityId
-          );
+        const posts = await withLoadingDiagnostics(
+          PAGE_NAME,
+          `posts for ${viewingCommunityId}`,
+          () => getCommunityPosts(viewingCommunityId)
+        );
 
 
 const mappedThreads = posts.map((post) =>
@@ -289,7 +334,7 @@ const mappedThreads = posts.map((post) =>
         );
       } catch (error) {
         console.error(
-          "Failed to fetch posts",
+          `[${PAGE_NAME}] Failed to fetch posts`,
           error
         );
       }
@@ -312,130 +357,161 @@ const handleThreadSubmit =
       payload:
         CreateThreadPayload
     ) => {
-      const editing =
-        modalState.editingThread;
+      if (!viewingCommunityId) return;
 
-    
-if (editing) {
-  try {
-    const updated =
-      await updateCommunityPost(
-        editing.id,
-        {
-          content:
-            payload.content,
-
-          imageUrl:
-            payload
-              .attachments?.[0]
-              ?.url,
-        }
-      );
-
-    threads.updateThread(
-      editing.id,
-      {
-        content:
-          updated.content,
-
-        attachments:
-          payload.attachments,
-      }
-    );
-
-    modalState.closeModal();
-
-    return;
-  } catch (error) {
-    console.error(
-      "Failed to update post",
-      error
-    );
-
-    return;
-  }
-}
-
-
+      setIsCreatingPost(true);
       try {
-        const postId =
-          await createCommunityPost(
-            viewingCommunityId,
+        const editing =
+          modalState.editingThread;
+
+        let imageUrl: string | undefined = undefined;
+        let fileUrl: string | undefined = undefined;
+        let fileName: string | undefined = undefined;
+
+        if (payload.attachments && payload.attachments.length > 0) {
+          for (const attachment of payload.attachments) {
+            let url = attachment.url;
+            const fileObj = (attachment as any).fileObj;
+            
+            if (fileObj instanceof File) {
+              try {
+                const uploadResult = await uploadChatAttachment(fileObj);
+                url = uploadResult.fileUrl;
+                attachment.url = toAbsoluteFileUrl(url);
+              } catch (err) {
+                console.error("Failed to upload attachment file", err);
+                alert("Failed to upload attachment: " + attachment.name);
+                return;
+              }
+            }
+
+            if (attachment.type === 'image') {
+              imageUrl = url;
+            } else if (attachment.type === 'file') {
+              fileUrl = url;
+              fileName = attachment.name;
+            }
+          }
+        }
+      
+        if (editing) {
+          try {
+            const updated =
+              await updateCommunityPost(
+                editing.id,
+                {
+                  content:
+                    payload.content,
+                  imageUrl: imageUrl || undefined,
+                  fileUrl: fileUrl || undefined,
+                  fileName: fileName || undefined,
+                }
+              );
+
+            threads.updateThread(
+              editing.id,
+              {
+                content:
+                  updated.content,
+                attachments:
+                  payload.attachments,
+              }
+            );
+
+            modalState.closeModal();
+            return;
+          } catch (error) {
+            console.error(
+              "Failed to update post",
+              error
+            );
+            return;
+          }
+        }
+
+        try {
+          const postId =
+            await createCommunityPost(
+              viewingCommunityId,
+              {
+                content:
+                  payload.content,
+                imageUrl: imageUrl || undefined,
+                fileUrl: fileUrl || undefined,
+                fileName: fileName || undefined,
+              }
+            );
+
+          const authorName = currentUserProfile?.displayName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You');
+          const authorProfilePicture = currentUserProfile?.avatarUrl;
+          const newThread: CommunityThread =
             {
+              id:
+                typeof postId ===
+                "string"
+                  ? postId
+                  : `thread-${Date.now()}`,
+
+              authorId:
+                currentUserId,
+
+              authorName,
+
+              authorProfilePicture,
+
+              authorAvatar: resolveAuthorAvatar(authorName, authorProfilePicture),
+
               content:
                 payload.content,
 
-              imageUrl:
-                payload
-                  .attachments?.[0]
-                  ?.url,
-            }
+              timestamp:
+                new Date().toISOString(),
+
+              likes: 0,
+
+              commentCount:
+                0,
+
+              shareCount:
+                0,
+
+              comments: [],
+
+              category:
+                payload.category,
+
+              attachments:
+                payload.attachments,
+
+              isLiked:
+                false,
+
+              isSaved:
+                false,
+
+              canEdit:
+                true,
+
+              canDelete:
+                true,
+
+              communityId:
+                viewingCommunityId,
+            };
+
+          threads.addThread(
+            newThread
           );
 
-        const newThread: CommunityThread =
-          {
-            id:
-              typeof postId ===
-              "string"
-                ? postId
-                : `thread-${Date.now()}`,
-
-            authorId:
-              currentUserId,
-
-            authorName:
-              "You",
-
-            authorAvatar: resolveAuthorAvatar("You", null),
-
-            content:
-              payload.content,
-
-            timestamp:
-              new Date().toISOString(),
-
-            likes: 0,
-
-            commentCount:
-              0,
-
-            shareCount:
-              0,
-
-            comments: [],
-
-            category:
-              payload.category,
-
-            attachments:
-              payload.attachments,
-
-            isLiked:
-              false,
-
-            isSaved:
-              false,
-
-            canEdit:
-              true,
-
-            canDelete:
-              true,
-
-            communityId:
-              viewingCommunityId,
-          };
-
-        threads.addThread(
-          newThread
-        );
-
-        modalState.closeModal();
-      } catch (error) {
-        console.error(
-          "Failed to create post",
-          error
-        );
+          modalState.closeModal();
+        } catch (error) {
+          console.error(
+            "Failed to create post",
+            error
+          );
+        }
+      } finally {
+        setIsCreatingPost(false);
       }
     },
     [
@@ -443,6 +519,9 @@ if (editing) {
       modalState,
       currentUserId,
       viewingCommunityId,
+      setIsCreatingPost,
+      currentUserProfile,
+      currentUser,
     ]
   );
 
@@ -550,6 +629,7 @@ const handleCommentSubmit =
       if (!threadId)
         return;
 
+      setIsLoadingComment(true);
       try {
         const commentId =
           await createComment(
@@ -557,33 +637,22 @@ const handleCommentSubmit =
             content
           );
 
+        const authorName = currentUserProfile?.displayName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You');
+        const authorProfilePicture = currentUserProfile?.avatarUrl;
         const newComment: ThreadComment =
           {
             id: commentId,
-
-            authorId:
-              currentUserId,
-
-            authorName:
-              "You",
-
-            authorAvatar: resolveAuthorAvatar("You", null),
-
+            authorId: currentUserId,
+            authorName,
+            authorProfilePicture,
+            authorAvatar: resolveAuthorAvatar(authorName, authorProfilePicture),
             content,
-
-            timestamp:
-              new Date().toISOString(),
-
+            timestamp: new Date().toISOString(),
             likes: 0,
-
-            isLiked:
-              false,
-
-            canEdit:
-              true,
-
-            canDelete:
-              true,
+            isLiked: false,
+            replies: [],
+            canEdit: true,
+            canDelete: true,
           };
 
         threads.addComment(
@@ -595,11 +664,16 @@ const handleCommentSubmit =
           "Failed to create comment",
           error
         );
+      } finally {
+        setIsLoadingComment(false);
       }
     },
     [
       threads,
       currentUserId,
+      setIsLoadingComment,
+      currentUserProfile,
+      currentUser,
     ]
   );
 
@@ -711,19 +785,7 @@ const handleThreadDelete =
   // Member Operations
   // ============================================
 
-  const handleApproveMember = useCallback(
-    (requestId: string) => {
-      community.approveMemberRequest(requestId);
-    },
-    [community]
-  );
 
-  const handleRejectMember = useCallback(
-    (requestId: string) => {
-      community.rejectMemberRequest(requestId);
-    },
-    [community]
-  );
 
   const handleMessageMember = useCallback(
     async (memberId: string) => {
@@ -1177,6 +1239,8 @@ onLike={
                 currentUserId={currentUserId}
                 onThreadEditRequest={handleThreadEditRequest}
                 onThreadDelete={handleThreadDelete}
+                currentUserAvatar={currentUserProfile?.avatarUrl}
+                currentUserDisplayName={currentUserProfile?.displayName}
               />
             )}
 
@@ -1258,13 +1322,13 @@ onLike={
               variant={modalState.editingThread ? 'edit' : 'create'}
               onSubmit={handleThreadSubmit}
               onCancel={modalState.closeModal}
-              authorAvatar={resolveAuthorAvatar(
+              authorAvatar={currentUserProfile?.avatarUrl || resolveAuthorAvatar(
                 currentUser
                   ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
                   : 'You',
                 null
               )}
-              authorName="You"
+              authorName={currentUserProfile?.displayName || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You')}
               isLoading={isCreatingPost}
             />
           </div>

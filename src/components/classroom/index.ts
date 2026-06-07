@@ -1,5 +1,6 @@
 // Main component
 export { default as ClassroomRoadmapSection } from './ClassroomRoadmapSection';
+export { default as ClassroomRoadmapResourceSection } from './ClassroomRoadmapResourceSection';
 
 // Roadmap views
 export { MentorRoadmap } from './roadmap/MentorRoadmap';
@@ -16,6 +17,7 @@ export { MentorAssignmentsList, MenteeTasksList } from './roadmap/AssignmentsLis
 export { ProgressBar } from './common/ProgressBar';
 export { Checkbox } from './common/Checkbox';
 export { IconButton } from './common/IconButton';
+export { ClassroomUserLink } from './common/ClassroomUserLink';
 
 // Hooks
 export { useToggleList } from './hooks/useToggleList';

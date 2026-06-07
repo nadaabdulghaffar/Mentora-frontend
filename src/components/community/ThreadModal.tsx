@@ -5,10 +5,11 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, Share2, MessageCircle, Link, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { X, Heart, Share2, MessageCircle, Link, MoreHorizontal, Pencil, Trash2, Paperclip } from 'lucide-react';
 import { Modal } from '../Modal';
 import { CommentThread } from './CommentThread';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
+import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
 import type { CommunityThread, ThreadComment } from '../../pages/community/types';
 import { formatTimestamp } from '../../pages/community/utils/threadUtils';
 import { buildCommunityPostShareUrl } from '../../pages/community/utils/shareUtils';
@@ -466,7 +467,11 @@ const handleLocalEdit =
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-gray-900">{thread.authorName}</p>
+                <ClassroomUserLink
+                  userId={thread.authorId}
+                  name={thread.authorName}
+                  className="font-semibold text-gray-900 text-sm"
+                />
                 {thread.authorRole && thread.authorRole !== 'member' && (
                   <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 capitalize">
                     {thread.authorRole}
@@ -483,6 +488,37 @@ const handleLocalEdit =
               <h2 className="mb-3 text-xl font-bold text-gray-900">{thread.title}</h2>
             )}
             <p className="whitespace-pre-wrap text-base text-gray-700 leading-relaxed">{thread.content}</p>
+
+            {/* Attachment Image Preview */}
+            {thread.attachments?.filter(a => a.type === 'image').map((att) => (
+              <div key={att.id} className="mt-4">
+                <a href={att.url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={att.url}
+                    alt={att.name || "attachment"}
+                    className="max-h-[300px] w-full rounded-md object-contain bg-gray-50 border border-gray-100 cursor-pointer"
+                  />
+                </a>
+              </div>
+            ))}
+
+            {/* Attachment File Link */}
+            {thread.attachments?.filter(a => a.type === 'file').map((att) => (
+              <div key={att.id} className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <Paperclip size={18} className="text-gray-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 truncate">{att.name || 'Attachment'}</p>
+                </div>
+                <a
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                >
+                  Open/Download
+                </a>
+              </div>
+            ))}
           </>
 
           {/* Category */}

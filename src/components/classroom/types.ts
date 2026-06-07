@@ -198,6 +198,8 @@ export interface BackendSubmissionResponse {
 
   taskId: number;
 
+  taskType?: "Roadmap" | "Classroom";
+
   taskTitle: string;
 
   menteeName: string;

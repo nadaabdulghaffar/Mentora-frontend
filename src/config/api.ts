@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { attachApiDiagnosticInterceptor } from '../utils/apiDiagnosticInterceptor';
 
 // إعدادات الـ API
 // القيمة تُقرأ من متغير بيئة VITE_API_URL الذي يمكن تعيينه عبر ملف
@@ -15,6 +16,8 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+attachApiDiagnosticInterceptor(apiClient);
 
 // إضافة الـ token تلقائياً لكل request
 apiClient.interceptors.request.use(

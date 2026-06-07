@@ -103,8 +103,37 @@ async attachRoadmapToProgram(
   return response.data;
 },
 
+  async getClassroomRoadmapResource(programId: number) {
+    const response = await apiClient.get(
+      `/classroom/program/${programId}/roadmap-resource`
+    );
 
+    return response.data;
+  },
 
+  async upsertClassroomRoadmapResource(
+    programId: number,
+    payload: {
+      resourceType: "Pdf" | "ExternalLink";
+      fileUrl?: string;
+      fileName?: string;
+      externalUrl?: string;
+    }
+  ) {
+    const response = await apiClient.put(
+      `/classroom/program/${programId}/roadmap-resource`,
+      payload
+    );
 
+    return response.data;
+  },
+
+  async deleteClassroomRoadmapResource(programId: number) {
+    const response = await apiClient.delete(
+      `/classroom/program/${programId}/roadmap-resource`
+    );
+
+    return response.data;
+  },
 
 };

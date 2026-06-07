@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createProgramSchema } from "./schema";
+import { getCreateProgramSchema } from "./schema";
 
 export type CreateProgramFormData =
-  z.infer<typeof createProgramSchema>;
+  z.infer<ReturnType<typeof getCreateProgramSchema>>;

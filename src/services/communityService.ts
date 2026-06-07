@@ -339,6 +339,10 @@ export interface CreatePostPayload {
   imageUrl?: string;
 
   linkUrl?: string;
+
+  fileUrl?: string;
+
+  fileName?: string;
 }
 
 export const createCommunityPost =
@@ -371,6 +375,10 @@ export interface UpdatePostPayload {
   imageUrl?: string;
 
   linkUrl?: string;
+
+  fileUrl?: string;
+
+  fileName?: string;
 }
 
 export const updateCommunityPost =
@@ -449,6 +457,10 @@ export interface CommunityPostResponse {
   canEdit: boolean;
 
   canDelete: boolean;
+
+  fileUrl?: string;
+
+  fileName?: string;
 }
 
 export interface CommunityFeedPostResponse {
@@ -483,6 +495,10 @@ export interface CommunityFeedPostResponse {
   communityId: string;
 
   communityName: string;
+
+  fileUrl?: string;
+
+  fileName?: string;
 }
 
 export interface CommunityFeedResult {

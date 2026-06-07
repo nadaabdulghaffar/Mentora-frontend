@@ -8,6 +8,13 @@ import MentorsMatch from "../components/dashboard components/MentorsMatch";
 import RightSidebar from "../components/dashboard components/RightSidebar";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
+import {
+  useEffectRunDiagnostics,
+  usePageLifecycleDiagnostics,
+  withLoadingDiagnostics,
+} from "../utils/pageDiagnosticLogger";
+
+const PAGE_NAME = "DashboardPage";
 
 const DashboardPage = () => {
     const navigate = useNavigate();
@@ -15,31 +22,36 @@ const DashboardPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    usePageLifecycleDiagnostics(PAGE_NAME);
+    useEffectRunDiagnostics(PAGE_NAME, "loadUser", [navigate]);
+
     useEffect(() => {
         const loadUser = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
+                await withLoadingDiagnostics(PAGE_NAME, "user", async () => {
                 // Load cached user from localStorage first
                 const cachedUser = authAPI.getCurrentUser();
                 const token = localStorage.getItem('accessToken');
-                console.log('DashboardPage - Cached user:', cachedUser, 'token present:', !!token);
+                console.log(`[${PAGE_NAME}] Cached user present=${Boolean(cachedUser)} token present=${Boolean(token)}`);
                 
                 if (cachedUser && token) {
                     setUser(cachedUser);
                     // if mentor, redirect automatically
                     if (cachedUser.role?.toLowerCase() === 'mentor') {
-                        console.log('DashboardPage - User is mentor, redirecting...');
+                        console.log(`[${PAGE_NAME}] User is mentor — redirecting`);
                         navigate('/mentor/dashboard');
                         return;
                     }
                 } else {
                     // No cached user or no token available
-                    console.warn('DashboardPage - Missing auth data, redirecting to login');
+                    console.warn(`[${PAGE_NAME}] Missing auth data — redirecting to login`);
                     navigate('/login');
                     return;
                 }
+                });
             } finally {
                 setLoading(false);
             }

@@ -22,6 +22,8 @@ interface CommunityFeedSectionProps {
   currentUserId?: string;
   onThreadEditRequest?: (thread: CommunityThread) => void;
   onThreadDelete?: (threadId: string) => void;
+  currentUserAvatar?: string;
+  currentUserDisplayName?: string;
 }
 
 /**
@@ -38,11 +40,14 @@ export const CommunityFeedSection: React.FC<CommunityFeedSectionProps> = ({
   currentUserId,
   onThreadEditRequest,
   onThreadDelete,
+  currentUserAvatar,
+  currentUserDisplayName,
 }) => {
   const currentUser = authAPI.getCurrentUser();
-  const currentUserDisplayName = currentUser
+  const fallbackDisplayName = currentUser
     ? `${currentUser.firstName} ${currentUser.lastName}`.trim() || 'You'
     : 'You';
+  const resolvedDisplayName = currentUserDisplayName || fallbackDisplayName;
 
   const openCreatePost = () => {
     onCreatePost?.();
@@ -58,9 +63,9 @@ export const CommunityFeedSection: React.FC<CommunityFeedSectionProps> = ({
           className="flex w-full items-center gap-3 text-left"
         >
           <ProfileAvatar
-            pictureUrl={resolveAuthorAvatar(currentUserDisplayName, null)}
-            name={currentUserDisplayName}
-            alt={currentUserDisplayName}
+            pictureUrl={currentUserAvatar || resolveAuthorAvatar(resolvedDisplayName, null)}
+            name={resolvedDisplayName}
+            alt={resolvedDisplayName}
             className="h-9 w-9 rounded-full object-cover"
           />
           <span className="w-full rounded-xl bg-pane px-4 py-2.5 text-sm text-gray-500">

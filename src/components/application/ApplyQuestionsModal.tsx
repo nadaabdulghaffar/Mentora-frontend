@@ -1,5 +1,6 @@
 import QuestionRenderer from "./QuestionRenderer";
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 
 interface ApplyQuestionsModalProps {
   open: boolean;
@@ -52,7 +53,6 @@ const ApplyQuestionsModal = ({
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const toast = require("react-hot-toast").toast;
       toast.error("Please answer the highlighted required question(s).");
     } catch {}
   }, [focusQuestionId]);

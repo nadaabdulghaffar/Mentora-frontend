@@ -29,6 +29,27 @@ interface Props {
   readOnly?: boolean;
 }
 
+const toAbsoluteFileUrl = (url?: string) => {
+  if (!url) return "";
+
+  if (url.startsWith("http")) {
+    return url;
+  }
+
+  const apiBase =
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:5069/api";
+
+  const backendOrigin = apiBase
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
+
+  return `${backendOrigin}${
+    url.startsWith("/") ? url : `/${url}`
+  }`;
+};
+
+
 export default function EditTaskModal({
   open,
   onClose,
@@ -564,18 +585,68 @@ export default function EditTaskModal({
           px-4 py-4
         "
       >
-        <a
-          href={attachmentUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="
-            text-primary
-            underline
-            break-all
-          "
-        >
-          📎 {fileName || "View Attachment"}
-        </a>
+        <div
+  className="
+    flex items-center
+    justify-between
+    rounded-2xl
+    border border-[#D0D5DD]
+    bg-white
+    px-4 py-3
+  "
+>
+  <div
+    className="
+      flex items-center gap-3
+      min-w-0
+    "
+  >
+    <div
+      className="
+        h-10 w-10 rounded-xl
+        bg-[#F2F4F7]
+        flex items-center
+        justify-center
+        shrink-0
+      "
+    >
+      📎
+    </div>
+
+    <div className="min-w-0">
+      <p
+        className="
+          text-sm font-medium
+          text-[#101828]
+          truncate
+        "
+      >
+        {fileName || "Attachment"}
+      </p>
+
+      <p
+        className="
+          text-xs text-[#667085]
+        "
+      >
+        Attached file
+      </p>
+    </div>
+  </div>
+
+  <a
+    href={toAbsoluteFileUrl(attachmentUrl)}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="
+      text-sm font-medium
+      text-primary
+      hover:underline
+    "
+  >
+    Open / Download
+  </a>
+</div>
       </div>
     ) : (
       <div

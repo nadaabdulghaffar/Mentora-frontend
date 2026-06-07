@@ -16,8 +16,7 @@ import { ProfileAvatar } from "../../components/profile";
 import { refreshOwnProfile } from "../../pages/profile/profileService";
 import authAPI from "../../services/authService";
 import type { AuthUser } from "../../types/api";
-
-
+import { useUnreadMessageCount } from "../../hooks/useUnreadMessageCount";
 
 const Sidebar = () => {
     const navigate = useNavigate();
@@ -29,6 +28,19 @@ const Sidebar = () => {
     const [user, setUser] = useState<AuthUser | null>(null);
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
   const userRole = user?.role?.toLowerCase();
+  
+  const { data: unreadMessageCount } = useUnreadMessageCount();
+
+  // ── Render diagnostics ────────────────────────────────────
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log(`[Sidebar] RENDER #${renderCountRef.current}`);
+
+  useEffect(() => {
+    console.log("[Sidebar] MOUNT");
+    return () => { console.log("[Sidebar] UNMOUNT"); };
+  }, []);
+  // ───────────────────────────────────────────────────
 
   const sidebarDisplayName = useMemo(() => {
     if (!user) {
@@ -156,6 +168,7 @@ const Sidebar = () => {
                       label="Messages"
                       onClick={goToMessages}
                       active={location.pathname === '/messages'}
+                      badgeCount={unreadMessageCount}
                     />
                     {userRole === "mentee" && (
                       <SidebarItem
@@ -285,12 +298,13 @@ interface SidebarItemProps {
     label: string;
   onClick?: () => void;
   active?: boolean;
+  badgeCount?: number;
 }
 
-const SidebarItem = ({ icon, label, onClick, active = false }: SidebarItemProps) => {
+const SidebarItem = ({ icon, label, onClick, active = false, badgeCount }: SidebarItemProps) => {
     return (
     <div
-      className={`flex items-center gap-3 cursor-pointer transition ${
+      className={`flex items-center justify-between cursor-pointer transition ${
         active ? 'text-primary' : 'text-gray-600 hover:text-primary'
       }`}
       onClick={onClick}
@@ -303,8 +317,15 @@ const SidebarItem = ({ icon, label, onClick, active = false }: SidebarItemProps)
         }
       }}
     >
-            {icon}
-            <span className="text-base font-medium">{label}</span>
-        </div>
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="text-base font-medium">{label}</span>
+      </div>
+      {!!badgeCount && badgeCount > 0 && (
+        <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[0.65rem] font-bold text-white bg-red-500 rounded-full">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      )}
+    </div>
     );
 };

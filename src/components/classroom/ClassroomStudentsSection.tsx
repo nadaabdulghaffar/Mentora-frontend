@@ -1,5 +1,7 @@
-import { AlertTriangle, Bell, FileDown, MessageSquare, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, Bell, MessageSquare, Search, Trash2, Users } from 'lucide-react';
 import { isValidUserGuid } from '../../services/messagingService';
+import { ClassroomUserLink } from './common/ClassroomUserLink';
 
 type MentorStudentRow = {
   id: string;
@@ -16,7 +18,7 @@ type MentorStudentRow = {
 
 type ClassroomStudentsSectionProps = {
   mentorStudents: MentorStudentRow[];
-    dashboardStats: {
+  dashboardStats: {
     studentsWaitingForReview: number;
     studentsAtRisk: number;
     averageRoadmapCompletion: number;
@@ -37,24 +39,38 @@ export default function ClassroomStudentsSection({
   messagingStudentId,
   onRequestDeleteStudent,
 }: ClassroomStudentsSectionProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredStudents = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return mentorStudents;
+    }
+
+    return mentorStudents.filter((student) => {
+      const haystack = [
+        student.name,
+        student.moduleLabel,
+        student.statusLabel,
+        student.email,
+        student.lastActive,
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [mentorStudents, searchQuery]);
+
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <span className="rounded-full bg-[#DDF6F0] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#117C64]">Live Overview</span>
+          <span className="rounded-full bg-[#DDF6F0] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#117C64]">
+            Live Overview
+          </span>
           <h1 className="mt-3 text-4xl font-bold leading-tight text-[#1F2432]">Student Dashboard</h1>
           <p className="mt-1 text-base text-[#6F7689]">Academic Progress Tracker</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#D6DBE8] bg-white px-4 text-sm font-semibold text-[#4D5670]">
-            <FileDown size={16} />
-            Export Report
-          </button>
-          <button type="button" className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#6E56CF] px-4 text-sm font-semibold text-white">
-            <UserPlus size={16} />
-            Invite Student
-          </button>
         </div>
       </div>
 
@@ -84,12 +100,13 @@ export default function ClassroomStudentsSection({
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7A8094]">Avg. Completion</p>
           <p className="mt-2 text-4xl font-bold text-[#1F2432]">{dashboardStats.averageRoadmapCompletion}%</p>
           <div className="mt-3 h-2 rounded-full bg-[#E8ECF5]">
-<div
-  className="h-2 rounded-full bg-gradient-to-r from-[#28A58A] to-[#6FCDBA]"
-  style={{
-    width: `${dashboardStats.averageRoadmapCompletion}%`,
-  }}
-/>          </div>
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-[#28A58A] to-[#6FCDBA]"
+              style={{
+                width: `${dashboardStats.averageRoadmapCompletion}%`,
+              }}
+            />
+          </div>
         </div>
 
         <div className="rounded-2xl border border-[#E6E9F2] bg-white p-4">
@@ -103,12 +120,25 @@ export default function ClassroomStudentsSection({
       </div>
 
       <div className="rounded-2xl border border-[#E6E9F2] bg-white p-4">
-        <div className="mb-4 flex flex-wrap items-center justify-end gap-3">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-[#1F2432]">Enrolled Students</h2>
+            <p className="mt-1 text-sm text-[#6F7689]">
+              {filteredStudents.length} of {mentorStudents.length} students shown
+            </p>
+          </div>
           <div className="relative w-full max-w-[260px]">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8891A7]" />
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8891A7]"
+            />
             <input
-              className="h-10 w-full rounded-xl border border-[#E1E6F1] bg-[#FAFBFE] pl-9 pr-3 text-sm text-[#3B455B] outline-none"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 w-full rounded-xl border border-[#E1E6F1] bg-[#FAFBFE] pl-9 pr-3 text-sm text-[#3B455B] outline-none focus:border-[#6E56CF]"
               placeholder="Search students..."
+              aria-label="Search students"
             />
           </div>
         </div>
@@ -125,87 +155,118 @@ export default function ClassroomStudentsSection({
               </tr>
             </thead>
             <tbody>
-              {mentorStudents.length === 0 ? (
+              {filteredStudents.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-10 text-center text-sm font-medium text-[#7A8094]">
-                    no student in this classroom yet
+                    {mentorStudents.length === 0
+                      ? 'no student in this classroom yet'
+                      : 'No students match your search'}
                   </td>
                 </tr>
-              ) : mentorStudents.map((student) => {
-                const statusToneClasses =
-                  student.statusTone === 'feedback'
-                    ? 'bg-[#EFEAFF] text-[#5E49C3]'
-                    : student.statusTone === 'idle'
-                      ? 'bg-[#FFE9E9] text-[#B33A3A]'
-                      : 'bg-[#DFF7F1] text-[#117C64]';
+              ) : (
+                filteredStudents.map((student) => {
+                  const statusToneClasses =
+                    student.statusTone === 'feedback'
+                      ? 'bg-[#EFEAFF] text-[#5E49C3]'
+                      : student.statusTone === 'idle'
+                        ? 'bg-[#FFE9E9] text-[#B33A3A]'
+                        : 'bg-[#DFF7F1] text-[#117C64]';
 
-                return (
-                  <tr key={student.id} className="border-b border-[#F1F3F8] last:border-b-0">
-                    <td className="px-3 py-4">
-                      <p className="font-semibold text-[#1F2432]">{student.name}</p>
-                      <p className="text-xs text-[#8A91A5]">
-  Last Activity:
-  {` `}
-  {student.email}
-</p>
-                    </td>
-                    <td className="px-3 py-4">
-                      <span className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${statusToneClasses}`}>
-                        {student.statusLabel}
-                      </span>
-                      <p className="mt-1 text-xs text-[#8A91A5]">{student.moduleLabel}</p>
-                    </td>
-                    <td className="px-3 py-4">
-                      <p className="text-xs font-semibold text-[#505A73]">{student.progress}% Complete</p>
-                      <div className="mt-2 h-2 w-36 rounded-full bg-[#E8ECF5]">
-                        <div className="h-2 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#33B5A2]" style={{ width: `${student.progress}%` }} />
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 font-semibold text-[#1F2432]">
-                      {String(student.completedTasks).padStart(2, '0')} / {student.totalTasks}
-                    </td>
-                    <td className="px-3 py-4">
-                      <div className="flex items-center gap-3">
-                        {student.statusTone === 'feedback' && (
-                          <button type="button" onClick={() => onOpenMentorSubmissionsForStudent(student.id)} className="text-sm font-semibold text-[#5B45BE]">Review Task</button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={
-                            !isValidUserGuid(student.id) ||
-                            messagingStudentId === student.id
-                          }
-                          onClick={() => onMessageStudent(student.id)}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D5CCFF] bg-white px-3 text-xs font-semibold text-[#503DB8] shadow-[0_1px_2px_rgba(91,69,190,0.12)] transition hover:bg-[#F7F4FF] disabled:cursor-not-allowed disabled:opacity-50"
+                  return (
+                    <tr key={student.id} className="border-b border-[#F1F3F8] last:border-b-0">
+                      <td className="px-3 py-4">
+                        <ClassroomUserLink
+                          userId={student.id}
+                          name={student.name}
+                          className="font-semibold text-[#1F2432]"
+                        />
+                        <p className="text-xs text-[#8A91A5]">
+                          Last Activity:
+                          {` `}
+                          {student.email}
+                        </p>
+                      </td>
+                      <td className="px-3 py-4">
+                        <span
+                          className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${statusToneClasses}`}
                         >
-                          <MessageSquare size={14} strokeWidth={2.2} />
-                          {messagingStudentId === student.id ? 'Opening...' : 'Message'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onRequestDeleteStudent(student)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#B33A3A] hover:bg-[#FFE9E9]"
-                          aria-label={`Delete ${student.name}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          {student.statusLabel}
+                        </span>
+                        <p className="mt-1 text-xs text-[#8A91A5]">{student.moduleLabel}</p>
+                      </td>
+                      <td className="px-3 py-4">
+                        <p className="text-xs font-semibold text-[#505A73]">{student.progress}% Complete</p>
+                        <div className="mt-2 h-2 w-36 rounded-full bg-[#E8ECF5]">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-[#6E56CF] to-[#33B5A2]"
+                            style={{ width: `${student.progress}%` }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-4 font-semibold text-[#1F2432]">
+                        {String(student.completedTasks).padStart(2, '0')} / {student.totalTasks}
+                      </td>
+                      <td className="px-3 py-4">
+                        <div className="flex items-center gap-3">
+                          {student.statusTone === 'feedback' && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenMentorSubmissionsForStudent(student.id)}
+                              className="text-sm font-semibold text-[#5B45BE]"
+                            >
+                              Review Task
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={
+                              !isValidUserGuid(student.id) ||
+                              messagingStudentId === student.id
+                            }
+                            onClick={() => onMessageStudent(student.id)}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#D5CCFF] bg-white px-3 text-xs font-semibold text-[#503DB8] shadow-[0_1px_2px_rgba(91,69,190,0.12)] transition hover:bg-[#F7F4FF] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <MessageSquare size={14} strokeWidth={2.2} />
+                            {messagingStudentId === student.id ? 'Opening...' : 'Message'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRequestDeleteStudent(student)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#B33A3A] hover:bg-[#FFE9E9]"
+                            aria-label={`Delete ${student.name}`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#7A8094]">
-          <p>Displaying {mentorStudents.length} records per page • {mentorStudents.length} total students</p>
+          <p>
+            Displaying {filteredStudents.length} of {mentorStudents.length} students
+          </p>
           <div className="flex items-center gap-2">
-            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">&lt;</button>
-            <button type="button" className="h-8 w-8 rounded-md bg-[#6E56CF] text-white">1</button>
-            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">2</button>
-            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">3</button>
-            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">&gt;</button>
+            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">
+              &lt;
+            </button>
+            <button type="button" className="h-8 w-8 rounded-md bg-[#6E56CF] text-white">
+              1
+            </button>
+            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">
+              2
+            </button>
+            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">
+              3
+            </button>
+            <button type="button" className="h-8 w-8 rounded-md border border-[#D9DEEA] text-[#7A8094]">
+              &gt;
+            </button>
           </div>
         </div>
       </div>

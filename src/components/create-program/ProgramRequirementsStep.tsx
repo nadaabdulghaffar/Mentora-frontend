@@ -1,18 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getIn, useFormikContext } from "formik";
 
 import lookupAPI from "../../services/lookupService";
 import type { CreateProgramFormData } from "./types";
 
-const EXPERIENCE_OPTIONS = [
-  { value: 1, label: "None" },
-  { value: 2, label: "Beginner" },
-  { value: 3, label: "Intermediate" },
-  { value: 4, label: "Advanced" },
-] as const;
-
 const DEFAULT_EXPERIENCE_FOR_NEW_TECH = 2;
 const hintStyle = "mt-1 text-xs text-[#64748B] leading-snug";
+const errorStyle = "mt-1 text-xs text-red-500";
 
 type TechOption = {
   id: number;
@@ -87,10 +81,35 @@ export default function ProgramRequirementsStep({ showValidationErrors = false }
     };
   }, [subDomainId, setFieldValue, values.technologies]);
 
+  const handleToggleTech = useCallback((techId: number, isChecked: boolean) => {
+    const list = values.technologies ?? [];
+    if (isChecked) {
+      setFieldValue(
+        "technologies",
+        list.filter((item) => item.technologyId !== techId)
+      );
+    } else {
+      setFieldValue("technologies", [
+        ...list,
+        { technologyId: techId, requiredExperienceLevel: DEFAULT_EXPERIENCE_FOR_NEW_TECH },
+      ]);
+    }
+  }, [values.technologies, setFieldValue]);
+
+  const handleUpdateExperience = useCallback((techId: number, level: number) => {
+    const list = values.technologies ?? [];
+    const parsed = Number(level);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 4) return;
+    setFieldValue(
+      "technologies",
+      list.map((item) =>
+        item.technologyId === techId ? { ...item, requiredExperienceLevel: parsed } : item
+      )
+    );
+  }, [values.technologies, setFieldValue]);
+
   const labelStyle = "block text-sm font-medium text-slateInk mb-2";
   const inputStyle = "w-full h-12 rounded-xl border border-[#D8DBE4] bg-white px-4 text-sm text-slateInk outline-none focus:border-primary";
-  const errorStyle = "mt-1 text-xs text-red-500";
-  const inlineSelectClass = "h-9 min-w-[7.5rem] shrink-0 rounded-lg border border-[#D8DBE4] bg-white px-2 text-xs sm:text-sm text-slateInk outline-none focus:border-primary";
 
   return (
     <div className="space-y-5">
@@ -157,64 +176,40 @@ export default function ProgramRequirementsStep({ showValidationErrors = false }
                 const rowIndex = list.findIndex((item) => item.technologyId === tech.id);
                 const techFieldErrors = rowIndex >= 0 && Array.isArray(getIn(errors, "technologies")) ? getIn(errors, `technologies.${rowIndex}`) : undefined;
 
-                const toggle = () => {
-                  if (checked) {
-                    setFieldValue(
-                      "technologies",
-                      list.filter((item) => item.technologyId !== tech.id)
-                    );
-                    return;
-                  }
-
-                  setFieldValue("technologies", [
-                    ...list,
-                    { technologyId: tech.id, requiredExperienceLevel: DEFAULT_EXPERIENCE_FOR_NEW_TECH },
-                  ]);
-                };
-
-                const updateExperience = (level: number) => {
-                  const parsed = Number(level);
-                  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 4) return;
-                  setFieldValue(
-                    "technologies",
-                    list.map((item) =>
-                      item.technologyId === tech.id ? { ...item, requiredExperienceLevel: parsed } : item
-                    )
-                  );
-                };
-
                 return (
-                  <li key={tech.id}>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:py-1.5 hover:bg-[#FAFAFE]/80">
-                      <label className="flex flex-1 min-w-0 items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={toggle}
-                          className="h-4 w-4 shrink-0 rounded border-[#D8DBE4] text-primary focus:ring-primary/30"
-                        />
-                        <span className="text-sm font-medium text-slateInk truncate">{tech.name}</span>
+                  <li key={tech.id} className="group relative flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[#F8F9FC]">
+                    <div className="flex h-6 items-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => handleToggleTech(tech.id, checked)}
+                        className="h-4 w-4 rounded border-[#C4CAD7] text-primary focus:ring-primary focus:ring-offset-0"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label className="block text-sm font-semibold text-[#1F2432] cursor-pointer" onClick={() => handleToggleTech(tech.id, checked)}>
+                        {tech.name}
                       </label>
-
-                      {checked && row && (
-                        <select
-                          className={inlineSelectClass}
-                          value={row.requiredExperienceLevel}
-                          onChange={(e) => updateExperience(Number(e.target.value))}
-                          aria-label={`Required experience for ${tech.name}`}
-                        >
-                          {EXPERIENCE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                      {checked && (
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <select
+                            value={row?.requiredExperienceLevel ?? 2}
+                            onChange={(e) => handleUpdateExperience(tech.id, Number(e.target.value))}
+                            className="h-9 w-full max-w-[200px] rounded-lg border border-[#D8DBE4] bg-white px-3 text-sm text-[#47516B] outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                          >
+                            <option value={1}>Beginner</option>
+                            <option value={2}>Intermediate</option>
+                            <option value={3}>Advanced</option>
+                            <option value={4}>Expert</option>
+                          </select>
+                          {showValidationErrors && techFieldErrors?.requiredExperienceLevel && (
+                            <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-1 rounded-md">
+                              {String(techFieldErrors.requiredExperienceLevel)}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
-
-                    {showValidationErrors && techFieldErrors?.requiredExperienceLevel && (
-                      <p className={`${errorStyle} px-3 pb-2 -mt-1`}>{String(techFieldErrors.requiredExperienceLevel)}</p>
-                    )}
                   </li>
                 );
               })
@@ -224,7 +219,11 @@ export default function ProgramRequirementsStep({ showValidationErrors = false }
           </ul>
         </div>
 
-        {showValidationErrors && getIn(errors, "technologies")?.message && <p className={errorStyle}>{String(getIn(errors, "technologies").message)}</p>}
+        {showValidationErrors && (() => {
+          const tErrors = getIn(errors, "technologies");
+          const msg = typeof tErrors === "string" ? tErrors : tErrors?.message;
+          return msg ? <p className={errorStyle}>{String(msg)}</p> : null;
+        })()}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -273,18 +272,37 @@ Application deadline
               Optional
             </span>
           </div>
-          <select
-            value={values.duration}
-            onChange={(e) => setFieldValue("duration", e.target.value)}
-            className={inputStyle}
-          >
-            <option value="">Select duration</option>
-            <option value="2 Weeks">2 Weeks</option>
-            <option value="1 Month">1 Month</option>
-            <option value="2 Months">2 Months</option>
-            <option value="3 Months">3 Months</option>
-            <option value="6 Months">6 Months</option>
-          </select>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFieldValue("duration", Math.max(1, (Number(values.duration) || 1) - 1))}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#D8DBE4] bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            >
+              -
+            </button>
+            <div className="relative flex-1">
+              <input
+                type="number"
+                min="1"
+                value={values.duration || ""}
+                onChange={(e) => setFieldValue("duration", e.target.value ? Number(e.target.value) : "")}
+                className={`${inputStyle} pr-20 text-center`}
+                placeholder="1"
+              />
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                <span className="text-sm font-medium text-gray-500">
+                  {Number(values.duration) === 1 ? "Month" : "Months"}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFieldValue("duration", (Number(values.duration) || 0) + 1)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#D8DBE4] bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+            >
+              +
+            </button>
+          </div>
           {showValidationErrors && getIn(errors, "duration") && <p className={errorStyle}>{String(getIn(errors, "duration"))}</p>}
         </div>
 

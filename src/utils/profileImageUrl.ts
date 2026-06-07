@@ -7,7 +7,8 @@ export function resolveProfilePictureUrl(url?: string | null): string {
     return '';
   }
 
-  return toAbsoluteFileUrl(trimmed);
+  const normalized = trimmed.replace(/\\/g, '/');
+  return toAbsoluteFileUrl(normalized);
 }
 
 /**

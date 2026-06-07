@@ -3,7 +3,7 @@
  * Centralized mock data for development and testing
  */
 
-import {
+import type {
   Community,
   CommunityMember,
   CommunityThread,
@@ -238,7 +238,14 @@ export const MOCK_COMMUNITY_THREADS: CommunityThread[] = [
     comments: [],
     isLiked: false,
     isSaved: false,
-    attachments: ['https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&h=400&fit=crop'],
+    attachments: [
+      {
+        id: 'mock-att-1',
+        type: 'image',
+        url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&h=400&fit=crop',
+        name: 'React native design',
+      }
+    ],
     communityId: 'fullstack-wizards',
     communityName: 'Fullstack Wizards',
   },

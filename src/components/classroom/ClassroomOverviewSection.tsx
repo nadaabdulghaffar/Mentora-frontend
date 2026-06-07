@@ -1,6 +1,7 @@
 
 import { Calendar } from 'lucide-react';
 import Feed, { type FeedPostProps } from '../Feed';
+import { ClassroomUserLink } from './common/ClassroomUserLink';
 
 type ClassroomUpcomingSessionCard = {
   title: string;
@@ -69,7 +70,12 @@ const ClassroomOverviewSection = ({
     <section className="space-y-5">
       <div>
         <h1 className="text-3xl font-bold leading-tight text-[#1E2330]">
-          Welcome back, {currentUserName}
+          Welcome back,{' '}
+          <ClassroomUserLink
+            userId={currentUserId}
+            name={currentUserName}
+            className="text-3xl font-bold leading-tight text-[#1E2330]"
+          />
         </h1>
       </div>
 

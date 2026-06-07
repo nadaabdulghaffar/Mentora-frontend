@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import Layout from "../shared/components/Layout";
 import ApplicationsHeader from "../components/ManageApplicants/ApplicationsHeader";
@@ -8,7 +8,7 @@ import ApplicationsFilters from "../components/ManageApplicants/ApplicationsFilt
 import ApplicantsTable from "../components/ManageApplicants/ApplicantsTable";
 import ApplicationsPagination from "../components/ManageApplicants/ApplicationsPagination";
 import ApplicantSidePanel from "../components/ManageApplicants/ApplicantSidePanel";
-import type { Applicant } from "../components/ManageApplicants/types";
+
 import SendResultsModal
 from "../components/ManageApplicants/SendResultsModal";
 
@@ -39,7 +39,7 @@ export default function ApplicationsDetailsPage() {
 const [applicants, setApplicants] =
   useState<ApplicantListItemDto[]>([]);
 
-const [loading, setLoading] =
+const [, setLoading] =
   useState(false);
 
 const [applicantsData, setApplicantsData] =
@@ -272,11 +272,11 @@ const handleStatusChange =
     <Layout>
       <div className="space-y-6">
 <ApplicationsHeader
-  title="My Applications"
+  title={applicants.length > 0 ? `Applicants for ${applicants[0].programName}` : "Applicants"}
   description="
     Review and manage all
     applications submitted
-    to your programs.
+    to this program.
   "
 
   onExport={handleExport}

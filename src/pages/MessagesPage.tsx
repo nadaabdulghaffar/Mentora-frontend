@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Paperclip,
   Search,
@@ -10,21 +11,31 @@ import {
 import Layout from "../shared/components/Layout";
 import authAPI from "../services/authService";
 import { chatHubService } from "../services/chatHubService";
+import { messageKeys } from "../hooks/useUnreadMessageCount";
 import {
   CHAT_ATTACHMENT_ACCEPT,
   fileNameFromAttachmentUrl,
   isImageAttachment,
   messagingService,
   resolveAttachmentDisplayUrl,
+  toAbsoluteFileUrl,
 } from "../services/messagingService";
 import type {
   ChatAttachmentUpload,
   ConversationResponseDto,
   MessageResponseDto,
 } from "../types/messaging";
+import {
+  useEffectRunDiagnostics,
+  usePageLifecycleDiagnostics,
+  withLoadingDiagnostics,
+} from "../utils/pageDiagnosticLogger";
+
+const PAGE_NAME = "MessagesPage";
 
 type Contact = {
   id: string;
+  otherUserId: string;
   name: string;
   role: string;
   avatar: string;
@@ -55,7 +66,8 @@ function formatListTime(value: string | null | undefined): string {
     return "";
   }
 
-  const date = new Date(value);
+  const utcValue = value.endsWith("Z") ? value : value + "Z";
+  const date = new Date(utcValue);
   const now = new Date();
   const isToday =
     date.getDate() === now.getDate() &&
@@ -70,7 +82,9 @@ function formatListTime(value: string | null | undefined): string {
 }
 
 function formatMessageTime(value: string): string {
-  return new Date(value).toLocaleTimeString([], {
+  if (!value) return "";
+  const utcValue = value.endsWith("Z") ? value : value + "Z";
+  return new Date(utcValue).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -86,9 +100,12 @@ function mapConversationToContact(
 
   return {
     id: conversation.conversationId,
+    otherUserId: conversation.otherUserId,
     name,
     role: "Student",
-    avatar: conversation.otherUserProfilePicture || DEFAULT_AVATAR,
+    avatar: conversation.otherUserProfilePicture
+      ? toAbsoluteFileUrl(conversation.otherUserProfilePicture)
+      : DEFAULT_AVATAR,
     preview,
     time: formatListTime(conversation.lastMessageSentAt),
     unread: conversation.unreadCount > 0 ? conversation.unreadCount : undefined,
@@ -157,13 +174,10 @@ type MessagesLocationState = {
 
 const MessagesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as MessagesLocationState | null;
-
-  const conversationIdFromRoute =
-    searchParams.get("conversationId") ??
-    locationState?.conversationId ??
-    null;
+  const queryClient = useQueryClient();
 
   const currentUserId = authAPI.getCurrentUser()?.userId ?? "";
 
@@ -186,9 +200,13 @@ const MessagesPage = () => {
   useRef<HTMLDivElement>(null);
   const activeContactIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef(currentUserId);
+  const contactsRef = useRef<Contact[]>([]);
   const handleIncomingMessageRef = useRef<
     (message: MessageResponseDto) => Promise<void>
   >(async () => {});
+
+  usePageLifecycleDiagnostics(PAGE_NAME);
+  useEffectRunDiagnostics(PAGE_NAME, "connectHub", []);
 
   useEffect(() => {
     activeContactIdRef.current = activeContactId;
@@ -197,6 +215,10 @@ const MessagesPage = () => {
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
+
+  useEffect(() => {
+    contactsRef.current = contacts;
+  }, [contacts]);
 
   useEffect(() => {
   const container =
@@ -216,17 +238,30 @@ const MessagesPage = () => {
 
       if (showLoading) {
         setIsLoadingMessages(true);
+        setActiveMessages([]);
       }
 
       try {
-        const messages = await messagingService.getMessages(conversationId);
-        setActiveMessages(
-          messages.map((message) =>
-            mapMessageToChatMessage(message, currentUserId)
-          )
+        const messages = await withLoadingDiagnostics(
+          PAGE_NAME,
+          `messages for ${conversationId}`,
+          () => messagingService.getMessages(conversationId)
         );
+        
+        if (activeContactIdRef.current !== conversationId) {
+          return;
+        }
+
+        setActiveMessages((prev) => {
+          const fetchedMessages = messages.map((message) =>
+            mapMessageToChatMessage(message, currentUserId)
+          );
+          const fetchedIds = new Set(fetchedMessages.map((m) => m.id));
+          const extra = prev.filter((m) => !fetchedIds.has(m.id));
+          return [...fetchedMessages, ...extra];
+        });
       } catch (error) {
-        console.error("Failed to load messages", error);
+        console.error(`[${PAGE_NAME}] Failed to load messages`, error);
         setActiveMessages([]);
       } finally {
         if (showLoading) {
@@ -238,9 +273,8 @@ const MessagesPage = () => {
   );
 
   const loadConversations = useCallback(
-    async (options?: { showLoading?: boolean; preserveSelection?: boolean }) => {
+    async (options?: { showLoading?: boolean }) => {
       const showLoading = options?.showLoading ?? true;
-      const preserveSelection = options?.preserveSelection ?? false;
 
       if (showLoading) {
         setIsLoadingConversations(true);
@@ -249,30 +283,25 @@ const MessagesPage = () => {
       setLoadError(null);
 
       try {
-        const list = await messagingService.getConversations();
+        const list = await withLoadingDiagnostics(
+          PAGE_NAME,
+          "conversations",
+          () => messagingService.getConversations()
+        );
         const mappedContacts = list.map(mapConversationToContact);
         setContacts(mappedContacts);
-
-        if (!preserveSelection) {
-          const preferredId =
-            conversationIdFromRoute ?? mappedContacts[0]?.id ?? null;
-
-          setActiveContactId(preferredId);
-
-          if (preferredId && !searchParams.get("conversationId")) {
-            setSearchParams({ conversationId: preferredId }, { replace: true });
-          }
-        }
+        return mappedContacts;
       } catch (error) {
-        console.error("Failed to load conversations", error);
+        console.error(`[${PAGE_NAME}] Failed to load conversations`, error);
         setLoadError("Unable to load conversations.");
+        return [];
       } finally {
         if (showLoading) {
           setIsLoadingConversations(false);
         }
       }
     },
-    [conversationIdFromRoute, searchParams, setSearchParams]
+    []
   );
 
   const handleIncomingMessage = useCallback(
@@ -290,14 +319,17 @@ const MessagesPage = () => {
         message.content?.trim() ||
         (message.attachmentUrl ? "Attachment" : "No messages yet");
 
-      let conversationMissing = false;
+      const isMissing = !contactsRef.current.some((c) => c.id === conversationId);
+
+      if (isMissing) {
+        console.log(`[${PAGE_NAME}] Refresh trigger — incoming message for unknown conversation`);
+        await loadConversations({ showLoading: false });
+        return;
+      }
 
       setContacts((prev) => {
         const index = prev.findIndex((contact) => contact.id === conversationId);
-        if (index === -1) {
-          conversationMissing = true;
-          return prev;
-        }
+        if (index === -1) return prev;
 
         const contact = prev[index];
         const updatedContact: Contact = {
@@ -316,14 +348,6 @@ const MessagesPage = () => {
         return next;
       });
 
-      if (conversationMissing) {
-        await loadConversations({
-          showLoading: false,
-          preserveSelection: true,
-        });
-        return;
-      }
-
       if (isActive) {
         setActiveMessages((prev) => {
           if (prev.some((item) => item.id === message.messageId)) {
@@ -338,13 +362,15 @@ const MessagesPage = () => {
 
         if (!isFromMe) {
           try {
-            await messagingService.markAsRead(conversationId);
-            await loadConversations({
-              showLoading: false,
-              preserveSelection: true,
+            const readCount = await messagingService.markAsRead(conversationId);
+            queryClient.setQueryData<number>(messageKeys.unreadCount(), (old) => {
+              console.log("[UnreadBadge] Count before decrement", old);
+              const newCount = Math.max(0, (old ?? 0) - readCount);
+              console.log("[UnreadBadge] Count after decrement", newCount);
+              return newCount;
             });
           } catch (error) {
-            console.error("Failed to mark conversation as read", error);
+            console.error(`[${PAGE_NAME}] Failed to mark conversation as read`, error);
           }
         }
       }
@@ -352,22 +378,16 @@ const MessagesPage = () => {
     [loadConversations]
   );
 
+  useEffectRunDiagnostics(PAGE_NAME, "loadConversations", [loadConversations]);
+  useEffectRunDiagnostics(PAGE_NAME, "loadActiveMessages", [
+    activeContactId,
+    isLoadingConversations,
+  ]);
+
   handleIncomingMessageRef.current = handleIncomingMessage;
 
   useEffect(() => {
     let mounted = true;
-
-    const connectHub = async () => {
-      try {
-        await chatHubService.connect();
-      } catch (error) {
-        if (mounted) {
-          console.error("Failed to connect to chat hub", error);
-        }
-      }
-    };
-
-    void connectHub();
 
     const unsubscribe = chatHubService.onReceiveMessage((message) => {
       if (mounted) {
@@ -375,16 +395,44 @@ const MessagesPage = () => {
       }
     });
 
+    // chatHubService.connect() is now handled globally by useUnreadMessageCount hook
+
     return () => {
       mounted = false;
       unsubscribe();
-      void chatHubService.disconnect();
+      // chatHubService.disconnect() is handled globally
     };
   }, []);
 
   useEffect(() => {
-    void loadConversations();
+    let mounted = true;
+    console.log(`[${PAGE_NAME}] Refresh trigger — initial loadConversations`);
+    
+    void loadConversations().then((mappedContacts) => {
+      if (!mounted) return;
+
+      const routeId = searchParams.get("conversationId") ?? locationState?.conversationId;
+      const preferredId = routeId ?? mappedContacts[0]?.id ?? null;
+
+      setActiveContactId(preferredId);
+
+      if (preferredId && !routeId) {
+        setSearchParams({ conversationId: preferredId }, { replace: true });
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadConversations]);
+
+  useEffect(() => {
+    const routeId = searchParams.get("conversationId") ?? locationState?.conversationId;
+    if (routeId && routeId !== activeContactId) {
+      setActiveContactId(routeId);
+    }
+  }, [searchParams, locationState, activeContactId]);
 
   useEffect(() => {
     if (!activeContactId) {
@@ -396,6 +444,9 @@ const MessagesPage = () => {
       return;
     }
 
+    console.log(
+      `[${PAGE_NAME}] Refresh trigger — loadActiveMessages conversationId=${activeContactId}`
+    );
     void loadActiveMessages(activeContactId);
 
     let cancelled = false;
@@ -410,21 +461,15 @@ const MessagesPage = () => {
       );
 
       try {
-        await messagingService.markAsRead(activeContactId);
-        if (!cancelled) {
-          await loadConversations({
-            showLoading: false,
-            preserveSelection: true,
-          });
-        }
+        const readCount = await messagingService.markAsRead(activeContactId);
+        queryClient.setQueryData<number>(messageKeys.unreadCount(), (old) => {
+          console.log("[UnreadBadge] Count before decrement", old);
+          const newCount = Math.max(0, (old ?? 0) - readCount);
+          console.log("[UnreadBadge] Count after decrement", newCount);
+          return newCount;
+        });
       } catch (error) {
-        console.error("Failed to mark conversation as read", error);
-        if (!cancelled) {
-          await loadConversations({
-            showLoading: false,
-            preserveSelection: true,
-          });
-        }
+        console.error(`[${PAGE_NAME}] Failed to mark conversation as read`, error);
       }
     };
 
@@ -536,11 +581,6 @@ const MessagesPage = () => {
 
         return [...prev, mapMessageToChatMessage(sent, currentUserId)];
       });
-
-      await loadConversations({
-        showLoading: false,
-        preserveSelection: true,
-      });
     } catch (error) {
       console.error("Failed to send message", error);
       setSendError("Unable to send message. Please try again.");
@@ -598,6 +638,12 @@ const MessagesPage = () => {
                           src={contact.avatar}
                           alt={contact.name}
                           className="h-11 w-11 rounded-full object-cover"
+                          onError={(event) => {
+                            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}`;
+                            if (event.currentTarget.src !== fallback) {
+                              event.currentTarget.src = fallback;
+                            }
+                          }}
                         />
                       </div>
 
@@ -634,11 +680,21 @@ const MessagesPage = () => {
                       src={activeContact.avatar}
                       alt={activeContact.name}
                       className="h-11 w-11 rounded-full object-cover"
+                      onError={(event) => {
+                        const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(activeContact.name)}`;
+                        if (event.currentTarget.src !== fallback) {
+                          event.currentTarget.src = fallback;
+                        }
+                      }}
                     />
                     <div>
-                      <p className="text-2xl font-bold leading-none text-[#222A3B]">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/profile/${activeContact.otherUserId}`)}
+                        className="text-left text-2xl font-bold leading-none text-[#222A3B] hover:text-primary transition"
+                      >
                         {activeContact.name}
-                      </p>
+                      </button>
                       <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#7E869C]">
                         {activeContact.role}
                       </p>

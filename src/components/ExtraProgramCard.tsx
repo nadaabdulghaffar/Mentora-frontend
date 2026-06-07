@@ -382,37 +382,29 @@ export const ExtraProgramCard: React.FC<
                       View Application
                     </button>
 
-                    <button
-                      onClick={() => {
-                        if (onEdit) {
+                    {onEdit && (
+                      <button
+                        onClick={() => {
                           onEdit();
-                        } else {
-                          console.warn(
-                            "Edit action not provided"
-                          );
-                        }
-                        setMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-[#F5F7FB]"
-                    >
-                      Edit
-                    </button>
+                          setMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm hover:bg-[#F5F7FB]"
+                      >
+                        Edit
+                      </button>
+                    )}
 
-                    <button
-                      onClick={() => {
-                        if (onUnpublish) {
+                    {onUnpublish && (
+                      <button
+                        onClick={() => {
                           onUnpublish();
-                        } else {
-                          console.warn(
-                            "Unpublish action not provided"
-                          );
-                        }
-                        setMenuOpen(false);
-                      }}
-                      className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-[#F5F7FB]"
-                    >
-                      Unpublish
-                    </button>
+                          setMenuOpen(false);
+                        }}
+                        className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-[#F5F7FB]"
+                      >
+                        Unpublish
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

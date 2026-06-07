@@ -1,11 +1,12 @@
 import React from 'react';
-import { X, FileText, Download } from 'lucide-react';
+import { X, FileText, Download, Link as LinkIcon } from 'lucide-react';
 
 export interface SubmissionFile {
   id: string;
   name: string;
   size: string;
   type: string;
+  url?: string;
 }
 
 export interface SubmissionView {
@@ -30,6 +31,14 @@ interface ViewSubmissionModalProps {
   onUpdateSubmission?: () => void;
 }
 
+function isLinkFile(file: SubmissionFile): boolean {
+  return (
+    file.type === 'LINK' ||
+    file.size === 'LINK' ||
+    (!!file.url && (file.url.startsWith('http://') || file.url.startsWith('https://')))
+  );
+}
+
 const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
   isOpen,
   onClose,
@@ -42,6 +51,11 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
     if (onUpdateSubmission) {
       onUpdateSubmission();
     }
+  };
+
+  const handleOpenLink = (url: string) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -76,7 +90,6 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
         </div>
 
         <div className="space-y-6">
-          {/* Submission Summary */}
           <div className="rounded-xl border border-[#E6E9F2] bg-[#F8FAFB] p-6">
             <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-[#1F2432]">
               Submission Summary
@@ -84,23 +97,46 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
 
             {submission.files && submission.files.length > 0 && (
               <div className="space-y-3">
-                {submission.files.map((file) => (
-                  <div key={file.id} className="flex items-center gap-3 rounded-lg p-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E8DAFD]">
-                      <FileText size={20} className="text-[#6E56CF]" />
+                {submission.files.map((file) => {
+                  const isLink = isLinkFile(file);
+
+                  return (
+                    <div key={file.id} className="flex items-center gap-3 rounded-lg p-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E8DAFD]">
+                        {isLink ? (
+                          <LinkIcon size={20} className="text-[#6E56CF]" />
+                        ) : (
+                          <FileText size={20} className="text-[#6E56CF]" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-[#1F2432]">{file.name}</p>
+                        <p className="text-xs text-[#A0AABC]">
+                          {file.size} • {file.type}
+                        </p>
+                      </div>
+                      {isLink && file.url ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenLink(file.url!)}
+                          className="rounded-lg p-2 hover:bg-[#E6E9F2]"
+                          aria-label={`Open link ${file.name}`}
+                        >
+                          <LinkIcon size={18} className="text-[#6E56CF]" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => file.url && handleOpenLink(file.url)}
+                          className="rounded-lg p-2 hover:bg-[#E6E9F2]"
+                          aria-label={`Download ${file.name}`}
+                        >
+                          <Download size={18} className="text-[#6E56CF]" />
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-[#1F2432]">{file.name}</p>
-                      <p className="text-xs text-[#A0AABC]">{file.size} • {file.type}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="rounded-lg p-2 hover:bg-[#E6E9F2]"
-                    >
-                      <Download size={18} className="text-[#6E56CF]" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -113,7 +149,6 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
             )}
           </div>
 
-          {/* Mentor Notification */}
           <div className="flex gap-3 rounded-xl border border-[#D5CCFF] bg-[#F5F3FF] p-4">
             <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#E8DAFD]">
               <span className="text-sm font-bold text-[#6E56CF]">ℹ</span>
@@ -123,7 +158,6 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
             </p>
           </div>
 
-          {/* Notes */}
           {submission.notes && (
             <div>
               <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-[#1F2432]">
@@ -138,15 +172,8 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
           )}
         </div>
 
-        {/* Action Buttons */}
         <div className="mt-8 flex justify-center gap-3">
-          <button
-            type="button"
-            onClick={handleUpdate}
-            className="flex items-center gap-2 rounded-xl border-2 border-[#E6E9F2] bg-white px-6 py-2.5 font-semibold text-[#1F2432] hover:bg-gray-50"
-          >
-            📋 Update Submissions
-          </button>
+         
         </div>
       </div>
     </div>

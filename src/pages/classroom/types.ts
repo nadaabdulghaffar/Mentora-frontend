@@ -15,14 +15,22 @@ export type StoredSubmissionLink = {
   url: string;
 };
 
+export type TaskSource = 'roadmap' | 'classroom';
+
 export type ClassroomTask = {
   id: string;
+
+  taskType: TaskSource;
 
   title: string;
 
   description: string;
 
   category: string;
+
+  phaseId?: string;
+
+  phaseName?: string;
 
   status:
     | "todo"
@@ -174,15 +182,6 @@ export type AssignmentEditContext = {
   phaseId: string;
   moduleId: string;
   assignmentIndex: number;
-};
-
-export type MentorCustomPublishedTask = {
-  id: string;
-  title: string;
-  description: string;
-  deadline: string;
-  resources: { title: string; url: string }[];
-  publishedAt: string;
 };
 
 export type NewTaskResource = {

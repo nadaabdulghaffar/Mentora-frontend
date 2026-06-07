@@ -33,6 +33,17 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // ── Render diagnostics ────────────────────────────────────
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log(`[NotificationBell] RENDER #${renderCountRef.current}`);
+
+  useEffect(() => {
+    console.log("[NotificationBell] MOUNT");
+    return () => { console.log("[NotificationBell] UNMOUNT"); };
+  }, []);
+  // ───────────────────────────────────────────────────
+
   const { data, isLoading, isError } = useUnreadNotificationCount({
     enabled: authAPI.isAuthenticated(),
   });

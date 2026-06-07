@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import authAPI from "../../services/authService";
 import { getApiErrorMessage } from "../../utils/apiErrorMessage";
 import { NOTIFICATION_DEFAULT_PAGE_SIZE } from "../constants";
@@ -29,6 +29,17 @@ export function NotificationDropdown({ onClose }: Props) {
   const [navigationFeedback, setNavigationFeedback] = useState<string | null>(
     null
   );
+
+  // ── Render diagnostics ────────────────────────────────────
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  console.log(`[NotificationDropdown] RENDER #${renderCountRef.current}`);
+
+  useEffect(() => {
+    console.log("[NotificationDropdown] MOUNT");
+    return () => { console.log("[NotificationDropdown] UNMOUNT"); };
+  }, []);
+  // ───────────────────────────────────────────────────
 
   const unread = useUnreadNotificationCount({ enabled: isAuthenticated });
   const list = useNotifications(1, NOTIFICATION_DEFAULT_PAGE_SIZE, {

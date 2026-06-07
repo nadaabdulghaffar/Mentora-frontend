@@ -1,5 +1,4 @@
 import api from "../config/api";
-import apiClient from "./api";
 import lookupAPI from "./lookupService";
 import type { CreateProgramFormData } from "../components/create-program/types";
 
@@ -18,6 +17,7 @@ const ANSWER_TYPES = new Set([
 export interface ProgramTechnologyRequirement {
   technologyId: number;
   requiredExperienceLevel: number;
+  technologyName?: string;
 }
 
 export interface ProgramQuestionPayload {
@@ -255,7 +255,7 @@ export function buildQuestionsPayload(
           questionText:
             q.questionText.trim(),
           answerType:
-            q.answerType,
+            q.answerType as "" | "Paragraph" | "MultipleChoice" | "TrueFalse",
           maxSelections:
             q.maxSelections ??
             null,
@@ -417,11 +417,9 @@ export const createProgram = async (
       data.capacity
     ),
 
-    // Send empty string for empty optional fields (matches backend expectations)
     duration:
-      data.duration &&
-      data.duration.trim()
-        ? data.duration.trim()
+      data.duration
+        ? `${data.duration} ${Number(data.duration) === 1 ? "Month" : "Months"}`
         : "",
 
     availability:
@@ -512,7 +510,7 @@ export const updateProgram = async (
     targetLevel: Number(data.targetLevel),
     educationLevel: Number(data.educationLevel),
     capacity: Number(data.capacity),
-    duration: String(data.duration ?? "").trim() || "",
+    duration: data.duration ? `${data.duration} ${Number(data.duration) === 1 ? "Month" : "Months"}` : "",
     availability: data.availability && String(data.availability).trim() ? String(data.availability).trim() : "",
     technologies,
     questions: validQuestions,
@@ -641,7 +639,7 @@ export function mapProgramResponseToFormData(
           rawAnswerType === "MultipleChoice" ||
           rawAnswerType === "TrueFalse" ||
           rawAnswerType === "Paragraph"
-            ? rawAnswerType
+            ? (rawAnswerType as "Paragraph" | "MultipleChoice" | "TrueFalse")
             : "Paragraph";
         const rawOptions = q.options ?? q.Options;
 
@@ -679,7 +677,7 @@ export function mapProgramResponseToFormData(
       EDUCATION_LEVEL_MAP
     ),
     capacity: Number(raw.capacity ?? raw.Capacity ?? 1),
-    duration: String(raw.duration ?? raw.Duration ?? ""),
+    duration: parseInt(String(raw.duration ?? raw.Duration ?? "").replace(/\D/g, ""), 10) || "",
     availability: String(raw.availability ?? raw.Availability ?? ""),
     technologies,
     roadmapId:
@@ -753,6 +751,14 @@ export interface ProgramViewDto {
 
   duration: string;
 
+  educationLevel?: string;
+
+  capacity?: number;
+
+  availability?: string;
+
+  technologies: ProgramTechnologyRequirement[];
+
   deadline: string;
 
   menteesCount: number;
@@ -776,6 +782,8 @@ export interface ProgramViewDto {
   isSaved: boolean;
 
   isApplied: boolean;
+
+  applicationStatus: string;
 
   roadmap?: {
     roadmapId: number;

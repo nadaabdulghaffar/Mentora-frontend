@@ -133,6 +133,7 @@ export default function ApplicantsTable({
                   <div className="relative">
 
                     <button
+                      disabled={(currentStatus === "Accepted" || currentStatus === "Rejected") && app.isNotified}
                       onClick={() =>
                         setOpenDropdown(
                           openDropdown ===
@@ -146,6 +147,7 @@ export default function ApplicantsTable({
                         px-4 py-2 rounded-lg
                         text-[14px]
                         ${statusStyles[currentStatus]}
+                        ${(currentStatus === "Accepted" || currentStatus === "Rejected") && app.isNotified ? 'opacity-70 cursor-not-allowed' : ''}
                       `}
                     >
 
@@ -156,9 +158,9 @@ export default function ApplicantsTable({
                         `}
                       />
 
-                      {currentStatus}
+                      {currentStatus}{(currentStatus === "Accepted" || currentStatus === "Rejected") && app.isNotified && " - Notified"}
 
-                      <ChevronDown size={16} />
+                      {!(currentStatus === "Accepted" || currentStatus === "Rejected" && app.isNotified) && <ChevronDown size={16} />}
 
                     </button>
 

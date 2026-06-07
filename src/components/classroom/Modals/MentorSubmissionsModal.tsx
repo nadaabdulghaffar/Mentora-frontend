@@ -1,8 +1,10 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { ClassroomUserLink } from '../common/ClassroomUserLink';
 
 export type MentorSubmissionSummary = {
   id: string;
+  studentId?: string;
   studentName: string;
   studentAvatar: string;
   submittedAt: string;
@@ -10,6 +12,7 @@ export type MentorSubmissionSummary = {
 reviewStatus:
   | 'reviewed'
   | 'pending'
+  | 'revision_requested'
   | 'draft';
 };
 
@@ -36,18 +39,27 @@ const MentorSubmissionsModal = ({
 
   const filteredSubmissions = submissions.filter((submission) => {
     if (filter === 'reviewed') {
-      return submission.reviewStatus === 'reviewed';
+      return (
+        submission.reviewStatus === 'reviewed' ||
+        submission.reviewStatus === 'revision_requested'
+      );
     }
 
     if (filter === 'pending') {
       return submission.reviewStatus === 'pending';
     }
 
-    return true;
+    return submission.reviewStatus !== 'draft';
   });
 
-  const reviewedCount = submissions.filter((submission) => submission.reviewStatus === 'reviewed').length;
-  const pendingCount = submissions.filter((submission) => submission.reviewStatus === 'pending').length;
+  const reviewedCount = submissions.filter(
+    (submission) =>
+      submission.reviewStatus === 'reviewed' ||
+      submission.reviewStatus === 'revision_requested'
+  ).length;
+  const pendingCount = submissions.filter(
+    (submission) => submission.reviewStatus === 'pending'
+  ).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -102,15 +114,25 @@ const MentorSubmissionsModal = ({
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-lg font-semibold text-[#1F2432]">{submission.studentName}</p>
+                      <ClassroomUserLink
+                        userId={submission.studentId}
+                        name={submission.studentName}
+                        className="text-lg font-semibold text-[#1F2432]"
+                      />
                       <span
                         className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
                           submission.reviewStatus === 'reviewed'
                             ? 'bg-[#DDF6F0] text-[#0E7A5F]'
-                            : 'bg-[#F4F6FB] text-[#667085]'
+                            : submission.reviewStatus === 'revision_requested'
+                              ? 'bg-[#FFE6EA] text-[#AF2F4D]'
+                              : 'bg-[#F4F6FB] text-[#667085]'
                         }`}
                       >
-                        {submission.reviewStatus === 'reviewed' ? 'Reviewed' : 'Pending'}
+                        {submission.reviewStatus === 'reviewed'
+                          ? 'Reviewed'
+                          : submission.reviewStatus === 'revision_requested'
+                            ? 'Revision Requested'
+                            : 'Pending'}
                       </span>
                     </div>
                     <p className="text-sm text-[#6F7689]">Submitted {submission.submittedAt}</p>

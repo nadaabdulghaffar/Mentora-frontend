@@ -1,12 +1,19 @@
 import { useEffect, useMemo } from "react";
 
-import { useParams } from "react-router-dom";
+
+
+import {
+  useParams,
+  useNavigate,
+} from "react-router-dom";
 
 import {
   BarChart3,
   Clock4,
   Bookmark,
 } from "lucide-react";
+
+import { toAbsoluteFileUrl } from "../../services/messagingService";
 
 import Layout from "../../shared/components/Layout";
 
@@ -38,6 +45,7 @@ export default function RoadmapViewPage() {
 
   const { roadmapId } =
     useParams();
+    const navigate = useNavigate();
 
   const loadForView =
     useRoadmapBuilderStore(
@@ -412,12 +420,15 @@ const subDomains =
 
                 <img
                   src={
-                    basicInfo.profilePictureUrl ||
-                    `https://ui-avatars.com/api/?name=${
-                      basicInfo.mentorName ||
-                      "Mentor"
-                    }`
-                  }
+  basicInfo.profilePictureUrl
+    ? toAbsoluteFileUrl(
+        basicInfo.profilePictureUrl
+      )
+    : `https://ui-avatars.com/api/?name=${
+        basicInfo.mentorName ||
+        "Mentor"
+      }`
+}
                   alt={
                     basicInfo.mentorName ||
                     "Mentor"
@@ -444,16 +455,25 @@ const subDomains =
                     Created by
                   </p>
 
-                  <p
-                    className="
-                      text-[16px]
-                      font-bold
-                      text-[#1F2432]
-                    "
-                  >
-                    {basicInfo.mentorName ||
-                      "Mentor"}
-                  </p>
+                  <button
+  type="button"
+  onClick={() =>
+    basicInfo.mentorProfileId &&
+    navigate(
+      `/profile/${basicInfo.mentorProfileId}`
+    )
+  }
+  className="
+    text-[16px]
+    font-bold
+    text-[#1F2432]
+    hover:text-primary
+    transition
+  "
+>
+  {basicInfo.mentorName ||
+    "Mentor"}
+</button>
 
                 </div>
 

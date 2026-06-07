@@ -3,6 +3,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function ApplicantSidePanel({
   applicant,
@@ -108,7 +109,7 @@ export default function ApplicantSidePanel({
             <img
               src={
                 applicant.menteeProfilePicture ||
-                "https://ui-avatars.com/api/?name=Applicant"
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(applicant.menteeName)}&background=random`
               }
               className="
                 w-24 h-24 rounded-full
@@ -137,6 +138,10 @@ export default function ApplicantSidePanel({
               {applicant.programName}
 
             </p>
+
+            <Link to={`/profile/${applicant.menteeId}`} className="text-sm font-medium text-blue-600 hover:text-blue-700 mt-2 inline-block">
+              View Profile &rarr;
+            </Link>
 
             {/* BADGES */}
             <div className="

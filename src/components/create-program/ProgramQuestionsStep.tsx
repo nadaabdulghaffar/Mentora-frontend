@@ -1,17 +1,16 @@
 import { PlusCircle, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useFormikContext, getIn } from "formik";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import type { CreateProgramFormData } from "./types";
-import {
-  fetchRoadmapBasicOptions,
-  type RoadmapBasicOption,
-} from "../../services/programService";
+import RoadmapSelectionField, {
+  PENDING_CREATE_PROGRAM_DRAFT_KEY,
+} from "./RoadmapSelectionField";
+import { useRoadmapOptionsForSubdomain } from "./useRoadmapOptionsForSubdomain";
 
 const answerHintStyle =
   "mt-1 text-xs text-[#64748B] leading-snug";
-const PENDING_CREATE_PROGRAM_DRAFT_KEY = "mentora:create-program-draft";
 
 export default function ProgramQuestionsStep({
   isEditMode = false,
@@ -23,43 +22,14 @@ export default function ProgramQuestionsStep({
   const location = useLocation();
 
   const subDomainId = values.subDomainId;
-
-  const [roadmapOptions, setRoadmapOptions] = useState<RoadmapBasicOption[]>([]);
-  const [roadmapsLoading, setRoadmapsLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setRoadmapsLoading(true);
-      try {
-        const list = await fetchRoadmapBasicOptions();
-        if (!cancelled) setRoadmapOptions(list);
-      } catch {
-        if (!cancelled) setRoadmapOptions([]);
-      } finally {
-        if (!cancelled) setRoadmapsLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const roadmapsForSubdomain = useMemo(() => {
-    if (!subDomainId || subDomainId < 1) return [];
-    return roadmapOptions.filter((r) => r.subDomainId === subDomainId);
-  }, [roadmapOptions, subDomainId]);
-
+  const { roadmapsForSubdomain, roadmapsLoading } = useRoadmapOptionsForSubdomain(subDomainId);
   const roadmapId = values.roadmapId;
 
   useEffect(() => {
-    if (roadmapId == null) return;
+    if (roadmapId == null || roadmapsLoading) return;
     const stillValid = roadmapsForSubdomain.some((r) => r.roadmapId === roadmapId);
     if (!stillValid) setFieldValue("roadmapId", null);
-  }, [roadmapsForSubdomain, roadmapId, setFieldValue]);
+  }, [roadmapsForSubdomain, roadmapId, setFieldValue, roadmapsLoading]);
 
   const questions = values.questions ?? [];
 
@@ -104,37 +74,11 @@ export default function ProgramQuestionsStep({
           </button>
         </div>
 
-        {roadmapsLoading && (
-          <p className="text-xs text-[#64748B] mb-2">
-            Loading roadmaps…
-          </p>
-        )}
-
-        {!roadmapsLoading &&
-          subDomainId > 0 &&
-          roadmapsForSubdomain.length ===
-            0 && (
-            <p className="text-xs text-[#64748B] mb-2">
-              No published roadmaps match this sub-domain, or none are
-              available. The program will be created without a linked roadmap.
-            </p>
-          )}
-
-        <select
-          value={roadmapId ?? ""}
-          onChange={(e) => {
-            const v = e.target.value;
-            setFieldValue("roadmapId", v ? Number(v) : null);
-          }}
-          className="w-full h-12 rounded-xl border border-[#D8DBE4] px-4 text-sm outline-none focus:border-primary"
-        >
-          <option value="">No Roadmap</option>
-          {roadmapsForSubdomain.map((r) => (
-            <option key={r.roadmapId} value={r.roadmapId}>
-              {r.title}
-            </option>
-          ))}
-        </select>
+        <RoadmapSelectionField
+          subDomainId={subDomainId}
+          value={roadmapId ?? null}
+          onChange={(nextRoadmapId) => setFieldValue("roadmapId", nextRoadmapId)}
+        />
       </div>
 
       {/* Questions */}

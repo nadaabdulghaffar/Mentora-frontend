@@ -191,7 +191,7 @@ export default function BuilderFooter() {
                 Cancel
               </button>
 
-              {/* Save Changes 
+                {/* Save Changes */}
               <button
                 id="builder-edit-save"
                 disabled={anyBusy}
@@ -217,7 +217,7 @@ export default function BuilderFooter() {
                   ? "Saving…"
                   : "Save Changes"}
               </button>
-*/}
+
                {/* Publish */}
               {roadmapStatus !== "Published" && (
                 <button

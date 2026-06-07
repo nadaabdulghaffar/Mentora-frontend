@@ -1,4 +1,5 @@
 import axios from "axios";
+import { attachApiDiagnosticInterceptor } from "../utils/apiDiagnosticInterceptor";
 
 /* =========================================
    API BASE URL
@@ -22,6 +23,8 @@ const apiClient = axios.create({
       "application/json",
   },
 });
+
+attachApiDiagnosticInterceptor(apiClient);
 
 /* =========================================
    REQUEST INTERCEPTOR

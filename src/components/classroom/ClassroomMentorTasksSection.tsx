@@ -1,7 +1,5 @@
-import type { ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import type { MentorCustomPublishedTask } from '../../pages/classroom/types';
-
+import { formatTaskDeadline } from '../../pages/classroom/utils';
 
 type MentorTaskCard = {
   id: string;
@@ -12,6 +10,7 @@ type MentorTaskCard = {
   submissions: string;
   avgScore: number;
   avgLabel: string;
+  deadline?: string;
 };
 
 type MentorTaskPhaseView = {
@@ -38,21 +37,11 @@ type ClassroomMentorTasksSectionProps = {
   onTogglePhase: (phaseId: string) => void;
   onOpenSubmissions: (taskId: string, filter?: 'all') => void;
   mentorRegistryRows: MentorRegistryRow[];
-  mentorCustomTasks: MentorCustomPublishedTask[];
   onAddNewTask: () => void;
 };
 
-type WorkflowTaskCardProps = {
-  statusLabel: string;
-  statusTone: 'done' | 'review' | 'risk';
-  title: string;
-  description: string;
-  submissions: string;
-  avgScore: number;
-  avgLabel: string;
+type WorkflowTaskCardProps = MentorTaskCard & {
   onViewSubmissions: () => void;
-  /** Optional content between description and footer (e.g. deadline, resource links) */
-  metaSlot?: ReactNode;
 };
 
 function MentorWorkflowTaskCard({
@@ -63,8 +52,8 @@ function MentorWorkflowTaskCard({
   submissions,
   avgScore,
   avgLabel,
+  deadline,
   onViewSubmissions,
-  metaSlot,
 }: WorkflowTaskCardProps) {
   const badgeClasses =
     statusTone === 'done'
@@ -84,8 +73,10 @@ function MentorWorkflowTaskCard({
       </div>
 
       <p className="mt-3 text-[22px] font-semibold leading-tight text-[#202738]">{title}</p>
+      <p className="mt-1 text-xs font-medium text-[#7D859B]">
+        {formatTaskDeadline(deadline) ?? 'No deadline set'}
+      </p>
       <p className="mt-1 text-sm text-[#6E7589]">{description}</p>
-      {metaSlot ? <div className="mt-2">{metaSlot}</div> : null}
 
       <div className="mt-4 flex items-end justify-between border-t border-[#ECEFF6] pt-3">
         <div className="flex flex-col items-start gap-2">
@@ -114,7 +105,6 @@ export default function ClassroomMentorTasksSection({
   onTogglePhase,
   onOpenSubmissions,
   mentorRegistryRows,
-  mentorCustomTasks,
   onAddNewTask,
 }: ClassroomMentorTasksSectionProps) {
   return (
@@ -137,104 +127,56 @@ export default function ClassroomMentorTasksSection({
       </div>
 
       <div className="space-y-7">
-        {mentorTaskPhasesView.map((phase) => {
-          const isPhaseExpanded = expandedMentorPhaseIds.includes(phase.id);
-
-          return (
-            <div key={phase.id} className="space-y-4 rounded-3xl border border-[#E6E9F2] bg-white p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className={`h-2.5 w-2.5 rounded-full ${phase.dotClass}`} />
-                  <p className="text-[28px] font-bold leading-none text-[#1F2432]">{phase.title}</p>
-                  <span className="rounded-full bg-[#F4F6FA] px-2.5 py-1 text-xs font-semibold text-[#7D859B]">
-                    {phase.milestonesLabel}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onTogglePhase(phase.id)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E6E9F2] bg-white text-[#697188]"
-                  aria-label={isPhaseExpanded ? `Collapse ${phase.title}` : `Expand ${phase.title}`}
-                >
-                  {isPhaseExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-              </div>
-
-              {isPhaseExpanded &&
-                (phase.tasks.length > 0 ? (
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {phase.tasks.map((task) => (
-                      <MentorWorkflowTaskCard
-                        key={task.id}
-                        statusLabel={task.statusLabel}
-                        statusTone={task.statusTone}
-                        title={task.title}
-                        description={task.description}
-                        submissions={task.submissions}
-                        avgScore={task.avgScore}
-                        avgLabel={task.avgLabel}
-                        onViewSubmissions={() => onOpenSubmissions(task.id)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid min-h-[122px] place-items-center rounded-2xl border border-dashed border-[#E3E7F0] bg-white text-center">
-                    <p className="text-sm text-[#8D95A8]">Define your first milestone for Visual Systems.</p>
-                  </div>
-                ))}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="rounded-3xl border border-[#E6E9F2] bg-white p-6">
-        <h2 className="text-[30px] font-bold leading-tight text-[#1F2432]">Tasks</h2>
-        <p className="mt-1 text-sm text-[#6F7689]">Tasks you publish for mentees appear here</p>
-
-        {mentorCustomTasks.length === 0 ? (
-          <div className="mt-6 grid min-h-[100px] place-items-center rounded-2xl border border-dashed border-[#E3E7F0] bg-[#FCFCFE] text-center">
-            <p className="px-4 text-sm text-[#8D95A8]">No published tasks yet. Use &quot;Add new task&quot; to create one.</p>
+        {mentorTaskPhasesView.length === 0 ? (
+          <div className="grid min-h-[160px] place-items-center rounded-3xl border border-dashed border-[#E3E7F0] bg-white text-center">
+            <p className="px-4 text-sm text-[#8D95A8]">
+              No tasks yet. Use &quot;Add new task&quot; to publish a classroom task.
+            </p>
           </div>
         ) : (
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {mentorCustomTasks.map((task) => (
-              <MentorWorkflowTaskCard
-                key={task.id}
-                statusLabel="Open for submissions"
-                statusTone="review"
-                title={task.title}
-                description={task.description.trim() ? task.description : 'No description provided.'}
-                submissions="0/45"
-                avgScore={0}
-                avgLabel="Average score"
-                onViewSubmissions={() => onOpenSubmissions(task.id)}
-                metaSlot={
-                  <>
-                    <p className="text-xs font-medium text-[#7D859B]">
-                      Deadline:{' '}
-                      <span className="text-[#3E4559]">{task.deadline ? task.deadline : 'Not set'}</span>
-                    </p>
-                    {task.resources.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {task.resources.map((res, i) => (
-                          <a
-                            key={`${task.id}-res-${i}`}
-                            href={res.url || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`inline-flex max-w-full items-center rounded-full border border-[#DDE2EF] bg-[#F8FAFE] px-2.5 py-0.5 text-[11px] font-medium text-[#5E4BC5] ${!res.url ? 'pointer-events-none opacity-50' : ''}`}
-                          >
-                            <span className="truncate">{res.title || res.url || 'Resource'}</span>
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                  </>
-                }
-              />
-            ))}
-          </div>
+          mentorTaskPhasesView.map((phase) => {
+            const isPhaseExpanded = expandedMentorPhaseIds.includes(phase.id);
+
+            return (
+              <div key={phase.id} className="space-y-4 rounded-3xl border border-[#E6E9F2] bg-white p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`h-2.5 w-2.5 rounded-full ${phase.dotClass}`} />
+                    <p className="text-[28px] font-bold leading-none text-[#1F2432]">{phase.title}</p>
+                    <span className="rounded-full bg-[#F4F6FA] px-2.5 py-1 text-xs font-semibold text-[#7D859B]">
+                      {phase.milestonesLabel}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => onTogglePhase(phase.id)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E6E9F2] bg-white text-[#697188]"
+                    aria-label={isPhaseExpanded ? `Collapse ${phase.title}` : `Expand ${phase.title}`}
+                  >
+                    {isPhaseExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                </div>
+
+                {isPhaseExpanded &&
+                  (phase.tasks.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {phase.tasks.map((task) => (
+                        <MentorWorkflowTaskCard
+                          key={task.id}
+                          {...task}
+                          onViewSubmissions={() => onOpenSubmissions(task.id)}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid min-h-[122px] place-items-center rounded-2xl border border-dashed border-[#E3E7F0] bg-white text-center">
+                      <p className="text-sm text-[#8D95A8]">No tasks in this phase yet.</p>
+                    </div>
+                  ))}
+              </div>
+            );
+          })
         )}
       </div>
 

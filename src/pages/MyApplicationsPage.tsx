@@ -506,9 +506,9 @@ primaryButtonText={
                   // 🟢 VIEW (dropdown)
                   onViewApplicants={() => goToApplicationDetails(item.id)}
 
-                  onEdit={() => openEditModal(item.id)}
+                  onEdit={item.status === "Closed" || isMentee ? undefined : () => openEditModal(item.id)}
 
-                  onUnpublish={() => handleUnpublish(item.id)}
+                  onUnpublish={item.status === "Closed" || isMentee ? undefined : () => handleUnpublish(item.id)}
 
                   onCancelApplying={() => {
                     void handleCancelApplying(item.id);
