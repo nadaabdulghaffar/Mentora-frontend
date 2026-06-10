@@ -721,6 +721,11 @@ export const getMyPublishedPrograms = async () => {
   return response.data;
 };
 
+export const getRecentApplications = async () => {
+  const response = await api.get("/MentorDashboard/recent-applications");
+  return response.data;
+};
+
 export const getPublishedProgramsByMentorProfile = async (
   mentorProfileId: string,
   page = 1,
@@ -887,7 +892,8 @@ export const getApplicantsByProgram =
     pageNumber = 1,
     pageSize = 10,
     status?: string,
-    search?: string
+    search?: string,
+    level?: string
   ) => {
 
     const response = await api.get(
@@ -899,6 +905,7 @@ export const getApplicantsByProgram =
           pageSize,
           status,
           search,
+          level,
         },
       }
     );

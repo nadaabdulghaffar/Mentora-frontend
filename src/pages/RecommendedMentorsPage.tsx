@@ -1,71 +1,12 @@
 import Layout from "../shared/components/Layout";
-import ProgramCard from "../components/ProgramCard";
-
-interface RecommendedMentor {
-  id: string;
-  title: string;
-  description: string;
-  image?: string;
-  tag?: string;
-  phases?: string;
-  author?: {
-    avatar: string;
-    name: string;
-  };
-}
-
-const recommendedMentors: RecommendedMentor[] = [
-  {
-    id: "mentor-1",
-    title: "Elena Rodriguez",
-    description: "Senior Product Designer at Meta focused on UX research and systems thinking.",
-    image: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=900&q=80",
-    tag: "UX RESEARCH",
-    phases: "128 REVIEWS",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Elena",
-      name: "Senior Product Designer",
-    },
-  },
-  {
-    id: "mentor-2",
-    title: "Amelia Shepherd",
-    description: "Lead Designer at Klaviyo helping creators turn ideas into clear product journeys.",
-    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=900&q=80",
-    tag: "ACCESSIBILITY",
-    phases: "314 RATINGS",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Amelia",
-      name: "Lead Designer",
-    },
-  },
-  {
-    id: "mentor-3",
-    title: "Marcus Thompson",
-    description: "Full-Stack Engineer at Google with 10+ years building scalable systems.",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=900&q=80",
-    tag: "BACKEND DEVELOPMENT",
-    phases: "95 REVIEWS",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Marcus",
-      name: "Senior Engineer",
-    },
-  },
-  {
-    id: "mentor-4",
-    title: "Priya Sharma",
-    description: "Data Science Lead at LinkedIn helping companies extract insights from data.",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80",
-    tag: "DATA SCIENCE",
-    phases: "203 RATINGS",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Priya",
-      name: "Data Science Lead",
-    },
-  },
-];
+import MentorRecommendationCard from "../components/MentorRecommendationCard";
+import { useRecommendations } from "../hooks/useRecommendations";
+import { useNavigate } from "react-router-dom";
 
 const RecommendedMentorsPage = () => {
+  const navigate = useNavigate();
+  const { data: mentors, isLoading, isError } = useRecommendations('mentors', 20);
+
   return (
     <Layout>
       <section className="w-full pb-8 pt-4">
@@ -78,23 +19,37 @@ const RecommendedMentorsPage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {recommendedMentors.map((mentor) => (
-            <ProgramCard
-              key={mentor.id}
-              variant="dual-buttons"
-              image={mentor.image}
-              tag={mentor.tag}
-              phases={mentor.phases}
-              title={mentor.title}
-              description={mentor.description}
-              author={mentor.author}
-              primaryButtonText="See Full Profile"
-              secondaryButtonText="Message"
-              className="h-full"
-            />
-          ))}
-        </div>
+        {isLoading ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {[...Array(6)].map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-96 w-full"></div>
+              ))}
+            </div>
+        ) : isError ? (
+            <div className="text-center py-12 text-gray-500">
+                <p>Failed to load recommendations. Please try again later.</p>
+            </div>
+        ) : !mentors || mentors.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+                <p>No mentor recommendations available at this time.</p>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {mentors.map((m) => (
+                <MentorRecommendationCard
+                  key={m.id}
+                  id={m.id}
+                  name={m.name}
+                  domain={m.headline}
+                  imageUrl={m.avatarUrl}
+                  matchPercentage={m.aiMatchScore}
+                  matchReasons={m.aiMatchReasons}
+                  onSeeProfileClick={() => navigate(`/profile/${m.id}`)}
+                  className="h-full"
+                />
+              ))}
+            </div>
+        )}
       </section>
     </Layout>
   );

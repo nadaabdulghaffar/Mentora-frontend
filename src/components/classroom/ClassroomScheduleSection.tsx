@@ -6,8 +6,7 @@ export type ClassroomScheduleSession = {
   duration: string;
   live: boolean;
   meetingLink?: string;
-
-
+  scheduledAt: string;
 };
 
 type ClassroomScheduleSectionProps = {

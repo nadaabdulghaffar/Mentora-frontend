@@ -1,62 +1,47 @@
+import { useNavigate } from 'react-router-dom';
+import MentorRecommendationCard from '../MentorRecommendationCard';
+import { useRecommendations } from '../../hooks/useRecommendations';
+import SectionTitle from '../SectionTitle';
+import ViewAllLink from '../ViewAllLink';
 import React from 'react';
-import { Lightbulb } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import ProgramCard from '../ProgramCard';
-
 const MentorsMatch: React.FC = () => {
-  const mentors = [
-    {
-      id: 'mentor-1',
-      name: 'Mona Zaki',
-      bio: 'Senior product manager who work in tech field and build products in many companies',
-      imageUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=900&q=80',
-    },
-    {
-      id: 'mentor-2',
-      name: 'Mona Zaki',
-      bio: 'Senior product manager who work in tech field and build products in many companies',
-      imageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80',
-    },
-    {
-      id: 'mentor-3',
-      name: 'Mona Zaki',
-      bio: 'Senior product manager who work in tech field and build products in many companies',
-      imageUrl: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=900&q=80',
-    },
-  ];
+  const navigate = useNavigate();
+  const { data: mentors, isLoading, isError } = useRecommendations('mentors', 3);
 
   return (
     <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h3 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800">Mentors Match with you</h3>
-        </div>
-        <Link
-          to="/recommended-mentors"
-          className="text-sm text-primary transition hover:underline"
-        >
-          View All
-        </Link>
+      <div className="flex items-center justify-between mb-6">
+        <SectionTitle>Mentors Match with you</SectionTitle>
+        <ViewAllLink to="/recommended-mentors" />
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-        {mentors.map((m) => (
-          <ProgramCard
-            key={m.id}
-            variant="simple-button"
-            image={m.imageUrl}
-            tag="DESIGN"
-            phases="50% MATCHING"
-            title={m.name}
-            description={m.bio}
-            authorText="This mentor match with you because both of us study design"
-            authorIcon={<Lightbulb size={16} />}
-            hideAuthorAvatar
-            primaryButtonText="See profile"
-            className="h-full"
-          />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+             <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-80 w-full"></div>
+          ))}
+        </div>
+      ) : isError || !mentors || mentors.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No mentor recommendations available right now.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          {mentors.map((m) => (
+            <MentorRecommendationCard
+              key={m.id}
+              id={m.id}
+              name={m.name}
+              domain={m.headline}
+              imageUrl={m.avatarUrl}
+              matchPercentage={m.aiMatchScore}
+              matchReasons={m.aiMatchReasons}
+              onSeeProfileClick={() => navigate(`/profile/${m.id}`)}
+              className="h-full"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

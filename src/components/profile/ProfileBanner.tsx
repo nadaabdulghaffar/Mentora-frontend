@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Flag, Link, Mail, MapPin, Pencil, Settings, Share2 } from 'lucide-react';
+
+import { Flag, Mail, MapPin, Pencil } from 'lucide-react';
 import type { ProfileEntity } from '../../pages/profile/types';
 import { ProfileAvatar } from './ProfileAvatar';
 
@@ -12,7 +12,6 @@ export interface ProfileBannerProps {
   followLoading?: boolean;
   messageLoading?: boolean;
   onEdit?: () => void;
-  onSettings?: () => void;
   onFollow?: () => void;
   onMessage?: () => void;
   onReport?: () => void;
@@ -27,32 +26,10 @@ export function ProfileBanner({
   followLoading = false,
   messageLoading = false,
   onEdit,
-  onSettings,
   onFollow,
   onMessage,
   onReport,
 }: ProfileBannerProps) {
-  const [shareOpen, setShareOpen] = useState(false);
-
-  const profileLink = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return '';
-    }
-
-    return window.location.href;
-  }, []);
-
-  const handleCopyLink = async () => {
-    if (!profileLink) return;
-
-    try {
-      await navigator.clipboard.writeText(profileLink);
-      setShareOpen(false);
-    } catch {
-      // No-op: keep the popup open if clipboard access is blocked.
-    }
-  };
-
   const showVisitorActions = !isOwner && (showFollow || showMessage);
 
   return (
@@ -109,55 +86,6 @@ export function ProfileBanner({
               >
                 <Pencil size={18} />
               </button>
-              <button
-                type="button"
-                onClick={onSettings}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition hover:bg-white/25"
-                aria-label="Settings"
-              >
-                <Settings size={18} />
-              </button>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShareOpen((prev) => !prev)}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition hover:bg-white/25"
-                  aria-label="Share profile"
-                >
-                  <Share2 size={18} />
-                </button>
-
-                {shareOpen ? (
-                  <div className="absolute right-0 top-full z-20 mt-3 w-80 rounded-2xl border border-white/15 bg-white p-4 text-slate-900 shadow-2xl shadow-black/20">
-                    <p className="text-sm font-semibold text-[#1F2533]">Share profile</p>
-                    <p className="mt-1 text-xs text-[#6B7289]">Copy this link and send it to anyone.</p>
-                    <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#D8DCE8] bg-[#F8F9FD] px-3 py-2">
-                      <Link size={16} className="shrink-0 text-primary" />
-                      <input
-                        readOnly
-                        value={profileLink}
-                        className="min-w-0 flex-1 bg-transparent text-xs text-[#1F2533] outline-none"
-                      />
-                    </div>
-                    <div className="mt-4 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShareOpen(false)}
-                        className="rounded-xl border border-[#D8DCE8] px-4 py-2 text-sm font-semibold text-[#6B7289] transition hover:bg-[#F8F9FD]"
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-dark"
-                      >
-                        Copy Link
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
             </>
           ) : showVisitorActions ? (
             <>

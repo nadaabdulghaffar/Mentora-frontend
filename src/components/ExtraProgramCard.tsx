@@ -12,6 +12,7 @@ export interface ExtraProgramCardProps {
     | "progress"
     | "main"
     | "mentor-application-card"
+    | "mentor-profile-program-card"
     | "mentee-application-card";
 
   image?: string;
@@ -40,7 +41,7 @@ export interface ExtraProgramCardProps {
   // ✅ NEW (mentor only)
   onViewApplicants?: () => void;
   onEdit?: () => void;
-  onUnpublish?: () => void;
+  onDelete?: () => void;
   onCancelApplying?: () => void;
 }
 
@@ -67,7 +68,7 @@ export const ExtraProgramCard: React.FC<
   // ✅ NEW
   onViewApplicants,
   onEdit,
-  onUnpublish,
+  onDelete,
   onCancelApplying,
 }) => {
   const progressValue =
@@ -85,6 +86,10 @@ export const ExtraProgramCard: React.FC<
   const isMentor =
     variant ===
     "mentor-application-card";
+
+  const isProfileMentor =
+    variant ===
+    "mentor-profile-program-card";
 
   const isMenteeApplication =
     variant ===
@@ -194,16 +199,10 @@ export const ExtraProgramCard: React.FC<
   ====================== */
 
   const hasImage =
-    variant ===
-      "simple-button" ||
-    variant ===
-      "dual-buttons" ||
-    variant ===
-      "main" ||
-    variant ===
-      "mentor-application-card" ||
-    variant ===
-      "mentee-application-card";
+    variant === "simple-button" ||
+    variant === "dual-buttons" ||
+    variant === "main" ||
+    variant === "mentor-profile-program-card";
 
   const statusStyles: Record<string, string> = {
     Open: "text-[#2EA594]",
@@ -218,25 +217,32 @@ export const ExtraProgramCard: React.FC<
 
   return (
     <article
-      className={`rounded-2xl border border-[#D8DBE4] bg-white shadow-sm overflow-hidden ${className}`}
+      className={`rounded-2xl border border-[#D8DBE4] bg-white shadow-sm overflow-hidden flex flex-col ${className}`}
     >
-      {hasImage &&
-        image && (
+      {(hasImage && (image || isProfileMentor)) && (
           <div
-            className={`relative w-full ${
+            className={`relative w-full shrink-0 ${
               isMain ||
-              isMentor
+              isMentor || isProfileMentor
                 ? "h-40"
                 : "h-32"
-            }`}
+            } ${!image ? "bg-[#F5F7FB] flex items-center justify-center" : ""}`}
           >
-            <img
-              src={image}
-              alt={title}
-              className="h-full w-full object-cover"
-            />
+            {image ? (
+              <img
+                src={image}
+                alt={title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="text-[#A1A9B8]">
+                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+            )}
 
-            {(isMentor || isMenteeApplication) && (
+            {isProfileMentor && (
               <div className={`absolute top-3 left-3 rounded-full bg-white px-3 py-1 text-xs font-semibold shadow-sm ${currentStatusClass}`}>
                 ● {status}
               </div>
@@ -245,18 +251,31 @@ export const ExtraProgramCard: React.FC<
         )}
 
       <div
-        className={`${
+        className={`flex-1 flex flex-col ${
           isMain ||
-          isMentor ||
+          isMentor || isProfileMentor ||
           isMenteeApplication
             ? "p-5"
             : "p-4"
         }`}
       >
-        {isMentor && (
-          <div className="flex flex-wrap gap-4 text-sm text-[#7D89A3] font-medium mb-3">
+        {(isMentor || isProfileMentor) && (
+          <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-[#7D89A3] font-medium mb-3">
             <span>
               Deadline: {deadline}
+            </span>
+            {isMentor && (
+              <span className={`inline-block rounded-full bg-[#F5F7FB] px-3 py-1 text-xs font-semibold ${currentStatusClass}`}>
+                ● {status}
+              </span>
+            )}
+          </div>
+        )}
+
+        {isMenteeApplication && (
+          <div className="mb-3">
+            <span className={`inline-block rounded-full bg-[#F5F7FB] px-3 py-1 text-xs font-semibold ${currentStatusClass}`}>
+              ● {status}
             </span>
           </div>
         )}
@@ -291,7 +310,7 @@ export const ExtraProgramCard: React.FC<
         <h3
           className={`font-bold leading-tight text-[#1F2432] line-clamp-2 ${
             isMain ||
-            isMentor ||
+            isMentor || isProfileMentor ||
             isMenteeApplication
               ? "text-[22px]"
               : "text-[18px]"
@@ -303,7 +322,7 @@ export const ExtraProgramCard: React.FC<
         <p
           className={`mt-3 text-[#5D6A85] line-clamp-3 break-words ${
             isMain ||
-            isMentor ||
+            isMentor || isProfileMentor ||
             isMenteeApplication
               ? "text-[15px] leading-6"
               : "text-sm leading-6"
@@ -312,7 +331,7 @@ export const ExtraProgramCard: React.FC<
           {description}
         </p>
 
-        <div className="mt-5">
+        <div className="mt-auto pt-5">
           {author &&
             isMain && (
               <div className="flex items-center justify-between gap-3">
@@ -339,7 +358,7 @@ export const ExtraProgramCard: React.FC<
             )}
 
           {/* ✅ MENTOR ONLY */}
-          {isMentor && (
+          {(isMentor || isProfileMentor) && (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -394,15 +413,15 @@ export const ExtraProgramCard: React.FC<
                       </button>
                     )}
 
-                    {onUnpublish && (
+                    {onDelete && (
                       <button
                         onClick={() => {
-                          onUnpublish();
+                          onDelete();
                           setMenuOpen(false);
                         }}
                         className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-[#F5F7FB]"
                       >
-                        Unpublish
+                        Delete
                       </button>
                     )}
                   </div>
@@ -421,22 +440,24 @@ export const ExtraProgramCard: React.FC<
                 {primaryButtonText}
               </button>
 
-              <button
-                type="button"
-                onClick={onSecondaryClick ?? onCancelApplying}
-                className={`h-11 px-4 rounded-xl border text-sm font-semibold transition ${
-                  (secondaryButtonText || "").toLowerCase().includes("withdraw")
-                    ? "border-red-200 text-red-600 hover:bg-red-50"
-                    : "border-[#C4CAD7] text-[#2E3547] hover:bg-[#F5F7FB]"
-                }`}
-              >
-                {secondaryButtonText}
-              </button>
+              {secondaryButtonText && (
+                <button
+                  type="button"
+                  onClick={onSecondaryClick ?? onCancelApplying}
+                  className={`h-11 px-4 rounded-xl border text-sm font-semibold transition ${
+                    (secondaryButtonText || "").toLowerCase().includes("withdraw")
+                      ? "border-red-200 text-red-600 hover:bg-red-50"
+                      : "border-[#C4CAD7] text-[#2E3547] hover:bg-[#F5F7FB]"
+                  }`}
+                >
+                  {secondaryButtonText}
+                </button>
+              )}
             </div>
           )}
 
           {!isMain &&
-            !isMentor &&
+            !(isMentor || isProfileMentor) &&
             !isMenteeApplication && (
               <div className="flex gap-2.5">
                 {variant ===

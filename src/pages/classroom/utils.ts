@@ -131,12 +131,20 @@ export const formatTaskDeadline = (
     return null;
   }
 
-  const parsed = new Date(deadline);
+  const parsed = parseSafeUtcDate(deadline);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
 
   return `Due ${parsed.toLocaleDateString()}`;
+};
+
+export const parseSafeUtcDate = (isoString?: string | null): Date => {
+  if (!isoString) return new Date(NaN);
+  
+  const isAmbiguous = !isoString.endsWith('Z') && !isoString.match(/[+-]\d{2}:\d{2}$/);
+  
+  return new Date(isAmbiguous ? `${isoString}Z` : isoString);
 };
 
 export const mapRoadmapPhaseTaskToClassroomTask = (

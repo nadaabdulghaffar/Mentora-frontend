@@ -79,7 +79,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <Bell size={22} aria-hidden />
+        <Bell size={28} aria-hidden />
         {showBadge && (
           <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white md:h-5 md:min-w-5 md:text-xs">
             {formatUnreadBadge(unreadCount)}

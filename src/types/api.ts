@@ -20,7 +20,7 @@ export interface ExploreSearchParams {
   searchQuery?: string;
   domainId?: number;
   subDomainId?: number;
-  recommendedForYou?: boolean;
+
   pageNumber?: number;
   pageSize?: number;
   openedNow?: boolean;
@@ -165,4 +165,19 @@ export interface MentorProgramItem {
   applicantsCount?: number;
   deadline?: string;
   status: string;
+}
+
+export interface ProgramSessionDto {
+  sessionId: number;
+  classroomId: number;
+  programId: number;
+  programTitle: string;
+  title: string;
+  meetingLink: string | null;
+  scheduledAt: string;
+  status: string;
+  createdAt: string;
+  dateDisplay: string;
+  timeDisplay: string;
+  isJoinable: boolean;
 }

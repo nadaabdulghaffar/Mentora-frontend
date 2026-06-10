@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Settings, X } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Modal } from '../../../components/Modal';
 
 interface SettingsModalProps {
@@ -26,14 +26,11 @@ export function SettingsModal({ isOpen, onClose, initialEmail = '', onSave }: Se
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} contentClassName="max-w-lg p-0 overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#ECEFF5] px-6 py-4">
+      <div className="flex items-center border-b border-[#ECEFF5] px-6 py-4">
         <div className="flex items-center gap-2">
           <Settings className="text-primary" size={22} />
           <h2 className="text-lg font-bold text-[#1F2533]">Settings</h2>
         </div>
-        <button type="button" onClick={onClose} className="rounded-lg p-2 text-[#8B92A8] hover:bg-[#F4F5FA]" aria-label="Close">
-          <X size={22} />
-        </button>
       </div>
 
       <div className="space-y-6 px-6 py-6">

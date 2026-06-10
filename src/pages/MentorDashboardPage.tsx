@@ -4,7 +4,9 @@ import Layout from "../shared/components/Layout";
 import WelcomeBanner from "../components/dashboard components/WelcomeBanner";
 import MentorMentorshipProgramsSection from "../components/dashboard components/MentorMentorshipProgramsSection";
 import MentorActiveApplicationsSection from "../components/dashboard components/MentorActiveApplicationsSection";
+import SearchSection from "../components/dashboard components/SearchSection";
 import RightSidebar from "../components/dashboard components/RightSidebar";
+import { MENTOR_DASHBOARD_CHIPS } from "../constants/chatbotPrompts";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
 
@@ -81,14 +83,19 @@ const MentorDashboardPage = () => {
                 <div className="space-y-4 md:space-y-6 lg:col-span-9 lg:space-y-8">
                     <WelcomeBanner
                         name={displayName}
-                        tagline="Continue your growth journey with expert mentorship. You have 3 sessions scheduled for today."
+                        tagline="Inspire, guide, and help shape the next generation of talent."
+                    />
+                    <SearchSection
+                        title="Mento AI is here to help you guide the next generation"
+                        placeholder="Ask about session planning, mentorship best practices, or your analytics..."
+                        suggestionChips={MENTOR_DASHBOARD_CHIPS}
                     />
                     <MentorMentorshipProgramsSection />
                     <MentorActiveApplicationsSection />
                 </div>
 
                 <div className="space-y-4 md:space-y-6 lg:col-span-3 lg:space-y-8">
-                    <RightSidebar upcomingTitle="Today's Sessions" />
+                    <RightSidebar upcomingTitle="Upcoming Sessions" />
                 </div>
 
             </div>

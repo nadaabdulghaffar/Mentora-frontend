@@ -5,7 +5,6 @@ import {
   Paperclip,
   Search,
   SendHorizontal,
-  Smile,
   X,
 } from "lucide-react";
 import Layout from "../shared/components/Layout";
@@ -449,8 +448,6 @@ const MessagesPage = () => {
     );
     void loadActiveMessages(activeContactId);
 
-    let cancelled = false;
-
     const markActiveConversationAsRead = async () => {
       setContacts((prev) =>
         prev.map((contact) =>
@@ -474,10 +471,6 @@ const MessagesPage = () => {
     };
 
     void markActiveConversationAsRead();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     activeContactId,
     isLoadingConversations,
@@ -492,9 +485,7 @@ const MessagesPage = () => {
     }
 
     return contacts.filter((contact) => {
-      return `${contact.name} ${contact.role} ${contact.preview}`
-        .toLowerCase()
-        .includes(query);
+      return contact.name.toLowerCase().includes(query);
     });
   }, [contacts, searchQuery]);
 
@@ -695,9 +686,6 @@ const MessagesPage = () => {
                       >
                         {activeContact.name}
                       </button>
-                      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#7E869C]">
-                        {activeContact.role}
-                      </p>
                     </div>
                   </div>
                 </header>
@@ -813,9 +801,6 @@ const MessagesPage = () => {
                       }
                       className="flex-1 bg-transparent text-sm text-[#2A3346] outline-none placeholder:text-[#9CA4B8]"
                     />
-                    <button type="button" className="text-[#7A8298] transition hover:text-[#5B647A]">
-                      <Smile size={19} />
-                    </button>
                     <button
                       type="button"
                       disabled={isSending || isUploadingAttachment || !canSend}

@@ -1,76 +1,55 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import ProgramCard from "../ProgramCard";
+import { useRecommendations } from "../../hooks/useRecommendations";
+import SectionTitle from "../SectionTitle";
+import ViewAllLink from "../ViewAllLink";
 
 const SuggestedPrograms = () => {
+    const navigate = useNavigate();
+    const { data: programs, isLoading, isError } = useRecommendations('programs', 3);
+
     return (
         <div className="bg-white rounded-2xl p-4 md:p-6 lg:p-8 shadow-sm">
-
             {/* Header */}
-            <div className="flex justify-between items-start mb-6">
-
+            <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-base md:text-lg lg:text-xl font-semibold text-gray-800">
-                        Programs Suggested for you
-                    </h3>
+                    <SectionTitle>Programs Suggested for you</SectionTitle>
                     <p className="text-xs md:text-sm lg:text-base text-gray-400 mt-1">
                         AI-matched based on your goals
                     </p>
                 </div>
-
-                <Link
-                    to="/suggested-programs"
-                    className="text-xs text-gray-500 transition hover:text-primary md:text-sm lg:text-base"
-                >
-                    View all
-                </Link>
+                <ViewAllLink to="/suggested-programs" />
             </div>
 
             {/* Cards Wrapper */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ProgramCard
-                    variant="dual-buttons"
-                    image="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80"
-                    tag="DESIGN"
-                    phases="92% MATCHING"
-                    title="UX Research Fundamentals"
-                    description="Master the art of user research with industry experts from top tech companies."
-                    author={{
-                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Moraa",
-                        name: "Moraa Zaki",
-                    }}
-                    primaryButtonText="Apply"
-                    secondaryButtonText="Details"
-                />
-                <ProgramCard
-                    variant="dual-buttons"
-                    image="https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=900&q=80"
-                    tag="LEADERSHIP"
-                    phases="88% MATCHING"
-                    title="Future Leaders Track"
-                    description="Develop soft skills and strategic thinking necessary for senior management roles."
-                    author={{
-                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Mona",
-                        name: "Mona Zaki",
-                    }}
-                    primaryButtonText="Apply"
-                    secondaryButtonText="Details"
-                />
-                <ProgramCard
-                    variant="dual-buttons"
-                    image="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80"
-                    tag="DESIGN"
-                    phases="85% MATCHING"
-                    title="UX Research Fundamentals"
-                    description="Master the craft of user-centered design through practical mentorship."
-                    author={{
-                        avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Moraa2",
-                        name: "Moraa Zaki",
-                    }}
-                    primaryButtonText="Apply"
-                    secondaryButtonText="Details"
-                />
-            </div>
-
+            {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[1, 2, 3].map((i) => (
+                         <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-80 w-full"></div>
+                    ))}
+                </div>
+            ) : isError || !programs || programs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No program recommendations available right now.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {programs.map((program) => (
+                        <ProgramCard
+                            key={program.id}
+                            variant="dual-buttons"
+                            image={program.avatarUrl || undefined}
+                            tag={program.headline?.toUpperCase() || undefined}
+                            phases={`${program.aiMatchScore}% MATCHING`}
+                            title={program.name}
+                            description={program.description || ''}
+                            primaryButtonText="View Details"
+                            onPrimaryClick={() => navigate(`/applications/${program.id}?apply=1`)}
+                            className="h-full"
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

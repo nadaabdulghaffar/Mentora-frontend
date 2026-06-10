@@ -1,16 +1,16 @@
-
 import React, {
   useCallback,
   useEffect,
   useState,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { useNavigate } from 'react-router-dom';
 import { Plus, Users } from 'lucide-react';
 
 import Layout from '../../shared/components/Layout';
 
-import { MOCK_COMMUNITIES } from './constants';
+
 
 import { PostCard } from '../../components/community/PostCard';
 
@@ -20,6 +20,8 @@ import { CreatePostForm } from '../../components/community/CreatePostForm';
 
 import CreateCommunityModal from '../../components/create-community/CreateCommunityModal';
 import { Alert } from '../../components/Alert';
+import RecommendedCommunitiesCard from '../../components/dashboard components/right/RecommendedCommunitiesCard';
+import { SharedCommunitySidebarCard } from '../../shared/components/SharedCommunitySidebarCard';
 
 import {
   useThreads,
@@ -78,58 +80,37 @@ const CommunitiesListPage: React.FC = () => {
     currentUser?.userId || '';
 
   usePageLifecycleDiagnostics(PAGE_NAME);
-  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser]);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser?.userId]);
 
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     displayName: string;
     avatarUrl: string;
   } | null>(null);
 
-useEffect(() => {
-  const fetchProfile = async () => {
-    try {
-      const profile = await withLoadingDiagnostics(
-        PAGE_NAME,
-        'profile',
-        () => refreshOwnProfile()
-      );
-
-      if (profile) {
-        setCurrentUserProfile({
-          displayName:
-            profile.displayName?.trim() ||
-            (currentUser
-              ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
-              : 'You'),
-          avatarUrl: profile.avatarUrl || '',
-        });
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const profile = await withLoadingDiagnostics(
+          PAGE_NAME,
+          'profile',
+          () => refreshOwnProfile()
+        );
+        if (profile) {
+          setCurrentUserProfile({
+            displayName: profile.displayName?.trim() || (currentUser ? `${currentUser.firstName} ${currentUser.lastName}`.trim() : 'You'),
+            avatarUrl: profile.avatarUrl || '',
+          });
+        }
+      } catch (err) {
+        console.error(`[${PAGE_NAME}] Failed to load user profile`, err);
       }
-    } catch (err) {
-      console.error(
-        `[${PAGE_NAME}] Failed to load user profile`,
-        err
-      );
-    }
-  };
-
-  fetchProfile();
-}, []); // <-- مؤقتاً للتشخيص
+    };
+    fetchProfile();
+  }, [currentUser?.userId]);
 
   const [
     isCreateCommunityOpen,
     setIsCreateCommunityOpen,
-  ] = useState(false);
-
-  const [
-    myCommunities,
-    setMyCommunities,
-  ] = useState<Community[]>(
-    []
-  );
-
-  const [
-    isLoadingCommunities,
-    setIsLoadingCommunities,
   ] = useState(false);
 
   const [
@@ -146,40 +127,19 @@ useEffect(() => {
     message: string;
   } | null>(null);
 
-  const loadMyCommunities = useCallback(async () => {
-    try {
-      setIsLoadingCommunities(true);
-
-      const response = await withLoadingDiagnostics(
-        PAGE_NAME,
-        'my communities',
-        async () => {
-          await ensureDomainsLoaded();
-          return getMyCommunities();
-        }
-      );
-      const mapped = mapCommunitiesResponse(response);
-
-      setMyCommunities(mapped);
-    } catch (error) {
-      console.error(
-        `[${PAGE_NAME}] Failed to fetch communities`,
-        error
-      );
-    } finally {
-      setIsLoadingCommunities(false);
-    }
-  }, []);
+  const { data: myCommunities = [], isLoading: isLoadingCommunities } = useQuery({
+    queryKey: ['myCommunities'],
+    queryFn: async () => {
+      await ensureDomainsLoaded();
+      const response = await getMyCommunities();
+      return mapCommunitiesResponse(response);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
   /* =========================
      FETCH COMMUNITIES
   ========================= */
-
-  useEffectRunDiagnostics(PAGE_NAME, 'loadMyCommunities', [loadMyCommunities]);
-
-  useEffect(() => {
-    void loadMyCommunities();
-  }, [loadMyCommunities]);
 
   useEffectRunDiagnostics(PAGE_NAME, 'loadFeed', []);
 
@@ -400,25 +360,9 @@ useEffect(() => {
         )}
 
         <div className="py-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-            <div className="flex-1 text-center sm:text-left">
-              <p className="text-sm text-gray-500">
-                Connect and grow with others across mentorship communities.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="inline-flex shrink-0 items-center justify-center gap-2 self-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/25 transition hover:bg-primary-dark sm:self-auto"
-              onClick={() => setIsCreateCommunityOpen(true)}
-            >
-              <Plus size={18} strokeWidth={2.5} aria-hidden />
-              Create Community
-            </button>
-          </div>
-
           <div className="grid gap-6 grid-cols-3">
             <div className="col-span-2 space-y-6">
+
               {!isLoadingCommunities && myCommunities.length === 0 ? (
                 <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white px-8 py-12 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -472,143 +416,47 @@ useEffect(() => {
             </div>
 
             <aside className="space-y-4">
-              <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                <h4 className="text-sm font-semibold text-slate-800 mb-3">
-                  Joined Communities
-                </h4>
-
-                {isLoadingCommunities ? (
-                  <div className="text-sm text-gray-500">
-                    Loading...
-                  </div>
-                ) : myCommunities.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+              <SharedCommunitySidebarCard
+                title="Joined Communities"
+                communities={myCommunities.slice(0, 3).map(c => ({
+                  id: c.id,
+                  name: c.name,
+                  avatarUrl: c.cover || c.avatar
+                }))}
+                isLoading={isLoadingCommunities}
+                emptyMessage={
+                  <div className="flex flex-col items-center">
                     <p className="text-sm font-medium text-slate-800">
                       No joined communities yet
                     </p>
-                    <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+                    <p className="mt-1 text-xs text-gray-500 leading-relaxed mb-3">
                       Explore communities to start connecting.
                     </p>
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate('/search-mentorship?tab=communities')
-                      }
-                      className="mt-3 text-xs font-semibold text-primary hover:underline"
+                      onClick={() => navigate('/search-mentorship?tab=communities')}
+                      className="text-xs font-semibold text-primary hover:underline"
                     >
                       Explore Communities →
                     </button>
                   </div>
-                ) : (
-                  <ul className="space-y-3">
-                    {myCommunities
-                      .slice(0, 3)
-                      .map((c) => (
-                        <li
-                          key={c.id}
-                          className="flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={
-                                c.cover || c.avatar
-                              }
-                              alt={
-                                c.name
-                              }
-                              className="h-8 w-8 rounded-lg object-cover"
-                            />
+                }
+                actionText="Open"
+                onActionClick={(id) => navigate(`/community/${id}`)}
+                footerLinkTo={myCommunities.length > 0 ? "/my-communities" : undefined}
+                footerLinkText={myCommunities.length > 0 ? "See All" : undefined}
+              />
 
-                            <div>
-                              <div className="text-sm font-medium text-slate-800">
-                                {
-                                  c.name
-                                }
-                              </div>
+              <RecommendedCommunitiesCard />
 
-                              <div className="text-xs text-gray-400">
-                                {c.memberCount.toLocaleString()}{' '}
-                                members
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/community/${c.id}`
-                              )
-                            }
-                            className="text-sm text-primary"
-                          >
-                            Open
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                                            )}
-
-              </div>
-
-              {myCommunities.length > 0 && (
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={() => navigate('/my-communities')}
-                    className="w-full rounded-md border border-gray-100 px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 transition"
-                  >
-                    See All
-                  </button>
-                </div>
-              )}
-
-
-              <div className="rounded-2xl border border-gray-100 bg-white p-4">
-                <h4 className="text-sm font-semibold text-slate-800 mb-3">
-                  Recommended
-                  Communities
-                </h4>
-
-                <ul className="space-y-3">
-                  {MOCK_COMMUNITIES.map(
-                    (c) => (
-                      <li
-                        key={`rec-${c.id}`}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={
-                              c.cover || c.avatar
-                            }
-                            alt={
-                              c.name
-                            }
-                            className="h-8 w-8 rounded-lg object-cover"
-                          />
-
-                          <div className="text-sm">
-                            <div className="font-medium text-slate-800">
-                              {
-                                c.name
-                              }
-                            </div>
-
-                            <div className="text-xs text-gray-400">
-                              {c.memberCount.toLocaleString()}{' '}
-                              members
-                            </div>
-                          </div>
-                        </div>
-
-                        <button className="rounded-md border border-gray-100 px-3 py-1 text-sm">
-                          Join
-                        </button>
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
+              <button
+                type="button"
+                className="flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
+                onClick={() => setIsCreateCommunityOpen(true)}
+              >
+                <Plus size={18} strokeWidth={2.5} aria-hidden />
+                Create Community
+              </button>
             </aside>
           </div>
         </div>
@@ -716,7 +564,6 @@ useEffect(() => {
             type: 'success',
             message: 'Community created successfully.',
           });
-          await loadMyCommunities();
           navigate(`/community/${createdCommunity.id}`);
         }}
       />

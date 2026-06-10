@@ -8,11 +8,13 @@ import { getRoadmapView } from "../../services/roadmapService";
 import { resolveCommunityImageUrl } from "../../utils/communityImageUrl";
 import {
   exploreRoadmapToListItem,
-  formatRoadmapExplorePhases,
+  formatRoadmapDuration,
   loadRoadmapDomainNameMaps,
   type DomainNameMaps,
 } from "../../utils/roadmapDisplayUtils";
+import { ensureDomainsLoaded, getDomainName } from "../../utils/domainCache";
 import type { ExploreItem } from "./exploreTypes";
+import { resolveAuthorAvatar } from "../community/utils/authorAvatar";
 
 const apiRoot = () =>
   (import.meta.env.VITE_API_URL ?? "http://localhost:5069/api").replace(
@@ -103,7 +105,9 @@ export async function mapRoadmapToExploreItem(
     title: r.title,
     description: r.description,
     image: mentorAvatar,
-    phases: formatRoadmapExplorePhases(listItem),
+    tag: listItem.domainName,
+    phases: listItem.subDomainName,
+    durationBadge: formatRoadmapDuration(listItem.duration),
     author: {
       avatar:
         mentorAvatar ??
@@ -134,24 +138,27 @@ export type ExploreCommunityRow = {
 
 export function mapExploreCommunityToItem(c: ExploreCommunityRow): ExploreItem {
   const cover = resolveCommunityImageUrl(c.coverImageUrl);
+  const authorName = c.creatorName ?? "Community";
+  const domainName = getDomainName(c.domainId);
   return {
     id: c.communityId,
     tab: "communities",
     title: c.name,
     description: c.description ?? "",
     image: cover,
-    tag: "COMMUNITY",
+    tag: domainName.toUpperCase(),
     phases: `${(c.membersCount ?? 0).toLocaleString()} MEMBERS`,
     isJoined: c.isMember,
     author: {
-      avatar: cover,
-      name: c.creatorName ?? "Community",
+      avatar: resolveAuthorAvatar(authorName),
+      name: authorName,
     },
   };
 }
 
-export function mapExploreCommunitiesToItems(
+export async function mapExploreCommunitiesToItems(
   items: ExploreCommunityRow[]
-): ExploreItem[] {
+): Promise<ExploreItem[]> {
+  await ensureDomainsLoaded();
   return items.map(mapExploreCommunityToItem);
 }

@@ -23,20 +23,19 @@ import {
 import { MentorOverviewContent } from './sections/MentorOverviewContent';
 import { MentorActivityContent } from './sections/MentorActivityContent';
 import { FeedbackSection } from './feedback';
-import { MentorRoadmapsContent } from './sections/MentorRoadmapsContent';
 import { MenteeOverviewContent } from './sections/MenteeOverviewContent';
 import { MenteeActivityContent } from './sections/MenteeActivityContent';
 import { SettingsModal } from './modals/SettingsModal';
 import { EditProfileModal } from './modals/EditProfileModal';
 import { EditEducationModal } from './modals/EditEducationModal';
-import { ProfileToast } from '../../components/profile/ProfileToast';
+import { notifySuccess, notifyError } from '../../utils/toast';
 import { followService } from '../../services/followService';
 import {
   isValidUserGuid,
   messagingService,
 } from '../../services/messagingService';
 
-type MentorTab = 'overview' | 'activity' | 'reviews' | 'roadmaps';
+type MentorTab = 'overview' | 'activity' | 'reviews';
 type MenteeTab = 'overview' | 'activity';
 
 const ProfilePage = () => {
@@ -52,10 +51,6 @@ const ProfilePage = () => {
   const [editEducationOpen, setEditEducationOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profileToast, setProfileToast] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
@@ -182,10 +177,7 @@ const ProfilePage = () => {
         const base = current ?? profile.followerCount ?? 0;
         return wasFollowing ? base + 1 : Math.max(0, base - 1);
       });
-      setProfileToast({
-        type: 'error',
-        message: 'Could not update follow status. Please try again.',
-      });
+      notifyError('Could not update follow status. Please try again.');
     } finally {
       setFollowLoading(false);
     }
@@ -197,10 +189,7 @@ const ProfilePage = () => {
     }
 
     if (!isValidUserGuid(profile.userId)) {
-      setProfileToast({
-        type: 'error',
-        message: 'Unable to start a conversation for this profile.',
-      });
+      notifyError('Unable to start a conversation for this profile.');
       return;
     }
 
@@ -219,10 +208,7 @@ const ProfilePage = () => {
       });
     } catch (error) {
       console.error('Failed to open conversation', error);
-      setProfileToast({
-        type: 'error',
-        message: 'Could not open conversation. Please try again.',
-      });
+      notifyError('Could not open conversation. Please try again.');
     } finally {
       setMessageLoading(false);
     }
@@ -260,10 +246,7 @@ const ProfilePage = () => {
         setProfile(refreshed);
       }
 
-      setProfileToast({
-        type: 'success',
-        message: 'Your profile was updated successfully.',
-      });
+      notifySuccess('Your profile was updated successfully.');
     },
     [viewer]
   );
@@ -280,10 +263,7 @@ const ProfilePage = () => {
         setProfile(refreshed);
       }
 
-      setProfileToast({
-        type: 'success',
-        message: 'Your education was updated successfully.',
-      });
+      notifySuccess('Your education was updated successfully.');
     },
     []
   );
@@ -369,7 +349,6 @@ const ProfilePage = () => {
           followLoading={followLoading}
           messageLoading={messageLoading}
           onEdit={() => setEditProfileOpen(true)}
-          onSettings={() => setSettingsOpen(true)}
           onFollow={() => void handleFollowToggle()}
           onMessage={() => void handleMessage()}
           onReport={() => undefined}
@@ -401,7 +380,6 @@ const ProfilePage = () => {
                 {mentorTab === 'reviews' ? (
                   <FeedbackSection mentorUserId={profile.userId} />
                 ) : null}
-                {mentorTab === 'roadmaps' ? <MentorRoadmapsContent profile={profile} /> : null}
               </>
             ) : (
               <>
@@ -415,7 +393,7 @@ const ProfilePage = () => {
                   />
                 ) : null}
                 {menteeTab === 'activity' ? (
-                  <MenteeActivityContent isOwner={isOwner} />
+                  <MenteeActivityContent isOwner={isOwner} targetUserId={profile.userId} />
                 ) : null}
               </>
             )}
@@ -448,14 +426,6 @@ const ProfilePage = () => {
             education={profile.education}
             onSave={handleSaveEducation}
           />
-
-          {profileToast ? (
-            <ProfileToast
-              type={profileToast.type}
-              message={profileToast.message}
-              onClose={() => setProfileToast(null)}
-            />
-          ) : null}
         </>
       ) : null}
     </Layout>

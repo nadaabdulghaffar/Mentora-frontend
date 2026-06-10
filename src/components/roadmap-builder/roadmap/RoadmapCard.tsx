@@ -5,13 +5,12 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { formatRoadmapDuration } from "../../../utils/roadmapDisplayUtils";
+import { formatRoadmapDuration, formatTargetLevel } from "../../../utils/roadmapDisplayUtils";
 
 import { useNavigate } from "react-router-dom";
 
 import type { RoadmapListItem } from "../../../types/roadmap";
 
-import { ROADMAP_DOMAIN_META } from "../../../constants/roadmapDomains";
 
 interface Props {
   roadmap: RoadmapListItem;
@@ -29,24 +28,6 @@ export default function RoadmapCard({
   const [openMenu, setOpenMenu] =
     useState(false);
 
-  const rawDomainBucket =
-    roadmap.domainId ??
-    (roadmap.skillDomainId != null
-      ? ((Math.max(1, roadmap.skillDomainId) - 1) % 4) + 1
-      : 1);
-
-  const domainBucket =
-    Number.isFinite(rawDomainBucket) && rawDomainBucket >= 1 && rawDomainBucket <= 4
-      ? rawDomainBucket
-      : 1;
-
-  const domainMeta =
-    ROADMAP_DOMAIN_META[
-      domainBucket as keyof typeof ROADMAP_DOMAIN_META
-    ] ?? ROADMAP_DOMAIN_META[1];
-
-  const Icon =
-    domainMeta?.icon;
 
   const safeDescription = roadmap.description ?? "";
 
@@ -60,6 +41,18 @@ export default function RoadmapCard({
 
   const durationLabel = formatRoadmapDuration(roadmap.duration);
 
+  const targetLevelFromStr = formatTargetLevel(roadmap.targetLevelFrom);
+  const targetLevelToStr = formatTargetLevel(roadmap.targetLevelTo);
+  
+  let targetAudienceLabel = "";
+  if (targetLevelFromStr && targetLevelToStr && targetLevelFromStr !== targetLevelToStr) {
+    targetAudienceLabel = `${targetLevelFromStr} → ${targetLevelToStr}`;
+  } else if (targetLevelFromStr) {
+    targetAudienceLabel = targetLevelFromStr;
+  } else if (targetLevelToStr) {
+    targetAudienceLabel = targetLevelToStr;
+  }
+
   return (
     <div
       className="
@@ -68,28 +61,11 @@ export default function RoadmapCard({
         p-6
         border border-[#ECEFF5]
         relative
+        flex flex-col h-full
       "
     >
-      {/* top */}
-      <div className="flex items-start justify-between">
-        <div
-          className={`
-            w-14 h-14 rounded-2xl
-            flex items-center justify-center
-            ${domainMeta.bg}
-          `}
-        >
-          {Icon && (
-            <Icon
-              size={26}
-              className={
-                domainMeta.color
-              }
-            />
-          )}
-        </div>
-
-        {/* menu */}
+      {/* top menu */}
+      <div className="absolute top-6 right-6 z-10">
         <div className="relative">
           <button
             onClick={() =>
@@ -175,9 +151,9 @@ export default function RoadmapCard({
       {/* title */}
       <h2
         className="
-          mt-6
-          text-[24px]
-          leading-[30px]
+          pr-10
+          text-[22px]
+          leading-tight
           font-bold
           text-[#1F2432]
           break-words
@@ -192,38 +168,40 @@ export default function RoadmapCard({
         className="
           mt-3
           text-[15px]
-          leading-7
+          leading-6
           text-[#667085]
-          min-h-[48px]
           break-words
           whitespace-normal
+          flex-1
         "
       >
         {shortDescription}
       </p>
 
-      {/* domain / subdomain / duration */}
-      <div
-        className="
-          mt-5
-          space-y-1.5
-          text-[#98A2B3]
-          text-sm font-semibold
-        "
-      >
-        <p>
-          <span className="text-[#B0B7C3]">Domain:</span>{' '}
-          {roadmap.domainName || '—'}
-        </p>
-        <p>
-          <span className="text-[#B0B7C3]">Subdomain:</span>{' '}
-          {roadmap.subDomainName || '—'}
-        </p>
-        <p>
-          <span className="text-[#B0B7C3]">Duration:</span>{' '}
-          {durationLabel || '—'}
-        </p>
+      {/* badges */}
+      <div className="mt-5 flex items-center gap-2 flex-wrap">
+        {roadmap.domainName && (
+          <span className="rounded-full bg-[#F4F0FF] px-3 py-1 text-xs font-semibold tracking-wide text-[#6B57B5] uppercase">
+            {roadmap.domainName}
+          </span>
+        )}
+        {roadmap.subDomainName && (
+          <span className="rounded-full bg-[#EAF9F7] px-3 py-1 text-xs font-semibold tracking-wide text-[#2EA594] uppercase">
+            {roadmap.subDomainName}
+          </span>
+        )}
+        {durationLabel && (
+          <span className="rounded-full bg-[#EEF2FF] px-3 py-1 text-xs font-semibold tracking-wide text-[#4338CA] uppercase">
+            {durationLabel}
+          </span>
+        )}
       </div>
+
+      {targetAudienceLabel && (
+        <div className="mt-3 text-sm text-[#5D6A85] flex items-center gap-1.5 font-medium">
+          <span>🎯</span> Target Audience: {targetAudienceLabel}
+        </div>
+      )}
 
       {/* button */}
       <button
@@ -233,7 +211,7 @@ export default function RoadmapCard({
           )
         }
         className="
-          mt-6
+          mt-5
           w-full h-12
           rounded-2xl
           bg-primary

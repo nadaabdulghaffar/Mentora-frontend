@@ -5,8 +5,6 @@ const apiRoot = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').re
   ''
 );
 
-const defaultProgramImage =
-  'https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=900&q=80';
 
 export type MentorApplicationProgramItem = {
   id: string;
@@ -16,6 +14,8 @@ export type MentorApplicationProgramItem = {
   applicantsCount?: number;
   deadline?: string;
   status: 'Open' | 'Closed';
+  tag?: string;
+  subDomains?: string[];
 };
 
 export type ExploreStyleProgramItem = {
@@ -75,6 +75,8 @@ export function mapPublishedProgramToMentorApplication(
     applicantsCount: 0,
     deadline,
     status: getProgramStatus(deadline),
+    tag: p.domainName || p.DomainName ? String(p.domainName ?? p.DomainName).toUpperCase() : undefined,
+    subDomains: p.subDomainName || p.SubDomainName ? [String(p.subDomainName ?? p.SubDomainName)] : [],
   };
 }
 
@@ -86,7 +88,7 @@ export function mapPublishedProgramToExploreStyle(
   const imageUrl = String(p.programImageUrl ?? p.ProgramImageUrl ?? '');
   const resolvedImage = imageUrl
     ? resolveProgramImageUrl(imageUrl)
-    : defaultProgramImage;
+    : undefined;
 
   return {
     id: String(p.programId ?? p.ProgramId),
@@ -123,7 +125,9 @@ export function mapAcceptedApplicationToMyProgram(
       : undefined,
     mentorName: String(a.mentorName ?? 'Mentor'),
     mentorAvatar: a.mentorProfilePicture
-      ? String(a.mentorProfilePicture)
+      ? String(a.mentorProfilePicture).startsWith('http')
+        ? String(a.mentorProfilePicture)
+        : `${apiRoot}${String(a.mentorProfilePicture).startsWith('/') ? String(a.mentorProfilePicture) : `/${String(a.mentorProfilePicture)}`}`
       : undefined,
     progress: 0,
   };

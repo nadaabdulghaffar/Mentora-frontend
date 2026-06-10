@@ -7,15 +7,16 @@
 import React, {
   useState,
   useCallback,
-  useMemo,
   useEffect,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { CommunitySidebar } from '../../components/community/CommunitySidebar';
 import Layout from '../../shared/components/Layout';
 import { CreatePostForm } from '../../components/community/CreatePostForm';
+import ConfirmationModal from '../../components/modals/ConfirmationModal';
 import { ThreadModal } from '../../components/community/ThreadModal';
 import {
   CommunityHeaderSection,
@@ -122,6 +123,24 @@ const threads =
   const [isLoadingComment, setIsLoadingComment] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showJoinToPostDialog, setShowJoinToPostDialog] = useState(false);
+
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    cancelText: string;
+    variant: 'primary' | 'danger';
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    variant: 'primary',
+    onConfirm: () => {},
+  });
   // Temporary: current user id - replace with real auth context
 
 const currentUser =
@@ -137,9 +156,10 @@ const currentUserId =
   const viewingCommunityId = params.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const sharedThreadId = searchParams.get('thread');
+  const queryClient = useQueryClient();
 
   usePageLifecycleDiagnostics(PAGE_NAME);
-  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser]);
+  useEffectRunDiagnostics(PAGE_NAME, 'fetchProfile', [currentUser?.userId]);
   useEffectRunDiagnostics(PAGE_NAME, 'fetchCommunity', [viewingCommunityId]);
   useEffectRunDiagnostics(PAGE_NAME, 'fetchPosts', [viewingCommunityId]);
 
@@ -191,7 +211,7 @@ const [pageAlert, setPageAlert] = useState<{
       }
     };
     fetchProfile();
-  }, [currentUser]);
+  }, [currentUser?.userId]);
 
   const {
     owners: communityOwners,
@@ -203,16 +223,7 @@ const [pageAlert, setPageAlert] = useState<{
     refreshMembers,
   } = useCommunityMembers(viewingCommunityId);
 
-  const activeCommunity =
-  useMemo(() => {
-    return (
-      backendCommunity ||
-      community.community
-    );
-  }, [
-    backendCommunity,
-    community.community,
-  ]);
+  const activeCommunity = backendCommunity;
 
   useEffect(() => {
   if (!viewingCommunityId)
@@ -380,7 +391,10 @@ const handleThreadSubmit =
                 attachment.url = toAbsoluteFileUrl(url);
               } catch (err) {
                 console.error("Failed to upload attachment file", err);
-                alert("Failed to upload attachment: " + attachment.name);
+                setPageAlert({
+                  type: 'error',
+                  message: "Failed to upload attachment: " + attachment.name
+                });
                 return;
               }
             }
@@ -851,31 +865,30 @@ const handleThreadDelete =
         return;
       }
 
-      const confirmed = window.confirm(
-        'Remove this member from the community?'
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        await removeCommunityMember(
-          viewingCommunityId,
-          memberId
-        );
-
-        setPageAlert({
-          type: 'success',
-          message: 'Member removed successfully.',
-        });
-        await refreshMembers();
-      } catch (error) {
-        setPageAlert({
-          type: 'error',
-          message: extractErrorMessage(error),
-        });
-      }
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Remove Member',
+        message: 'Remove this member from the community?',
+        confirmText: 'Remove',
+        cancelText: 'Cancel',
+        variant: 'danger',
+        onConfirm: async () => {
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+          try {
+            await removeCommunityMember(viewingCommunityId, memberId);
+            setPageAlert({
+              type: 'success',
+              message: 'Member removed successfully.',
+            });
+            await refreshMembers();
+          } catch (error) {
+            setPageAlert({
+              type: 'error',
+              message: extractErrorMessage(error),
+            });
+          }
+        },
+      });
     },
     [
       viewingCommunityId,
@@ -912,31 +925,30 @@ const handleBanMember =
         return;
       }
 
-      const confirmed = window.confirm(
-        'Ban this member from the community? They will not be able to rejoin.'
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        await banCommunityMember(
-          viewingCommunityId,
-          memberId
-        );
-
-        setPageAlert({
-          type: 'success',
-          message: 'Member banned successfully.',
-        });
-        await refreshMembers();
-      } catch (error) {
-        setPageAlert({
-          type: 'error',
-          message: extractErrorMessage(error),
-        });
-      }
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Ban Member',
+        message: 'Ban this member from the community? They will not be able to rejoin.',
+        confirmText: 'Ban',
+        cancelText: 'Cancel',
+        variant: 'danger',
+        onConfirm: async () => {
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+          try {
+            await banCommunityMember(viewingCommunityId, memberId);
+            setPageAlert({
+              type: 'success',
+              message: 'Member banned successfully.',
+            });
+            await refreshMembers();
+          } catch (error) {
+            setPageAlert({
+              type: 'error',
+              message: extractErrorMessage(error),
+            });
+          }
+        },
+      });
     },
     [
       viewingCommunityId,
@@ -974,34 +986,34 @@ const handleBanMember =
         return;
       }
 
-      const confirmed = window.confirm(
-        `Change this member's role to ${newRole}?`
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        await updateMemberRole(
-          viewingCommunityId,
-          memberId,
-          newRole === 'Admin'
-            ? CommunityRole.Admin
-            : CommunityRole.Member
-        );
-
-        setPageAlert({
-          type: 'success',
-          message: 'Member role updated successfully.',
-        });
-        await refreshMembers();
-      } catch (error) {
-        setPageAlert({
-          type: 'error',
-          message: extractErrorMessage(error),
-        });
-      }
+      setConfirmConfig({
+        isOpen: true,
+        title: 'Change Role',
+        message: `Change this member's role to ${newRole}?`,
+        confirmText: 'Change',
+        cancelText: 'Cancel',
+        variant: 'primary',
+        onConfirm: async () => {
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+          try {
+            await updateMemberRole(
+              viewingCommunityId,
+              memberId,
+              newRole === 'Admin' ? CommunityRole.Admin : CommunityRole.Member
+            );
+            setPageAlert({
+              type: 'success',
+              message: 'Member role updated successfully.',
+            });
+            await refreshMembers();
+          } catch (error) {
+            setPageAlert({
+              type: 'error',
+              message: extractErrorMessage(error),
+            });
+          }
+        },
+      });
     },
     [
       viewingCommunityId,
@@ -1030,6 +1042,7 @@ const handleJoinCommunity =
         await joinCommunity(
           viewingCommunityId
         );
+        queryClient.invalidateQueries({ queryKey: ['myCommunities'] });
 
         setBackendCommunity(
           (prev) =>
@@ -1068,6 +1081,7 @@ const handleLeaveCommunity =
         await leaveCommunity(
           viewingCommunityId
         );
+        queryClient.invalidateQueries({ queryKey: ['myCommunities'] });
 
         setBackendCommunity(
           (prev) =>
@@ -1135,11 +1149,13 @@ const canManageCommunity =
       )}
       <div className="py-6">
 
-        {isLoadingCommunity && (
-  <div className="py-10 text-center text-gray-500">
-    Loading community...
-  </div>
-)}
+        {(!activeCommunity || isLoadingCommunity) && !communityError && (
+          <div className="py-20 flex flex-col items-center justify-center">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+            <div className="text-lg font-medium text-slate-700">Loading community...</div>
+            <p className="text-sm text-gray-500 mt-2">Please wait while we fetch the latest data</p>
+          </div>
+        )}
 
 {communityError && (
   <div className="py-10 text-center text-red-500">
@@ -1157,7 +1173,8 @@ const canManageCommunity =
   </div>
 )}
 
-        <div className="grid gap-6 grid-cols-3">
+        {activeCommunity && !isLoadingCommunity && !communityError && (
+          <div className="grid gap-6 grid-cols-3">
           {/* Main Content - 2 columns */}
           <div className="col-span-2 space-y-6">
             {/* Header */}
@@ -1301,7 +1318,8 @@ onLike={
 
 </div>
 
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -1443,11 +1461,22 @@ onClick={async () => {
         </div>
       )}
 
+      <ConfirmationModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        cancelText={confirmConfig.cancelText}
+        variant={confirmConfig.variant}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
+
   
 {/* Settings Modal for admins */}
 {modalState.modalType ===
   "settings" &&
-canManageCommunity ? (
+canManageCommunity && activeCommunity ? (
   <div
     className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-12"
     onClick={() => {

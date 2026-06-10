@@ -27,13 +27,13 @@ const WelcomeBanner = ({ name, tagline }: Props) => {
   />
 
   {/* Text */}
-  <div className="relative z-10 max-w-xl">
-    <h2 className="text-xl md:text-3xl lg:text-4xl font-bold leading-tight">
-      Hello , {name}
+  <div className="relative z-10 max-w-2xl flex flex-col justify-center py-2">
+    <h2 className="text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight text-white mb-1.5 md:mb-2">
+      Hello, {name}
     </h2>
 
-    <p className="mt-0.5 text-sm font-medium text-purple-100 md:text-lg lg:text-xl">
-      {tagline ?? "Continue your growth journey with expert mentorship"}
+    <p className="text-sm md:text-base lg:text-lg font-medium text-white/90 leading-relaxed">
+      {tagline ?? "Keep learning, growing, and moving closer to your goals every day."}
     </p>
   </div>
 

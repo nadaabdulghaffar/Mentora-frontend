@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { MessageSquare } from 'lucide-react';
 import authAPI from '../../../services/authService';
 import {
   deleteFeedback,
@@ -12,7 +13,8 @@ import {
 import { AIInsightsSection } from './AIInsightsSection';
 import { FeedbackMetrics } from './FeedbackMetrics';
 import { FeedbackModal } from './FeedbackModal';
-import { MOCK_AI_FEEDBACK_INSIGHTS } from './mockAiInsights';
+import { notifySuccess, notifyError } from '../../../utils/toast';
+import ConfirmationModal from '../../../components/modals/ConfirmationModal';
 import { ReviewsList } from './ReviewsList';
 import type {
   FeedbackEligibilityResponse,
@@ -32,13 +34,12 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [eligibility, setEligibility] = useState<FeedbackEligibilityResponse | null>(null);
   const [myFeedback, setMyFeedback] = useState<FeedbackReviewDto | null>(null);
+  const [feedbackToDelete, setFeedbackToDelete] = useState<FeedbackReviewDto | null>(null);
   const [deletingFeedbackId, setDeletingFeedbackId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const currentUser = useMemo(() => authAPI.getCurrentUser(), []);
   const isMentee = currentUser?.role?.toLowerCase() === 'mentee';
@@ -90,7 +91,6 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
       return;
     }
 
-    setActionError(null);
     try {
       const eligibilityResponse = await getFeedbackEligibility(selectedProgramId);
       setEligibility(eligibilityResponse);
@@ -104,7 +104,7 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
     } catch (stateError) {
       setEligibility(null);
       setMyFeedback(null);
-      setActionError(
+      notifyError(
         stateError instanceof Error
           ? stateError.message
           : 'Failed to load feedback actions state.'
@@ -128,15 +128,11 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
   };
 
   const openCreateModal = () => {
-    setActionError(null);
-    setSuccessMessage(null);
     setModalMode('create');
     setModalOpen(true);
   };
 
   const openEditModalForReview = (review: FeedbackReviewDto) => {
-    setActionError(null);
-    setSuccessMessage(null);
     setMyFeedback(review);
     setModalMode('edit');
     setModalOpen(true);
@@ -147,8 +143,6 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
       return;
     }
     setSubmitting(true);
-    setActionError(null);
-    setSuccessMessage(null);
 
     try {
       if (modalMode === 'create') {
@@ -157,19 +151,19 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
           rating: payload.rating,
           comment: payload.comment,
         });
-        setSuccessMessage('Feedback submitted successfully.');
+        notifySuccess('Feedback submitted successfully.');
       } else if (myFeedback?.feedbackId) {
         await updateFeedback(myFeedback.feedbackId, {
           rating: payload.rating,
           comment: payload.comment,
         });
-        setSuccessMessage('Feedback updated successfully.');
+        notifySuccess('Feedback updated successfully.');
       }
 
       setModalOpen(false);
       await Promise.all([loadPage(1, false), refreshFeedbackActionsState()]);
     } catch (submitError) {
-      setActionError(
+      notifyError(
         submitError instanceof Error ? submitError.message : 'Failed to save feedback.'
       );
     } finally {
@@ -177,35 +171,32 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
     }
   };
 
-  const handleDeleteReview = async (review: FeedbackReviewDto) => {
-    if (!review.feedbackId || deleting) {
-      return;
-    }
+  const confirmDeleteReview = (review: FeedbackReviewDto) => {
+    setFeedbackToDelete(review);
+  };
 
-    const confirmed = window.confirm(
-      'Delete your feedback? This action cannot be undone.'
-    );
-    if (!confirmed) {
+  const executeDeleteReview = async () => {
+    if (!feedbackToDelete || !feedbackToDelete.feedbackId || deleting) {
       return;
     }
 
     setDeleting(true);
-    setDeletingFeedbackId(review.feedbackId);
-    setActionError(null);
-    setSuccessMessage(null);
+    setDeletingFeedbackId(feedbackToDelete.feedbackId);
     try {
-      await deleteFeedback(review.feedbackId);
-      if (myFeedback?.feedbackId === review.feedbackId) {
+      await deleteFeedback(feedbackToDelete.feedbackId);
+      if (myFeedback?.feedbackId === feedbackToDelete.feedbackId) {
         setMyFeedback(null);
       }
-      setSuccessMessage('Feedback deleted successfully.');
+      notifySuccess('Feedback deleted successfully.');
       await Promise.all([loadPage(1, false), refreshFeedbackActionsState()]);
+      setFeedbackToDelete(null);
     } catch (deleteError) {
-      setActionError(
+      notifyError(
         deleteError instanceof Error
           ? deleteError.message
           : 'Failed to delete feedback.'
       );
+      setFeedbackToDelete(null);
     } finally {
       setDeleting(false);
       setDeletingFeedbackId(null);
@@ -244,24 +235,27 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-[#1F2533]">Feedback & Reviews</h1>
-        <p className="mt-1 text-sm text-[#6B7289]">
-          Program feedback from mentees, plus AI-powered sentiment highlights.
-        </p>
-      </header>
-
-      {isMentee && canManageFeedback && eligibility?.isEligible && !eligibility.alreadySubmitted ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="text-sm font-semibold text-primary transition hover:text-primary-dark"
-          >
-            Leave Feedback
-          </button>
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[#1F2533]">Feedback & Reviews</h1>
+          <p className="mt-1 text-sm text-[#6B7289]">
+            Program feedback from mentees, plus AI-powered sentiment highlights.
+          </p>
         </div>
-      ) : null}
+
+        {isMentee && canManageFeedback && eligibility?.isEligible && !eligibility.alreadySubmitted ? (
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#D2D8E6] bg-white px-5 text-sm font-semibold text-[#1F2533] shadow-sm transition hover:bg-[#F8F9FB] hover:border-[#C4CBDB] active:bg-[#F0F2F7]"
+            >
+              <MessageSquare size={18} className="text-[#1F2533]" />
+              Leave Feedback
+            </button>
+          </div>
+        ) : null}
+      </header>
 
       {isMentee && canManageFeedback && eligibility && !eligibility.isEligible ? (
         <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
@@ -269,16 +263,6 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
         </div>
       ) : null}
 
-      {actionError ? (
-        <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#B91C1C]">
-          {actionError}
-        </div>
-      ) : null}
-      {successMessage ? (
-        <div className="rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm text-[#166534]">
-          {successMessage}
-        </div>
-      ) : null}
 
       <FeedbackMetrics
         averageRating={data.averageRating}
@@ -286,7 +270,7 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
         bayesianRating={data.bayesianRating}
       />
 
-      <AIInsightsSection insights={MOCK_AI_FEEDBACK_INSIGHTS} />
+      <AIInsightsSection mentorUserId={mentorUserId} />
 
       <ReviewsList
         reviews={reviews}
@@ -297,7 +281,7 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
         onLoadMore={handleLoadMore}
         currentUserId={isMentee ? currentUserId : undefined}
         onEditReview={isMentee ? openEditModalForReview : undefined}
-        onDeleteReview={isMentee ? handleDeleteReview : undefined}
+        onDeleteReview={isMentee ? confirmDeleteReview : undefined}
         deletingFeedbackId={deletingFeedbackId}
       />
 
@@ -307,9 +291,20 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
         submitting={submitting}
         initialRating={modalMode === 'edit' ? myFeedback?.rating ?? 0 : 0}
         initialComment={modalMode === 'edit' ? myFeedback?.comment ?? '' : ''}
-        error={actionError}
+        error={undefined}
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmitModal}
+      />
+
+      <ConfirmationModal
+        isOpen={!!feedbackToDelete}
+        onConfirm={executeDeleteReview}
+        onCancel={() => setFeedbackToDelete(null)}
+        title="Delete Review?"
+        message="Are you sure you want to delete this review? This action cannot be undone."
+        confirmText="Delete Review"
+        variant="danger"
+        isLoading={deleting}
       />
     </div>
   );

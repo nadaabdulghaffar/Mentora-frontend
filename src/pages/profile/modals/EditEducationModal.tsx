@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GraduationCap, Plus, Trash2, X } from 'lucide-react';
+import { GraduationCap, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../../components/Modal';
 import { getApiErrorMessage } from '../../../utils/apiErrorMessage';
 import type { EducationEntry } from '../types';
@@ -123,11 +123,8 @@ export function EditEducationModal({ isOpen, onClose, education, onSave }: EditE
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} contentClassName="max-w-xl p-0 overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#ECEFF5] px-6 py-4">
+      <div className="flex items-center border-b border-[#ECEFF5] px-6 py-4">
         <h2 className="text-lg font-bold text-[#1F2533]">Edit Education</h2>
-        <button type="button" onClick={onClose} className="rounded-lg p-2 text-[#8B92A8] hover:bg-[#F4F5FA]" aria-label="Close">
-          <X size={22} />
-        </button>
       </div>
 
       <div className="max-h-[60vh] space-y-6 overflow-y-auto px-6 py-6">

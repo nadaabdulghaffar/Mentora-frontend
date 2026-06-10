@@ -1,6 +1,6 @@
 import type { ProfileRole } from '../../pages/profile/types';
 
-type MentorTab = 'overview' | 'activity' | 'reviews' | 'roadmaps';
+type MentorTab = 'overview' | 'activity' | 'reviews';
 type MenteeTab = 'overview' | 'activity';
 
 interface ProfileTabsProps {
@@ -13,7 +13,6 @@ const MENTOR_TABS: { id: MentorTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'activity', label: 'Activity' },
   { id: 'reviews', label: 'Reviews' },
-  { id: 'roadmaps', label: 'Roadmaps' },
 ];
 
 const MENTEE_TABS: { id: MenteeTab; label: string }[] = [

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, ChevronDown, Link, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Camera, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../../../components/Modal';
 import { InputGroup, SelectField, SelectWithTags, TextAreaField, type Option } from '../../../components/MultiStepForm';
 import { ProfileAvatar } from '../../../components/profile/ProfileAvatar';
@@ -100,10 +100,8 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isMentor = profile.role === 'mentor';
   const [displayName, setDisplayName] = useState(profile.displayName);
-  const [headline, setHeadline] = useState(profile.headline);
-  const [countryCode, setCountryCode] = useState(profile.countryCode ?? '');
   const [email, setEmail] = useState(profile.email);
-  const [bio, setBio] = useState(profile.bio);
+  const [bio, setBio] = useState(profile.bio || '');
   const [profilePicturePath, setProfilePicturePath] = useState(
     profile.profilePicturePath ?? ''
   );
@@ -147,6 +145,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
   const [saveError, setSaveError] = useState('');
   const [toolError, setToolError] = useState('');
   const [linkError, setLinkError] = useState('');
+  const [bioError, setBioError] = useState('');
 
   const selectedToolIds = useMemo(() => new Set(tools.map((tool) => tool.technologyId)), [tools]);
   const availableTechnologies = technologyOptions.filter(
@@ -159,10 +158,8 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     }
 
     setDisplayName(profile.displayName);
-    setHeadline(profile.headline);
-    setCountryCode(profile.countryCode ?? '');
     setEmail(profile.email);
-    setBio(profile.bio);
+    setBio(profile.bio || '');
     setProfilePicturePath(profile.profilePicturePath ?? '');
     setLinks(profile.socialLinks);
     setDomainId(profile.domainId ?? '');
@@ -178,6 +175,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
     setSaveError('');
     setToolError('');
     setLinkError('');
+    setBioError('');
 
     const loadLookups = async () => {
       setLoadingLookups(true);
@@ -406,9 +404,44 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
       return;
     }
 
+    const trimmedBio = bio ? bio.trim() : '';
+    
+    if (!bio || bio.length === 0) {
+      setBioError('Bio is required');
+      setBasicInfoOpen(true);
+      return;
+    }
+
+    if (trimmedBio.length === 0) {
+      setBioError('Bio cannot be empty spaces');
+      setBasicInfoOpen(true);
+      return;
+    }
+
+    if (trimmedBio.length > 500) {
+      setBioError('Bio cannot exceed 500 characters');
+      setBasicInfoOpen(true);
+      return;
+    }
+
+    if (isMentor) {
+      if (!yearsOfExperience || yearsOfExperience.trim() === '') {
+        setSaveError('Years of experience is required for mentors');
+        setExperienceOpen(true);
+        return;
+      }
+      const validOptions = MENTOR_YEARS_OPTIONS.map((o) => o.value);
+      if (!validOptions.includes(yearsOfExperience as any)) {
+        setSaveError('Please select a valid years of experience option');
+        setExperienceOpen(true);
+        return;
+      }
+    }
+
     setSaving(true);
     setSaveError('');
     setLinkError('');
+    setBioError('');
     try {
       const linkedInLink = links.find(
         (link) =>
@@ -418,8 +451,7 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
       );
 
       await onSave({
-        bio,
-        countryCode,
+        bio: trimmedBio || undefined,
         profilePictureUrl: profilePicturePath || undefined,
         linkedInUrl: isMentor ? linkedInLink?.url.trim() ?? '' : undefined,
         socialLinks: links,
@@ -631,27 +663,6 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                     </div>
                     <div className="sm:col-span-2">
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8B92A8]">
-                        Role / Headline
-                      </label>
-                      <input
-                        value={headline}
-                        onChange={(e) => setHeadline(e.target.value)}
-                        className="w-full rounded-xl border border-[#D8DCE8] px-4 py-2.5 text-sm outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8B92A8]">
-                        Country Code
-                      </label>
-                      <input
-                        value={countryCode}
-                        onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
-                        placeholder="EG"
-                        className="w-full rounded-xl border border-[#D8DCE8] px-4 py-2.5 text-sm outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8B92A8]">
                         Email Address
                       </label>
                       <input
@@ -673,7 +684,9 @@ export function EditProfileModal({ isOpen, onClose, profile, onSave }: EditProfi
                         onChange={setBio}
                         rows={4}
                         placeholder="Write a short summary about yourself..."
+                        maxLength={500}
                       />
+                      {bioError ? <p className="mt-1.5 text-sm text-red-600">{bioError}</p> : null}
                     </div>
                   </div>
 

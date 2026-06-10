@@ -5,6 +5,7 @@ import WelcomeBanner from "../components/dashboard components/WelcomeBanner";
 import SearchSection from "../components/dashboard components/SearchSection";
 import SuggestedPrograms from "../components/dashboard components/SuggestedPrograms";
 import MentorsMatch from "../components/dashboard components/MentorsMatch";
+import RecommendedCommunities from "../components/dashboard components/RecommendedCommunities";
 import RightSidebar from "../components/dashboard components/RightSidebar";
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
@@ -105,6 +106,7 @@ const DashboardPage = () => {
                     <SearchSection />
                     <SuggestedPrograms />
                     <MentorsMatch />
+                    <RecommendedCommunities />
 
                 </div>
 

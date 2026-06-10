@@ -33,6 +33,7 @@ export interface ExploreItem {
   image?: string;
   tag?: string;
   phases?: string;
+  durationBadge?: string;
   isJoined?: boolean;
   isApplied?: boolean;
   author?: { avatar: string; name: string };
@@ -41,7 +42,7 @@ export interface ExploreItem {
 export interface ExploreFiltersState {
   domainId: number | null;
   subDomainId: number | null;
-  recommendedForYou: boolean;
+
   openedNow: boolean | null;
   targetLevel: number | null;
   educationLevel: number | null;
@@ -50,7 +51,6 @@ export interface ExploreFiltersState {
 export const DEFAULT_EXPLORE_FILTERS: ExploreFiltersState = {
   domainId: null,
   subDomainId: null,
-  recommendedForYou: false,
   openedNow: null,
   targetLevel: null,
   educationLevel: null,

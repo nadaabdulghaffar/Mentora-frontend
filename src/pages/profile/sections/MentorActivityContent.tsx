@@ -6,7 +6,8 @@ import CreateProgramModal from '../../../components/create-program/CreateProgram
 import type { CreateProgramFormData } from '../../../components/create-program/types';
 import { ActivityScrollSection } from '../../../components/profile/ActivityScrollSection';
 import RoadmapCard from '../../../components/roadmap-builder/roadmap/RoadmapCard';
-import { Alert } from '../../../components/Alert';
+import { notifySuccess, notifyError } from '../../../utils/toast';
+import ConfirmationModal from '../../../components/modals/ConfirmationModal';
 import type { AuthUser } from '../../../types/api';
 import type { RoadmapListItem } from '../../../types/roadmap';
 import {
@@ -15,7 +16,7 @@ import {
   getPublishedProgramsByMentorProfile,
   getProgramView,
   mapProgramResponseToFormData,
-  unpublishProgram,
+  deleteProgram,
 } from '../../../services/programService';
 import {
   deleteRoadmap,
@@ -35,7 +36,6 @@ import {
   extractApiData,
   extractPagedProgramItems,
   formatDeadline,
-  getProgramStatus,
   isApiSuccess,
   mapPublishedProgramToExploreStyle,
   mapPublishedProgramToMentorApplication,
@@ -49,10 +49,7 @@ interface MentorActivityContentProps {
   viewer: AuthUser;
 }
 
-type PageAlert = {
-  type: 'success' | 'error';
-  message: string;
-};
+
 
 export function MentorActivityContent({
   profile,
@@ -71,9 +68,12 @@ export function MentorActivityContent({
   const [ownerPrograms, setOwnerPrograms] = useState<MentorApplicationProgramItem[]>([]);
   const [visitorPrograms, setVisitorPrograms] = useState<ExploreStyleProgramItem[]>([]);
   const [roadmaps, setRoadmaps] = useState<RoadmapListItem[]>([]);
-  const [pageAlert, setPageAlert] = useState<PageAlert | null>(null);
+
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [deletingRoadmapId, setDeletingRoadmapId] = useState<number | null>(null);
+
+  const [programToDelete, setProgramToDelete] = useState<string | null>(null);
+  const [roadmapToDelete, setRoadmapToDelete] = useState<number | null>(null);
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingProgramId, setEditingProgramId] = useState<number | null>(null);
@@ -190,19 +190,13 @@ export function MentorActivityContent({
           mapProgramResponseToFormData(res.data as Record<string, unknown>)
         );
       } else {
-        setPageAlert({
-          type: 'error',
-          message: res?.message || 'Could not load program details for editing.',
-        });
+        notifyError(res?.message || 'Could not load program details for editing.');
         setIsEditOpen(false);
         setEditingProgramId(null);
       }
     } catch (err) {
       console.error(err);
-      setPageAlert({
-        type: 'error',
-        message: 'Could not load program details for editing.',
-      });
+      notifyError('Could not load program details for editing.');
       setIsEditOpen(false);
       setEditingProgramId(null);
     } finally {
@@ -220,10 +214,7 @@ export function MentorActivityContent({
     message?: string,
     updatedProgram?: Record<string, unknown>
   ) => {
-    setPageAlert({
-      type: 'success',
-      message: message || 'Program updated successfully.',
-    });
+    notifySuccess(message || 'Program updated successfully.');
 
     if (updatedProgram) {
       const patch = mapPublishedProgramToMentorApplication(updatedProgram);
@@ -236,52 +227,36 @@ export function MentorActivityContent({
     await loadPrograms();
   };
 
-  const handleUnpublish = async (programId: string) => {
-    const confirmed = window.confirm(
-      'Unpublish this program? It will no longer be visible to mentees, but applications will be kept.'
-    );
-    if (!confirmed) return;
+  const handleDeleteProgram = async (programId: string) => {
+    setProgramToDelete(null);
 
     setActionLoadingId(programId);
     try {
-      const res = await unpublishProgram(Number(programId));
+      const res = await deleteProgram(Number(programId));
       if (res?.success) {
-        setPageAlert({
-          type: 'success',
-          message: res.message || 'Program unpublished successfully.',
-        });
+        notifySuccess(res.message || 'Program deleted successfully.');
         setOwnerPrograms((prev) => prev.filter((item) => item.id !== programId));
       } else {
-        setPageAlert({
-          type: 'error',
-          message: res?.message || 'Could not unpublish program.',
-        });
+        notifyError(res?.message || 'Could not delete program.');
       }
     } catch (err) {
       console.error(err);
-      setPageAlert({
-        type: 'error',
-        message: 'Could not unpublish program.',
-      });
+      notifyError(extractErrorMessage(err));
     } finally {
       setActionLoadingId(null);
     }
   };
 
   const handleDeleteRoadmap = async (roadmapId: number) => {
-    if (!window.confirm('Delete this roadmap? This action cannot be undone.')) {
-      return;
-    }
+    setRoadmapToDelete(null);
     setDeletingRoadmapId(roadmapId);
     try {
       await deleteRoadmap(roadmapId);
+      notifySuccess('Roadmap deleted successfully.');
       setRoadmaps((prev) => prev.filter((r) => r.roadmapId !== roadmapId));
     } catch (error) {
       console.error(extractErrorMessage(error));
-      setPageAlert({
-        type: 'error',
-        message: extractErrorMessage(error),
-      });
+      notifyError(extractErrorMessage(error));
     } finally {
       setDeletingRoadmapId(null);
     }
@@ -291,13 +266,7 @@ export function MentorActivityContent({
 
   return (
     <div className="w-full min-w-0 space-y-6">
-      {pageAlert ? (
-        <Alert
-          type={pageAlert.type}
-          message={pageAlert.message}
-          onClose={() => setPageAlert(null)}
-        />
-      ) : null}
+
 
       <ActivityScrollSection
         title="Mentorship Programs"
@@ -309,12 +278,14 @@ export function MentorActivityContent({
           ? ownerPrograms.map((item) => {
               const isDeadlinePassed = item.status === 'Closed';
               return (
-                <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px]">
+                <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px] flex">
                   <ExtraProgramCard
-                    variant="mentor-application-card"
+                    variant="mentor-profile-program-card"
                     title={item.title}
                     description={item.description}
                     image={item.image}
+                    tag={item.tag}
+                    subDomains={item.subDomains}
                     applicantsCount={item.applicantsCount}
                     deadline={formatDeadline(item.deadline)}
                     status={item.status}
@@ -325,13 +296,12 @@ export function MentorActivityContent({
                     onPrimaryClick={() => goToManageApplicants(item.id)}
                     onViewApplicants={() => goToApplicationDetails(item.id)}
                     onEdit={isDeadlinePassed ? undefined : () => openEditModal(item.id)}
-                    onUnpublish={isDeadlinePassed ? undefined : () => handleUnpublish(item.id)}
+                    onDelete={isDeadlinePassed ? undefined : () => setProgramToDelete(item.id)}
                   />
                 </div>
               );
             })
           : visitorPrograms.map((item) => {
-              const isClosed = getProgramStatus(item.deadline) === 'Closed';
               return (
               <div key={item.id} className="w-[320px] shrink-0 snap-start md:w-[340px]">
                 <ProgramCard
@@ -342,17 +312,9 @@ export function MentorActivityContent({
                   title={item.title}
                   description={item.description}
                   author={item.author}
-                  primaryButtonText={isClosed ? undefined : (item.isApplied ? 'Join classroom' : 'Apply')}
-                  secondaryButtonText="Details"
+                  primaryButtonText="View Details"
                   className="h-full w-[320px] md:w-[340px]"
-                  onPrimaryClick={isClosed ? undefined : () => {
-                    if (item.isApplied) {
-                      navigate(`/classroom/${item.id}`);
-                    } else {
-                      navigate(`/applications/${item.id}?apply=1`);
-                    }
-                  }}
-                  onSecondaryClick={() => navigate(`/applications/${item.id}`)}
+                  onPrimaryClick={() => navigate(`/applications/${item.id}`)}
                 />
               </div>
             )})}
@@ -372,7 +334,7 @@ export function MentorActivityContent({
               >
                 <RoadmapCard
                   roadmap={roadmap}
-                  onDelete={() => handleDeleteRoadmap(roadmap.roadmapId)}
+                  onDelete={() => setRoadmapToDelete(roadmap.roadmapId)}
                   isDeleting={deletingRoadmapId === roadmap.roadmapId}
                 />
               </div>
@@ -395,10 +357,8 @@ export function MentorActivityContent({
                     .filter(Boolean)
                     .join(' · ')}
                   primaryButtonText="View Roadmap"
-                  secondaryButtonText="Details"
                   className="h-full w-[320px] md:w-[340px]"
                   onPrimaryClick={() => navigate(`/roadmap/${roadmap.roadmapId}`)}
-                  onSecondaryClick={() => navigate(`/roadmap/${roadmap.roadmapId}`)}
                 />
               </div>
             ))}
@@ -424,6 +384,36 @@ export function MentorActivityContent({
           ) : null}
         </>
       ) : null}
+
+      <ConfirmationModal
+        isOpen={!!programToDelete}
+        onConfirm={() => {
+          if (programToDelete) {
+            handleDeleteProgram(programToDelete);
+          }
+        }}
+        onCancel={() => setProgramToDelete(null)}
+        title="Delete Program"
+        message="Are you sure you want to delete this program?"
+        confirmText="Delete Program"
+        variant="danger"
+        isLoading={!!actionLoadingId}
+      />
+
+      <ConfirmationModal
+        isOpen={!!roadmapToDelete}
+        onConfirm={() => {
+          if (roadmapToDelete !== null) {
+            handleDeleteRoadmap(roadmapToDelete);
+          }
+        }}
+        onCancel={() => setRoadmapToDelete(null)}
+        title="Delete Roadmap?"
+        message="Are you sure you want to delete this roadmap? This action cannot be undone."
+        confirmText="Delete Roadmap"
+        variant="danger"
+        isLoading={!!deletingRoadmapId}
+      />
     </div>
   );
 }

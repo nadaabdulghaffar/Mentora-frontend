@@ -5,11 +5,10 @@ export { FeedbackModal } from './FeedbackModal';
 export { ReviewsList } from './ReviewsList';
 export { ReviewCard } from './ReviewCard';
 export type {
-  AiFeedbackInsights,
+  SentimentSummaryDto,
   FeedbackEligibilityResponse,
   FeedbackReviewDto,
   MentorReviewsResponse,
   SubmitFeedbackRequest,
   UpdateFeedbackRequest,
 } from './types';
-export { MOCK_AI_FEEDBACK_INSIGHTS } from './mockAiInsights';

@@ -1,5 +1,6 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { toast } from "react-hot-toast";
 
 import Layout from "../shared/components/Layout";
 import ApplicationsHeader from "../components/ManageApplicants/ApplicationsHeader";
@@ -49,7 +50,6 @@ const [applicantsData, setApplicantsData] =
 
   const [levelFilter, setLevelFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
   const [rowsPerPage, setRowsPerPage] = useState(4);
   const [currentPage, setCurrentPage] = useState(1);
 const [selectedApplicant, setSelectedApplicant] =
@@ -72,59 +72,34 @@ const [sendingResults, setSendingResults] =
  
 
 
+  const fetchApplicants = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const response = await getApplicantsByProgram(
+        Number(id),
+        currentPage,
+        rowsPerPage,
+        statusFilter === "All" ? undefined : statusFilter,
+        search,
+        levelFilter === "All" ? undefined : levelFilter
+      );
+      setApplicants(response.data.items);
+      setApplicantsData(response.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, currentPage, rowsPerPage, statusFilter, search, levelFilter]);
+
   useEffect(() => {
-
-  const fetchApplicants =
-    async () => {
-
-      try {
-
-        setLoading(true);
-
-        const response =
-          await getApplicantsByProgram(
-            Number(id),
-            currentPage,
-            rowsPerPage,
-            statusFilter === "All"
-              ? undefined
-              : statusFilter,
-            search
-          );
-
-        setApplicants(
-          response.data.items
-        );
-
-        setApplicantsData(
-          response.data
-        );
-
-      } catch (error) {
-
-        console.error(error);
-
-      } finally {
-
-        setLoading(false);
-      }
-    };
-
-  if (id) {
     fetchApplicants();
-  }
-
-}, [
-  id,
-  currentPage,
-  rowsPerPage,
-  statusFilter,
-  search,
-]);
+  }, [fetchApplicants]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [rowsPerPage, search, levelFilter, statusFilter, sortOrder]);
+  }, [rowsPerPage, search, levelFilter, statusFilter]);
 
 
 const handleRowClick = (
@@ -180,27 +155,22 @@ const handleExport =
 
 const handleSendResults =
   async () => {
-
     try {
-
       setSendingResults(true);
-
-      await sendResults(
-        Number(id)
-      );
-
+      await sendResults(Number(id));
       setShowSendModal(false);
-
-      console.log(
-        "Results sent successfully"
-      );
-
-    } catch (error) {
-
+      toast.success("Results notifications sent successfully.");
+      
+      // Refresh the applicants list to update notification badges
+      await fetchApplicants();
+    } catch (error: any) {
       console.error(error);
-
+      setShowSendModal(false);
+      
+      // Fallback message if backend does not provide one or if it's generic
+      const msg = error?.response?.data?.message || "There are no new accepted or rejected applicants to notify.";
+      toast.error(msg);
     } finally {
-
       setSendingResults(false);
     }
 };
@@ -272,19 +242,12 @@ const handleStatusChange =
     <Layout>
       <div className="space-y-6">
 <ApplicationsHeader
-  title={applicants.length > 0 ? `Applicants for ${applicants[0].programName}` : "Applicants"}
-  description="
-    Review and manage all
-    applications submitted
-    to this program.
-  "
-
+  title="Manage Applicants"
+  description="Review, evaluate, and manage applicant submissions for this program."
   onExport={handleExport}
-
-onSendResults={() =>
-  setShowSendModal(true)
-}
-
+  onSendResults={() =>
+    setShowSendModal(true)
+  }
 />
         <ApplicationsTabs statusFilter={statusFilter} setStatusFilter={setStatusFilter} />
 
@@ -295,8 +258,6 @@ onSendResults={() =>
               setSearch={setSearch}
               levelFilter={levelFilter}
               setLevelFilter={setLevelFilter}
-              sortOrder={sortOrder}
-              setSortOrder={(value) => setSortOrder(value as "ASC" | "DESC")}
             />
           </div>
 

@@ -137,7 +137,6 @@ const MyCommunitiesPage = () => {
                     name: `Hosted community`,
                   }}
                   primaryButtonText="Open Community"
-                  secondaryButtonText="Preview"
                   className="h-full"
                   onPrimaryClick={() =>
                     navigate(

@@ -17,6 +17,8 @@ export default function ApplicantRow({
   setOpenDropdown,
   onChangeStatus,
 }: Props) {
+    console.log("avatar:", app.avatar);
+
   return (
     <div
       className="grid items-center bg-white rounded-2xl px-6 py-5 border hover:shadow-md transition"
@@ -25,7 +27,14 @@ export default function ApplicantRow({
       }}
     >
       <div className="flex items-center gap-4">
-        <img src={app.avatar} className="w-12 h-12 rounded-full" />
+<img
+  src={
+    app.avatar
+      ? `http://localhost:5069${app.avatar}`
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(app.name)}&background=random`
+  }
+  className="w-12 h-12 rounded-full object-cover"
+/>
         <span className="font-semibold text-[16px] text-[#1F2432]">
           {app.name}
         </span>

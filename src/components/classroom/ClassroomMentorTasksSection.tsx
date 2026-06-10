@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Plus, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { formatTaskDeadline } from '../../pages/classroom/utils';
 
 type MentorTaskCard = {
@@ -11,6 +12,8 @@ type MentorTaskCard = {
   avgScore: number;
   avgLabel: string;
   deadline?: string;
+  taskType?: 'Classroom' | 'Roadmap';
+  taskId?: number;
 };
 
 type MentorTaskPhaseView = {
@@ -38,13 +41,20 @@ type ClassroomMentorTasksSectionProps = {
   onOpenSubmissions: (taskId: string, filter?: 'all') => void;
   mentorRegistryRows: MentorRegistryRow[];
   onAddNewTask: () => void;
+  isClassroomOwner?: boolean;
+  onEditTask?: (taskId: string) => void;
+  onDeleteTask?: (taskId: string) => void;
 };
 
 type WorkflowTaskCardProps = MentorTaskCard & {
   onViewSubmissions: () => void;
+  isClassroomOwner?: boolean;
+  onEditTask?: (taskId: string) => void;
+  onDeleteTask?: (taskId: string) => void;
 };
 
 function MentorWorkflowTaskCard({
+  id,
   statusLabel,
   statusTone,
   title,
@@ -53,8 +63,25 @@ function MentorWorkflowTaskCard({
   avgScore,
   avgLabel,
   deadline,
+  taskType,
   onViewSubmissions,
+  isClassroomOwner,
+  onEditTask,
+  onDeleteTask,
 }: WorkflowTaskCardProps) {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const badgeClasses =
     statusTone === 'done'
       ? 'bg-[#DDF6F0] text-[#0E7A5F]'
@@ -70,6 +97,46 @@ function MentorWorkflowTaskCard({
         <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${badgeClasses}`}>
           {statusLabel}
         </span>
+
+        {isClassroomOwner && taskType === 'Classroom' && (
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-[#6E7589] transition hover:bg-[#F4F6FA] hover:text-[#1F2432]"
+              aria-label="Task options"
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {showMenu && (
+              <div className="absolute right-0 top-full z-10 mt-1 w-40 overflow-hidden rounded-xl border border-[#ECEFF6] bg-white py-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onEditTask?.(id);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium text-[#202738] transition hover:bg-[#F7F8FC]"
+                >
+                  <Edit2 size={16} className="text-[#6E7589]" />
+                  Edit Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onDeleteTask?.(id);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm font-medium text-[#AF2F4D] transition hover:bg-[#FFF5F7]"
+                >
+                  <Trash2 size={16} />
+                  Delete Task
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <p className="mt-3 text-[22px] font-semibold leading-tight text-[#202738]">{title}</p>
@@ -106,6 +173,9 @@ export default function ClassroomMentorTasksSection({
   onOpenSubmissions,
   mentorRegistryRows,
   onAddNewTask,
+  isClassroomOwner,
+  onEditTask,
+  onDeleteTask,
 }: ClassroomMentorTasksSectionProps) {
   return (
     <>
@@ -166,6 +236,9 @@ export default function ClassroomMentorTasksSection({
                           key={task.id}
                           {...task}
                           onViewSubmissions={() => onOpenSubmissions(task.id)}
+                          isClassroomOwner={isClassroomOwner}
+                          onEditTask={onEditTask}
+                          onDeleteTask={onDeleteTask}
                         />
                       ))}
                     </div>
@@ -207,9 +280,8 @@ export default function ClassroomMentorTasksSection({
                   <td className="px-3 py-3 text-[15px] font-semibold text-[#0E7A5F]">{row.avgScore}%</td>
                   <td className="px-3 py-3">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${
-                        row.statusTone === 'done' ? 'bg-[#DDF6F0] text-[#0E7A5F]' : 'bg-[#EFF2F7] text-[#505A73]'
-                      }`}
+                      className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${row.statusTone === 'done' ? 'bg-[#DDF6F0] text-[#0E7A5F]' : 'bg-[#EFF2F7] text-[#505A73]'
+                        }`}
                     >
                       {row.statusLabel}
                     </span>

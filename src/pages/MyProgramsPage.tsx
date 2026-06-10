@@ -10,6 +10,7 @@ import {
   getMyApplications,
   getProgramView,
 } from "../services/programService";
+import { classroomService } from "../services/classroomService";
 
 
 
@@ -80,36 +81,37 @@ if (role === "mentor") {
     programsRes.success &&
     programsRes.data
   ) {
-          const mapped =
-      programsRes.data.items.map(
-        (p: any) => ({
-          id: String(p.programId),
+          const mapped = await Promise.all(
+            programsRes.data.items.map(async (p: any) => {
+              const programId = p.programId ?? p.ProgramId;
+              if (!programId) {
+                console.error("ProgramId is missing in API response for Mentor published programs:", p);
+              }
 
-          title: p.title,
+              let progress = 0;
+              try {
+                if (programId) {
+                  const dashboardRes = await classroomService.getClassroomDashboard(programId);
+                  if (dashboardRes?.success && dashboardRes.data) {
+                    progress = dashboardRes.data.averageRoadmapCompletion || 0;
+                  }
+                }
+              } catch {
+                // Ignore if no classroom dashboard exists yet
+              }
 
-          description:
-            p.description,
-
-          tag:
-            p.domainName?.toUpperCase?.() ??
-            "PROGRAM",
-
-          phases:
-            p.subDomainName ??
-            p.SubDomainName ??
-            p.subdomainName ??
-            "SUB-DOMAIN",
-
-          subDomainName:
-            p.subDomainName ??
-            p.SubDomainName ??
-            p.subdomainName,
-
-          image: resolveImageUrl(p.programImageUrl),
-
-          progress: 0,
-        })
-      );
+              return {
+                id: String(programId),
+                title: p.title,
+                description: p.description,
+                tag: p.domainName?.toUpperCase?.() ?? "PROGRAM",
+                phases: p.subDomainName ?? p.SubDomainName ?? p.subdomainName ?? "SUB-DOMAIN",
+                subDomainName: p.subDomainName ?? p.SubDomainName ?? p.subdomainName,
+                image: resolveImageUrl(p.programImageUrl),
+                progress,
+              };
+            })
+          );
 
     if (isMounted) {
       setPrograms(mapped);
@@ -131,13 +133,17 @@ if (role === "mentor") {
 
     const mapped = await Promise.all(
       accepted.map(async (a: any) => {
-        const programId = Number(a.programId ?? 0);
+        const programId = Number(a.programId ?? a.ProgramId ?? 0);
+        if (!programId || programId <= 0) {
+          console.error("ProgramId is missing or invalid in API response for Mentee applications:", a);
+        }
 
         let subDomainName =
           a.subDomainName ?? a.SubDomainName ?? a.subdomainName;
         let mentorName = a.mentorName;
         let mentorAvatar = a.mentorProfilePicture;
         let image = resolveImageUrl(a.programImageUrl);
+        let progress = 0;
 
         // Use ProgramView as source of truth for My Programs card metadata.
         if (programId > 0) {
@@ -150,6 +156,18 @@ if (role === "mentor") {
           } catch {
             // Keep fallback values from my-applications response.
           }
+
+          try {
+            const completionRes = await classroomService.getClassroomCompletion(programId);
+            if (completionRes?.success && completionRes.data?.students) {
+              const mentee = completionRes.data.students.find((s: any) => s.studentId === response.data?.userId);
+              if (mentee) {
+                progress = mentee.overallCompletionPercent || 0;
+              }
+            }
+          } catch {
+            // Ignore if no classroom completion exists yet
+          }
         }
 
         const compactDescription = String(a.programDescription ?? "")
@@ -158,7 +176,7 @@ if (role === "mentor") {
           .slice(0, 110);
 
         return {
-          id: String(programId > 0 ? programId : a.applicationId),
+          id: String(programId),
           title: a.programTitle,
           description: compactDescription,
           tag: a.mentorDomain?.toUpperCase?.() ?? "PROGRAM",
@@ -167,7 +185,7 @@ if (role === "mentor") {
           image,
           mentorName,
           mentorAvatar: resolveImageUrl(mentorAvatar),
-          progress: 0,
+          progress,
         };
       })
     );

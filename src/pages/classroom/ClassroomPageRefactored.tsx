@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from 'react-hot-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import authAPI from '../../services/authService';
 import { classroomService } from '../../services/classroomService';
 import Layout from '../../shared/components/Layout';
@@ -18,6 +19,7 @@ import ClassroomMenteeTasksSection from '../../components/classroom/ClassroomMen
 import ClassroomStudentsSection from '../../components/classroom/ClassroomStudentsSection';
 import type { FeedPostProps } from '../../components/Feed';
 import MentorNewSessionModal from '../../components/classroom/Modals/MentorNewSessionModal';
+import ConfirmationModal from '../../components/modals/ConfirmationModal';
 import SessionDetailsModal from '../../components/classroom/Modals/SessionDetailsModal';
 import DeleteStudentModal from '../../components/classroom/Modals/DeleteStudentModal';
 import { classroomFeedService } from "../../services/classroomFeedService";
@@ -80,23 +82,80 @@ import {
 import type { BackendSubmissionResponse } from '../../components/classroom/types.ts';
 
 
-const mapSession = (session: any) => ({
-  id: String(session.sessionId),
-  title: session.title,
-  dateLabel: `${session.dateDisplay} • ${session.timeDisplay}`,
-  duration: "60 min",
-  live: session.isJoinable,
-  meetingLink: session.meetingLink,
-  scheduledAt: session.scheduledAt,
-});
+const getLocalSessionDateStrings = (scheduledAtIso?: string) => {
+  if (!scheduledAtIso) {
+    return { dateDisplay: 'TBD', timeDisplay: 'TBD' };
+  }
+  const date = UTILS.parseSafeUtcDate(scheduledAtIso);
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-const mapUpcomingSession = (session: any) => ({
-  title: session.title,
-  dateLabel: session.dateDisplay,
-  timeLabel: session.timeDisplay,
-  meetingLink: session.meetingLink,
-  isJoinable: Boolean(session.isJoinable),
-});
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  let dateDisplay = '';
+  if (isSameDay(date, now)) {
+    dateDisplay = 'Today';
+  } else if (isSameDay(date, tomorrow)) {
+    dateDisplay = 'Tomorrow';
+  } else {
+    dateDisplay = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  }
+
+  const timeDisplay = date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  return { dateDisplay, timeDisplay };
+};
+
+const mapSession = (session: any) => {
+  const { dateDisplay, timeDisplay } = getLocalSessionDateStrings(session.scheduledAt);
+  return {
+    id: String(session.sessionId),
+    title: session.title,
+    dateLabel: `${dateDisplay} • ${timeDisplay}`,
+    duration: "60 min",
+    live: session.isJoinable,
+    meetingLink: session.meetingLink,
+    scheduledAt: session.scheduledAt,
+  };
+};
+
+const mapUpcomingSession = (session: any) => {
+  const { dateDisplay, timeDisplay } = getLocalSessionDateStrings(session.scheduledAt);
+  return {
+    title: session.title,
+    dateLabel: dateDisplay,
+    timeLabel: timeDisplay,
+    meetingLink: session.meetingLink,
+    isJoinable: Boolean(session.isJoinable),
+  };
+};
+
+const API_ROOT = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').replace(
+  /\/api\/?$/,
+  ''
+);
+
+const resolveAvatarUrl = (path: string | null | undefined, name: string) => {
+  if (!path) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+  }
+  if (path.startsWith('http')) {
+    return path;
+  }
+  return `${API_ROOT}${path.startsWith('/') ? path : `/${path}`}`;
+};
 
 const mapAttachmentPreview = (attachment: AddPostAttachment) => ({
   id: attachment.id,
@@ -194,6 +253,23 @@ const ClassroomPage = ({}: Record<string, never> = {}) => {
   const tasksState = useTasksState(CONSTANTS.initialTasks);
   const { setTaskItems } = tasksState;
 
+  const queryClient = useQueryClient();
+
+  const { data: pendingReviewCount = 0 } = useQuery({
+    queryKey: ['pendingReviews', classroomProgramId],
+    queryFn: async () => {
+      if (!isMentor || !classroomProgramId) return 0;
+      const res = await mentorTaskService.getProgramSubmissions(
+        classroomProgramId,
+        undefined,
+        'Submitted'
+      );
+      const arr = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      return arr.length;
+    },
+    enabled: isMentor && !!classroomProgramId,
+  });
+
   const [classroomData, setClassroomData] =
   useState<any>(null);
 
@@ -222,6 +298,10 @@ const [
 
   const [haveLoadedMenteeTasks, setHaveLoadedMenteeTasks] = useState(false);
   const [isPublishingClassroomTask, setIsPublishingClassroomTask] = useState(false);
+  
+  const [editingClassroomTaskData, setEditingClassroomTaskData] = useState<{ taskId: number; initialData: CreateClassroomTaskFormValues } | null>(null);
+  const [deletingClassroomTaskId, setDeletingClassroomTaskId] = useState<number | null>(null);
+  const isClassroomOwner = isMentor && String(user?.userId) === String(mentorUserId);
 
   const mentorTasksState = useMentorTasksState();
   const studentsState = useStudentsState([]);
@@ -249,6 +329,9 @@ useState<FeedPostProps[]>(
     meetingLink?: string;
     isJoinable: boolean;
   } | null>(null);
+
+  const [sessionToCancel, setSessionToCancel] = useState<{ id: string; title: string } | null>(null);
+  const [isCancelingSession, setIsCancelingSession] = useState(false);
 
 
 
@@ -739,7 +822,7 @@ const fetchMentorRegistry = useCallback(async () => {
     ? classroomTasksResponse.data
     : [];
 
-  const classroomMetaById = new Map(
+  const classroomMetaById = new Map<number, any>(
     classroomApiTasks.map((task: any) => [task.classroomTaskId, task])
   );
 
@@ -789,6 +872,8 @@ const fetchMentorRegistry = useCallback(async () => {
       submissions: `${task.totalSubmissions || 0}/${task.totalStudents || 0}`,
       avgScore: Number(task.averageScore || 0),
       avgLabel: 'Average score',
+      taskType: task.taskType === 'Classroom' ? 'Classroom' : 'Roadmap',
+      taskId: task.taskId,
       deadline:
         classroomMeta?.deadline ||
         roadmapDeadlineByTaskId.get(String(task.taskId)),
@@ -818,6 +903,8 @@ const fetchMentorRegistry = useCallback(async () => {
       phase: task.phaseName || 'General',
       submissions: `${task.totalSubmissions || 0}/${task.totalStudents || 0}`,
       avgScore: Number(task.averageScore || 0),
+      taskType: task.taskType === 'Classroom' ? 'Classroom' : 'Roadmap',
+      taskId: task.taskId,
       statusTone:
         Number(task.averageScore || 0) >= 85 ? 'done' : 'neutral',
       statusLabel: task.status || 'Open',
@@ -873,21 +960,22 @@ const activeMissionTask = useMemo(() => {
       try {
         setSessionsLoading(true);
 
-        const data = await classroomService.getSessions(classroomProgramId);
-        console.log("Sessions Response:", data);
+        const [sessionsResponse, upcomingResponse] = await Promise.all([
+          classroomService.getSessions(classroomProgramId),
+          classroomService.getUpcomingSession(classroomProgramId).catch((err) => {
+            console.error("Failed to fetch upcoming session:", err);
+            return null;
+          })
+        ]);
 
-        const sessionItems = Array.isArray(data?.data) ? data.data : [];
-
+        const sessionItems = Array.isArray(sessionsResponse?.data) ? sessionsResponse.data : [];
         setSessions(sessionItems.map(mapSession));
 
-        const latestSession = [...sessionItems].sort((left, right) => {
-          const leftCreatedAt = new Date(left.createdAt ?? 0).getTime();
-          const rightCreatedAt = new Date(right.createdAt ?? 0).getTime();
-
-          return rightCreatedAt - leftCreatedAt;
-        })[0];
-
-        setUpcomingSession(latestSession ? mapUpcomingSession(latestSession) : null);
+        if (upcomingResponse?.data) {
+          setUpcomingSession(mapUpcomingSession(upcomingResponse.data));
+        } else {
+          setUpcomingSession(null);
+        }
       } catch (error) {
         console.error("Failed to fetch sessions:", error);
         setUpcomingSession(null);
@@ -927,74 +1015,71 @@ const activeMissionTask = useMemo(() => {
 
   try {
 
-    setIsDashboardLoading(
-      true
-    );
+    setIsDashboardLoading(true);
 
-    const response =
-      await classroomService
-        .getClassroomDashboard(
-          classroomProgramId
+    if (isMentor) {
+      const response = await classroomService.getClassroomDashboard(classroomProgramId);
+      console.log("DASHBOARD RESPONSE:", response);
+
+      if (!response?.success) {
+        console.error('Dashboard request failed:', response?.message ?? 'Unknown error');
+        return;
+      }
+
+      setDashboardData(response.data);
+      const studentsFromApi = Array.isArray(response.data?.students)
+        ? response.data.students
+        : [];
+
+      const mappedStudents = studentsFromApi.map((student: any) => ({
+        id: student.studentId,
+        name: student.fullName,
+        email: student.lastCompletedItemTitle || 'No Activity Yet',
+        statusLabel:
+          student.tasksWaitingForReview > 0
+            ? 'Needs Feedback'
+            : student.isAtRisk
+              ? 'Idle Student'
+              : 'Module Active',
+        statusTone:
+          student.tasksWaitingForReview > 0
+            ? 'feedback'
+            : student.isAtRisk
+              ? 'idle'
+              : 'active',
+        moduleLabel: student.lastCompletedItemTitle || 'No Activity',
+        progress: student.overallCompletionPercent,
+        completedTasks: student.completedTasks,
+        totalTasks: student.totalTasks,
+        lastActive: student.lastCompletedAt,
+      }));
+
+      setMentorStudents(mappedStudents);
+    } else {
+      const response = await classroomService.getClassroomCompletion(classroomProgramId);
+      console.log("COMPLETION RESPONSE:", response);
+
+      if (response?.success && response.data?.students) {
+        const currentMentee = response.data.students.find(
+          (s: any) => s.studentId === user?.userId
         );
-
-    console.log(
-      "DASHBOARD RESPONSE:",
-      response
-    );
-
-    if (!response?.success) {
-      console.error(
-        'Dashboard request failed:',
-        response?.message ?? 'Unknown error'
-      );
-      return;
+        if (currentMentee) {
+          // Store mentee's own overall completion percentage in dashboardData so
+          // ClassroomOverviewSection receives it properly through averageRoadmapCompletion prop
+          setDashboardData({
+            averageRoadmapCompletion: currentMentee.overallCompletionPercent
+          });
+        } else {
+          setDashboardData({ averageRoadmapCompletion: 0 });
+        }
+      }
     }
 
-    setDashboardData(response.data);
-    const studentsFromApi = Array.isArray(response.data?.students)
-      ? response.data.students
-      : [];
-
-    const mappedStudents = studentsFromApi.map((student: any) => ({
-      id: student.studentId,
-      name: student.fullName,
-      email: student.lastCompletedItemTitle || 'No Activity Yet',
-      statusLabel:
-        student.tasksWaitingForReview > 0
-          ? 'Needs Feedback'
-          : student.isAtRisk
-            ? 'Idle Student'
-            : 'Module Active',
-      statusTone:
-        student.tasksWaitingForReview > 0
-          ? 'feedback'
-          : student.isAtRisk
-            ? 'idle'
-            : 'active',
-      moduleLabel: student.lastCompletedItemTitle || 'No Activity',
-      progress: student.overallCompletionPercent,
-      completedTasks: student.completedTasks,
-      totalTasks: student.totalTasks,
-      lastActive: student.lastCompletedAt,
-    }));
-
-    setMentorStudents(mappedStudents);
-
   } catch (error) {
-
-    console.error(
-      "Failed to fetch dashboard",
-      error
-    );
-
+    console.error("Failed to fetch dashboard", error);
   } finally {
-
-    setIsDashboardLoading(
-      false
-    );
-
+    setIsDashboardLoading(false);
   }
-
 };
 
     const fetchCurrentProfile = async () => {
@@ -1049,7 +1134,7 @@ useEffect(() => {
     return;
   }
 
-  if (roadmapId && !phases.length && !classroomId) {
+  if (roadmapId && phases.length === 0) {
     return;
   }
 
@@ -1061,6 +1146,7 @@ useEffect(() => {
         console.error('Failed to fetch mentee tasks', error);
       }
     });
+
 
   return () => {
     isCancelled = true;
@@ -1077,8 +1163,111 @@ useEffect(() => {
 useEffect(() => {
   setHaveLoadedMenteeTasks(false);
   setTaskItems([]);
-}, [roadmapId, classroomId, setTaskItems]);
+}, [roadmapId, classroomId, phases.length, setTaskItems]);
 
+  const handleEditClassroomTask = (taskRef: string) => {
+    const taskIdStr = taskRef.replace('classroom-', '');
+    const taskId = Number(taskIdStr);
+    
+    // Find the task in mentorTaskPhasesView
+    let taskData: any;
+    for (const phase of mentorTaskPhasesView) {
+      const found = phase.tasks.find(t => t.id === taskRef);
+      if (found) {
+        taskData = found;
+        break;
+      }
+    }
+
+    if (!taskData) {
+      toast.error('Task not found');
+      return;
+    }
+
+    // Classroom data has the attachmentUrl
+    const classroomApiTasks = Array.isArray(classroomData?.tasks) ? classroomData.tasks : [];
+    const meta = classroomApiTasks.find((t: any) => t.classroomTaskId === taskId);
+
+    setEditingClassroomTaskData({
+      taskId,
+      initialData: {
+        title: taskData.title,
+        description: taskData.description || '',
+        deadline: taskData.deadline || '',
+        attachmentUrl: meta?.attachmentUrl || '',
+      }
+    });
+  };
+
+  const handleSaveEditClassroomTask = async (values: CreateClassroomTaskFormValues) => {
+    if (!editingClassroomTaskData) return;
+    
+    setIsPublishingClassroomTask(true);
+    try {
+      await classroomTaskService.updateTask(editingClassroomTaskData.taskId, values);
+      toast.success('Task updated successfully');
+      
+      // Optimistic updates
+      setMentorTaskPhasesView(prev => prev.map(phase => ({
+        ...phase,
+        tasks: phase.tasks.map(t => t.id === `classroom-${editingClassroomTaskData.taskId}` ? {
+          ...t,
+          title: values.title,
+          description: values.description,
+          deadline: values.deadline,
+        } : t)
+      })));
+      setMentorRegistryRows(prev => prev.map(r => r.id === `classroom-${editingClassroomTaskData.taskId}` ? {
+        ...r,
+        title: values.title,
+      } : r));
+      setTaskItems(prev => prev.map(t => t.id === String(editingClassroomTaskData.taskId) && t.taskType === 'classroom' ? {
+        ...t,
+        title: values.title,
+        description: values.description,
+        deadline: values.deadline,
+      } : t));
+
+      setEditingClassroomTaskData(null);
+      // refetch for consistency
+      fetchMentorRegistry();
+      fetchMenteeTasks();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to update task');
+    } finally {
+      setIsPublishingClassroomTask(false);
+    }
+  };
+
+  const handleDeleteClassroomTask = (taskRef: string) => {
+    const taskIdStr = taskRef.replace('classroom-', '');
+    const taskId = Number(taskIdStr);
+    setDeletingClassroomTaskId(taskId);
+  };
+
+  const confirmDeleteClassroomTask = async () => {
+    if (!deletingClassroomTaskId) return;
+
+    try {
+      await classroomTaskService.deleteTask(deletingClassroomTaskId);
+      toast.success('Task deleted successfully');
+
+      // Optimistic updates
+      setMentorTaskPhasesView(prev => prev.map(phase => ({
+        ...phase,
+        tasks: phase.tasks.filter(t => t.id !== `classroom-${deletingClassroomTaskId}`)
+      })));
+      setMentorRegistryRows(prev => prev.filter(r => r.id !== `classroom-${deletingClassroomTaskId}`));
+      setTaskItems(prev => prev.filter(t => t.id !== String(deletingClassroomTaskId) || t.taskType !== 'classroom'));
+
+      setDeletingClassroomTaskId(null);
+      // refetch for consistency
+      fetchMentorRegistry();
+      fetchMenteeTasks();
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Failed to delete task');
+    }
+  };
 
 const handleOpenPostDetails =
   useCallback(
@@ -1129,10 +1318,18 @@ const handleScheduleSession = async () => {
       toast.success('Session scheduled successfully');
     }
 
-    const refreshedSessions =
-      await classroomService.getSessions(classroomProgramId);
+    const [refreshedSessions, upcomingResponse] = await Promise.all([
+      classroomService.getSessions(classroomProgramId),
+      classroomService.getUpcomingSession(classroomProgramId).catch(() => null)
+    ]);
 
     setSessions(refreshedSessions.data.map(mapSession));
+    
+    if (upcomingResponse?.data) {
+      setUpcomingSession(mapUpcomingSession(upcomingResponse.data));
+    } else {
+      setUpcomingSession(null);
+    }
 
     setSessionTitle('');
     setSessionDate('');
@@ -1164,19 +1361,31 @@ const handleScheduleSession = async () => {
 
 const handleCancelSession = async (sessionId: string) => {
   try {
+    setIsCancelingSession(true);
     await classroomService.cancelSession(Number(sessionId));
 
-    const refreshedSessions =
-      await classroomService.getSessions(classroomProgramId);
+    const [refreshedSessions, upcomingResponse] = await Promise.all([
+      classroomService.getSessions(classroomProgramId),
+      classroomService.getUpcomingSession(classroomProgramId).catch(() => null)
+    ]);
 
     setSessions(refreshedSessions.data.map(mapSession));
 
+    if (upcomingResponse?.data) {
+      setUpcomingSession(mapUpcomingSession(upcomingResponse.data));
+    } else {
+      setUpcomingSession(null);
+    }
+
     setShowSessionDetailsModal(false);
+    setSessionToCancel(null);
 
     toast.success('Session cancelled successfully');
   } catch (error) {
     console.error('Failed to cancel session:', error);
     toast.error('Failed to cancel session. Please try again.');
+  } finally {
+    setIsCancelingSession(false);
   }
 };
 
@@ -1273,12 +1482,7 @@ MentorSubmissionSummary[] =
       studentName:
         submission.menteeName,
 
-      studentAvatar:
-        submission.menteeProfilePicture ||
-
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-          submission.menteeName
-        )}`,
+      studentAvatar: resolveAvatarUrl(submission.menteeProfilePicture, submission.menteeName),
 
       submittedAt:
         submission.submittedAt,
@@ -1360,12 +1564,7 @@ MentorSubmissionSummary[] =
             studentName:
               submission.menteeName,
 
-            studentAvatar:
-              submission.menteeProfilePicture ||
-
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                submission.menteeName
-              )}`,
+            studentAvatar: resolveAvatarUrl(submission.menteeProfilePicture, submission.menteeName),
 
             submittedAt:
               submission.submittedAt,
@@ -2122,11 +2321,7 @@ const handleViewSubmission =
 
     studentName: submission.menteeName,
 
-    studentAvatar:
-      submission.menteeProfilePicture ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        submission.menteeName
-      )}`,
+    studentAvatar: resolveAvatarUrl(submission.menteeProfilePicture, submission.menteeName),
 
     reviewStatus: UTILS.mapMentorSubmissionReviewStatus(submission),
 
@@ -2219,6 +2414,8 @@ const handleSubmitMentorReview = async (
         ? 'Revision requested successfully'
         : 'Submission reviewed successfully'
     );
+
+    queryClient.invalidateQueries({ queryKey: ['pendingReviews', classroomProgramId] });
 
     await refreshMentorTaskData();
 
@@ -2423,7 +2620,7 @@ const handleResubmitTask = async (
             onAddPost={handleAddPost}
             onSubmitTask={handleOverviewSubmitTask}
               onReviewNow={() => setActiveTab('tasks')}
-            pendingReviewCount={tasksState.taskItems.filter((task) => task.status === 'submitted').length}
+            pendingReviewCount={pendingReviewCount}
             currentUserId={user?.userId ?? 'current-user'}
             currentUserName={currentUserProfile.displayName}
             currentUserAvatarUrl={currentUserProfile.avatarUrl}
@@ -2470,39 +2667,25 @@ const handleResubmitTask = async (
 
     setMeetingLink(session.meetingLink || '');
 
-    const parts = session.dateLabel.split('•');
-
-    if (parts.length === 2) {
-      const datePart = parts[0].trim();
-      const timePart = parts[1].trim();
-
-      const parsedDate = new Date(`${datePart} ${timePart}`);
+    if (session.scheduledAt) {
+      const parsedDate = UTILS.parseSafeUtcDate(session.scheduledAt);
 
       if (!isNaN(parsedDate.getTime())) {
-        setSessionDate(
-          parsedDate.toISOString().split('T')[0]
-        );
+        const localYear = parsedDate.getFullYear();
+        const localMonth = String(parsedDate.getMonth() + 1).padStart(2, '0');
+        const localDay = String(parsedDate.getDate()).padStart(2, '0');
+        setSessionDate(`${localYear}-${localMonth}-${localDay}`);
 
-        setSessionTime(
-          parsedDate.toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          })
-        );
+        const localHour = String(parsedDate.getHours()).padStart(2, '0');
+        const localMinute = String(parsedDate.getMinutes()).padStart(2, '0');
+        setSessionTime(`${localHour}:${localMinute}`);
       }
     }
 
     setShowNewSessionModal(true);
   }}
   onCancelSession={(session) => {
-    const confirmed = window.confirm(
-      `Cancel "${session.title}" session?`
-    );
-
-    if (confirmed) {
-      handleCancelSession(session.id);
-    }
+    setSessionToCancel({ id: session.id, title: session.title });
   }}
 />
 
@@ -2516,6 +2699,9 @@ const handleResubmitTask = async (
               onOpenSubmissions={handleOpenMentorSubmissions}
               mentorRegistryRows={mentorRegistryRows}
               onAddNewTask={handleOpenNewMentorTaskModal}
+              isClassroomOwner={isClassroomOwner}
+              onEditTask={handleEditClassroomTask}
+              onDeleteTask={handleDeleteClassroomTask}
             />
           ) : (
             <ClassroomMenteeTasksSection
@@ -2674,6 +2860,26 @@ onOpenMentorSubmissionsForStudent={
           onSubmitReview={handleSubmitMentorReview}
         />
 
+        <MentorNewTaskModal
+          isOpen={!!editingClassroomTaskData}
+          onClose={() => setEditingClassroomTaskData(null)}
+          onPublish={handleSaveEditClassroomTask}
+          isPublishing={isPublishingClassroomTask}
+          initialData={editingClassroomTaskData?.initialData}
+        />
+
+        {deletingClassroomTaskId && (
+          <ConfirmationModal
+            isOpen={true}
+            onCancel={() => setDeletingClassroomTaskId(null)}
+            onConfirm={confirmDeleteClassroomTask}
+            title="Delete Classroom Task"
+            message="Are you sure you want to delete this task? This action cannot be undone, but existing student submissions will remain in the database."
+            confirmText="Delete Task"
+            variant="danger"
+          />
+        )}
+
         <PostDiscussionModal
           isOpen={modals.showPostDiscussionModal}
           onClose={() => modals.setShowPostDiscussionModal(false)}
@@ -2701,17 +2907,12 @@ onOpenMentorSubmissionsForStudent={
           isOpen={showTaskDetailsModal}
           onClose={() => setShowTaskDetailsModal(false)}
           task={
-  tasksState.selectedTaskDetailsId
-    ? ({
-        id:
-          tasksState.selectedTaskDetailsId,
-
-        title:
-          tasksState.taskItems.find(
-            (t) =>
-              t.id ===
-              tasksState.selectedTaskDetailsId
-          )?.title,
+            tasksState.selectedTaskDetailsId
+              ? ({
+                  id: tasksState.selectedTaskDetailsId,
+                  title: tasksState.taskItems.find(
+                    (t) => t.id === tasksState.selectedTaskDetailsId
+                  )?.title,
 
         category:
           tasksState.taskItems.find(
@@ -2845,6 +3046,21 @@ onCancelSession={handleCancelSession}
 )}
 
       
+      <ConfirmationModal
+        isOpen={!!sessionToCancel}
+        title="Cancel Session?"
+        message="Are you sure you want to cancel this session? This action cannot be undone."
+        confirmText="Cancel Session"
+        cancelText="Keep Session"
+        variant="danger"
+        isLoading={isCancelingSession}
+        onConfirm={() => {
+          if (sessionToCancel) handleCancelSession(sessionToCancel.id);
+        }}
+        onCancel={() => {
+          if (!isCancelingSession) setSessionToCancel(null);
+        }}
+      />
     </Layout>
   );
 };

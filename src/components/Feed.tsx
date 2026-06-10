@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { validateCommentContent, validateThreadContent } from '../pages/community/utils/threadUtils';
 import { ClassroomUserLink } from './classroom/common/ClassroomUserLink';
+import ConfirmationModal from './modals/ConfirmationModal';
 
 // Types
 export interface PostAttachment {
@@ -157,6 +158,8 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(comment.content);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -255,10 +258,12 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
 
   const handleDeleteClick = () => {
     closeMenu();
-    if (typeof window !== 'undefined' && !window.confirm('Delete this comment? This cannot be undone.')) {
-      return;
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
     onDeleteComment(comment.id);
+    setShowDeleteConfirm(false);
   };
 
   const overflowMenu =
@@ -445,6 +450,17 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
           )}
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Delete Comment?"
+        message="Delete this comment? This cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

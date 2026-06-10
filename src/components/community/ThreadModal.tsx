@@ -5,9 +5,10 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Heart, Share2, MessageCircle, Link, MoreHorizontal, Pencil, Trash2, Paperclip } from 'lucide-react';
+import { Heart, Share2, MessageCircle, Link, MoreHorizontal, Pencil, Trash2, Paperclip } from 'lucide-react';
 import { Modal } from '../Modal';
 import { CommentThread } from './CommentThread';
+import ConfirmationModal from '../modals/ConfirmationModal';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
 import type { CommunityThread, ThreadComment } from '../../pages/community/types';
@@ -82,6 +83,7 @@ export const ThreadModal: React.FC<ThreadModalProps> = ({
   currentUserRole = 'member',
 }) => {
   const [commentInput, setCommentInput] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 const [localComments, setLocalComments] =
   useState<ThreadComment[]>(
@@ -332,9 +334,11 @@ const handleLocalEdit =
 
   const handleDeleteThread = () => {
     closeThreadMenu();
-    if (typeof window !== 'undefined' && !window.confirm('Delete this post? This cannot be undone.')) {
-      return;
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
     onThreadDelete?.(thread.id);
   };
 
@@ -431,7 +435,7 @@ const handleLocalEdit =
       {shareDialog}
       {threadOwnerMenuPortal}
       <div className="w-full max-w-full max-h-[90vh] overflow-y-auto">
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-1">
+        <div className="absolute right-12 top-4 z-10 flex items-center gap-1">
           {showThreadOwnerMenu && (
             <button
               ref={threadMenuTriggerRef}
@@ -445,14 +449,6 @@ const handleLocalEdit =
               <MoreHorizontal size={22} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            aria-label="Close modal"
-          >
-            <X size={24} />
-          </button>
         </div>
 
         {/* Thread Content */}
@@ -639,6 +635,16 @@ Comments ({localComments.length})
           )}
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Delete Post?"
+        message="Delete this post? This cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </Modal>
   );
 };

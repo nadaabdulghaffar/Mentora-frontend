@@ -6,11 +6,12 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Heart, Reply as ReplyIcon, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import type { ThreadComment } from '../../pages/community/types';
 import { formatTimestamp, validateCommentContent } from '../../pages/community/utils/threadUtils';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
+import ConfirmationModal from '../modals/ConfirmationModal';
 
 interface CommentThreadProps {
   comment: ThreadComment;
@@ -47,15 +48,11 @@ function commentAllowsDelete(currentUserId: string | undefined, c: ThreadComment
  */
 export const CommentThread: React.FC<CommentThreadProps> = ({
   comment,
-  onReply,
-  onLike,
   onEdit,
   onDelete,
   currentUserId,
   depth = 0,
   variant = 'community',
-  showCommentLike = true,
-  showReplyAction = true,
 }) => {
   const formatCommentTimestamp = (timestamp: string): string => {
     if (variant !== 'classroom') {
@@ -74,14 +71,11 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     });
   };
 
-  const [showReplyInput, setShowReplyInput] = useState(false);
-  const [replyContent, setReplyContent] = useState('');
-  const [showReplies, setShowReplies] = useState(false);
-  const [localLikes, setLocalLikes] = useState(comment.likes);
-  const [localIsLiked, setLocalIsLiked] = useState(!!comment.isLiked);
   const [localReplies, setLocalReplies] = useState<ThreadComment[]>(comment.replies ?? []);
   const [isEditing, setIsEditing] = useState(false);
   const [editDraft, setEditDraft] = useState(comment.content);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
@@ -94,10 +88,8 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
   }, []);
 
   useEffect(() => {
-    setLocalLikes(comment.likes);
-    setLocalIsLiked(!!comment.isLiked);
     setLocalReplies(comment.replies ?? []);
-  }, [comment.id, comment.likes, comment.isLiked, comment.replies]);
+  }, [comment.id, comment.replies]);
 
   useEffect(() => {
     if (!isEditing) setEditDraft(comment.content);
@@ -128,8 +120,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     };
   }, [menuOpen, closeMenu]);
 
-  const maxDepth = 3;
-  const canNest = depth < maxDepth;
+
 
   const showEdit = Boolean(onEdit && commentAllowsEdit(currentUserId, comment));
   const showDelete = Boolean(onDelete && commentAllowsDelete(currentUserId, comment));
@@ -151,32 +142,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     setMenuOpen(true);
   };
 
-  const handleReplySubmit = () => {
-    const trimmed = replyContent.trim();
-    if (!trimmed) return;
 
-    const uid = currentUserId ?? 'current-user';
-    const newReply: ThreadComment = {
-      id: `reply-${Date.now()}`,
-      authorId: uid,
-      authorName: 'You',
-      authorAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser',
-      authorRole: 'member',
-      content: trimmed,
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-      replies: [],
-      canDelete: true,
-      canEdit: true,
-    };
-
-    setLocalReplies((prev) => [...prev, newReply]);
-    setShowReplies(true);
-    onReply?.(comment.id, trimmed);
-    setReplyContent('');
-    setShowReplyInput(false);
-  };
 
   const handleSaveEdit = () => {
     const trimmed = editDraft.trim();
@@ -188,14 +154,18 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
 
   const handleDeleteClick = () => {
     closeMenu();
-    const subtree =
-      localReplies.length > 0 || (comment.replies && comment.replies.length > 0);
-    const msg = subtree
-      ? 'Delete this comment and all replies under it? This cannot be undone.'
-      : 'Delete this comment? This cannot be undone.';
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
-    onDelete?.(comment.id);
+    setShowDeleteConfirm(true);
   };
+
+  const handleConfirmDelete = () => {
+    onDelete?.(comment.id);
+    setShowDeleteConfirm(false);
+  };
+
+  const hasSubtree = localReplies.length > 0 || (comment.replies && comment.replies.length > 0);
+  const deleteMessage = hasSubtree
+    ? 'Delete this comment and all replies under it? This cannot be undone.'
+    : 'Delete this comment? This cannot be undone.';
 
   const marginLeft = depth * 12;
 
@@ -258,26 +228,42 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
         />
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <ClassroomUserLink
-              userId={comment.authorId}
-              name={comment.authorName}
-              className="font-semibold text-gray-900 text-sm"
-            />
-            {comment.authorRole && comment.authorRole !== 'member' && (
-              <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
-                  comment.authorRole === 'admin'
-                    ? 'bg-red-100 text-red-700'
-                    : comment.authorRole === 'author'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-700'
-                }`}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <ClassroomUserLink
+                userId={comment.authorId}
+                name={comment.authorName}
+                className="font-semibold text-gray-900 text-sm truncate"
+              />
+              {comment.authorRole && comment.authorRole !== 'member' && (
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize shrink-0 ${
+                    comment.authorRole === 'admin'
+                      ? 'bg-red-100 text-red-700'
+                      : comment.authorRole === 'author'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {comment.authorRole}
+                </span>
+              )}
+              <span className="text-xs text-gray-500 shrink-0">{formatCommentTimestamp(comment.timestamp)}</span>
+            </div>
+
+            {showOverflowMenu && (
+              <button
+                ref={menuTriggerRef}
+                type="button"
+                onClick={openMenu}
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-label="Comment actions"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-800 -mr-2"
               >
-                {comment.authorRole}
-              </span>
+                <MoreHorizontal size={18} />
+              </button>
             )}
-            <span className="text-xs text-gray-500">{formatCommentTimestamp(comment.timestamp)}</span>
           </div>
 
           {isEditing ? (
@@ -321,133 +307,22 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </p>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            {showCommentLike && (
-              <button
-                type="button"
-                onClick={() => {
-                  setLocalIsLiked((prevLiked) => {
-                    setLocalLikes((prevLikes) =>
-                      prevLiked ? Math.max(0, prevLikes - 1) : prevLikes + 1
-                    );
-                    return !prevLiked;
-                  });
-                  onLike?.(comment.id);
-                }}
-                className={`flex items-center gap-1 text-xs font-medium transition ${
-                  localIsLiked ? 'text-red-500' : 'text-gray-600 hover:text-red-500'
-                }`}
-              >
-                <Heart size={14} fill={localIsLiked ? 'currentColor' : 'none'} />
-                {localLikes > 0 && <span>{localLikes}</span>}
-              </button>
-            )}
 
-            <div className="inline-flex items-center gap-0.5">
-              {showReplyAction && canNest && (
-                <button
-                  type="button"
-                  onClick={() => setShowReplyInput(!showReplyInput)}
-                  className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition"
-                >
-                  <ReplyIcon size={14} />
-                  Reply
-                </button>
-              )}
-              {showOverflowMenu && (
-                <button
-                  ref={menuTriggerRef}
-                  type="button"
-                  onClick={openMenu}
-                  aria-expanded={menuOpen}
-                  aria-haspopup="menu"
-                  aria-label="Comment actions"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
-                >
-                  <MoreHorizontal size={18} />
-                </button>
-              )}
-            </div>
-          </div>
 
-          {showReplyAction && showReplyInput && (
-            <div className="mt-3 space-y-2">
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.ctrlKey) {
-                    e.preventDefault();
-                    handleReplySubmit();
-                  }
-                }}
-                placeholder="Write a reply..."
-                className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm text-gray-700 outline-none focus:border-blue-400 focus:bg-white"
-                rows={2}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleReplySubmit}
-                  disabled={!replyContent.trim()}
-                  className="rounded px-3 py-1 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  Reply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowReplyInput(false);
-                    setReplyContent('');
-                  }}
-                  className="rounded px-3 py-1 text-xs font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
 
-          {showReplyAction && (localReplies.length > 0 || comment.replies?.length) && (
-            <div className="mt-3">
-              {!showReplies ? (
-                <button
-                  type="button"
-                  onClick={() => setShowReplies(true)}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 transition"
-                >
-                  View {localReplies.length} {localReplies.length === 1 ? 'reply' : 'replies'}
-                </button>
-              ) : (
-                <div className="space-y-3 border-l-2 border-gray-200 pl-3">
-                  {localReplies.map((reply) => (
-                    <CommentThread
-                      key={reply.id}
-                      comment={reply}
-                      onReply={onReply}
-                      onLike={onLike}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      currentUserId={currentUserId}
-                      depth={depth + 1}
-                      variant={variant}
-                      showCommentLike={showCommentLike}
-                      showReplyAction={showReplyAction}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setShowReplies(false)}
-                    className="text-xs font-medium text-gray-600 hover:text-gray-800 transition"
-                  >
-                    Hide replies
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Delete Comment?"
+        message={deleteMessage}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

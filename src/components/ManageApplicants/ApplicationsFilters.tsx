@@ -5,8 +5,6 @@ type Props = {
   setSearch: (val: string) => void;
   levelFilter: string;
   setLevelFilter: (val: string) => void;
-  sortOrder: string;
-  setSortOrder: (val: string) => void;
 };
 
 export default function ApplicationsFilters({
@@ -14,8 +12,6 @@ export default function ApplicationsFilters({
   setSearch,
   levelFilter,
   setLevelFilter,
-  sortOrder,
-  setSortOrder,
 }: Props) {
   return (
     <div className="bg-white rounded-2xl border px-5 py-3 flex items-center gap-3 shadow-sm">
@@ -37,20 +33,12 @@ export default function ApplicationsFilters({
           className="bg-transparent outline-none"
         >
           <option value="All">All</option>
+          <option value="Beginner">Beginner</option>
           <option value="Junior">Junior</option>
-          <option value="Mid-Level">Mid-Level</option>
+          <option value="Mid">Mid</option>
           <option value="Senior">Senior</option>
         </select>
       </div>
-
-      <select
-        value={sortOrder}
-        onChange={(e) => setSortOrder(e.target.value)}
-        className="bg-gray-100 px-3 py-2 rounded-lg text-[13px]"
-      >
-        <option>ASC</option>
-        <option>DESC</option>
-      </select>
     </div>
   );
 }

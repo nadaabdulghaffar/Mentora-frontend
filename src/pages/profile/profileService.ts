@@ -97,6 +97,11 @@ type PublicProfileDto = {
   totalReviews?: number | null;
   followerCount?: number | null;
   isVerified?: boolean | null;
+  subDomains?: BackendSubDomainDto[];
+  expertise?: BackendMentorExpertiseDto[];
+  technologies?: BackendMenteeTechnologyDto[];
+  currentLevel?: string | null;
+  educationStatus?: string | null;
 };
 
 export type MenteeTechnologyInput = {
@@ -106,7 +111,7 @@ export type MenteeTechnologyInput = {
 
 export type OwnProfileUpdatePayload = {
   bio?: string;
-  countryCode?: string;
+
   profilePictureUrl?: string;
   linkedInUrl?: string;
   pastExperience?: string;
@@ -536,9 +541,11 @@ function mapPublicProfile(profile: PublicProfileDto): ProfileEntity {
     yearsOfExperience: profile.yearsOfExperience == null ? undefined : String(profile.yearsOfExperience),
     relevantExpertise: [],
     tools: [],
-    subDomains: [],
-    technologies: [],
-    expertise: [],
+    subDomains: mapSubDomains(profile.subDomains),
+    technologies: mapMenteeTechnologies(profile.technologies),
+    expertise: mapMentorExpertise(profile.expertise),
+    currentLevel: profile.currentLevel?.trim() || undefined,
+    educationStatus: profile.educationStatus?.trim() || undefined,
     domainName: profile.domainName?.trim() || undefined,
     reviewAverage: profile.averageRating ?? undefined,
     reviewTotal: profile.totalReviews ?? undefined,
@@ -574,7 +581,6 @@ export async function updateOwnProfile(
 
   const payload: Record<string, string | number | undefined> = {
     bio: toNullableTrimmed(patch.bio),
-    countryCode: toNullableTrimmed(patch.countryCode)?.toUpperCase(),
     profilePictureUrl: toStorageProfilePictureUrl(patch.profilePictureUrl),
     pastExperience: toNullableTrimmed(patch.pastExperience),
   };
@@ -805,3 +811,8 @@ export const PROFILE_DEMO_ROUTES = {
   publicMentor: DEMO_PUBLIC_MENTOR_ID,
   publicMentee: DEMO_PUBLIC_MENTEE_ID,
 } as const;
+
+export async function getPublicMenteePrograms(menteeId: string) {
+  const response = await apiClient.get(`/profile/mentee/${menteeId}/programs`);
+  return response.data;
+}

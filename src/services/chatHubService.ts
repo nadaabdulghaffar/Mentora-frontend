@@ -19,7 +19,10 @@ function logTokenPresence(context: string): void {
 }
 
 function isNegotiationAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
+  if (error instanceof Error) {
+    return error.name === "AbortError" || error.message.includes("stopped during negotiation");
+  }
+  return false;
 }
 
 function formatSignalRError(error: unknown): string {

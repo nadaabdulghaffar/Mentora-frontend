@@ -28,7 +28,6 @@ export function readFiltersFromSearchParams(
   return {
     domainId: parseOptionalInt(params.get("domainId")),
     subDomainId: parseOptionalInt(params.get("subDomainId")),
-    recommendedForYou: params.get("recommended") === "true",
     openedNow: openedNow === true ? true : null,
     targetLevel: parseOptionalInt(params.get("targetLevel")),
     educationLevel: parseOptionalInt(params.get("educationLevel")),
@@ -51,7 +50,7 @@ export function buildExploreSearchParams(
 
   if (filters.domainId != null) params.domainId = filters.domainId;
   if (filters.subDomainId != null) params.subDomainId = filters.subDomainId;
-  if (filters.recommendedForYou) params.recommendedForYou = true;
+
   if (filters.openedNow === true) params.openedNow = true;
   if (filters.targetLevel != null) params.targetLevel = filters.targetLevel;
   if (filters.educationLevel != null)
@@ -100,8 +99,7 @@ export function applyExploreUrlUpdate(
     if (f.subDomainId != null) next.set("subDomainId", String(f.subDomainId));
     else next.delete("subDomainId");
 
-    if (f.recommendedForYou) next.set("recommended", "true");
-    else next.delete("recommended");
+
 
     if (f.openedNow === true) next.set("openedNow", "true");
     else next.delete("openedNow");

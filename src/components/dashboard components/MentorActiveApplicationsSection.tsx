@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import {
-  getMyPublishedPrograms,
-  getApplicantsByProgram,
-} from "../../services/programService";
+import { getRecentApplications } from "../../services/programService";
 
 const COMPONENT_NAME = "MentorActiveApplicationsSection";
 
@@ -33,121 +30,16 @@ const levelStyles = {
 
 export default function ActiveApplicationsSection() {
   const navigate = useNavigate();
-  const [applications, setApplications] =
-    useState<DashboardApplication[]>([]);
 
-  const [loading, setLoading] =
-    useState(false);
+  const { data: response, isLoading: loading } = useQuery({
+    queryKey: ["recentApplications"],
+    queryFn: getRecentApplications,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
 
-  // ── Diagnostics ──────────────────────────────────────────────
-  const renderCountRef = useRef(0);
-  const effectRunCountRef = useRef(0);
-  const fetchCountRef = useRef(0);
-  renderCountRef.current += 1;
-  console.log(
-    `[${COMPONENT_NAME}] RENDER #${renderCountRef.current}`
-  );
-  // ─────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-  effectRunCountRef.current += 1;
-  const effectRun = effectRunCountRef.current;
-  console.log(
-    `[${COMPONENT_NAME}] useEffect "loadApplications" RUN #${effectRun} (dep array: []) — ` +
-    `component has rendered ${renderCountRef.current} time(s) total`
-  );
-
-  const loadApplications = async () => {
-    fetchCountRef.current += 1;
-    const fetchNum = fetchCountRef.current;
-    console.log(
-      `[${COMPONENT_NAME}] FETCH #${fetchNum} — getApplicantsByProgram triggered from effectRun #${effectRun}`
-    );
-    // Stack trace: shows exact JS call stack at the moment of fetch
-    console.trace(`[${COMPONENT_NAME}] FETCH #${fetchNum} stack trace`);
-    try {
-      setLoading(true);
-
-      const programsResponse =
-        await getMyPublishedPrograms();
-
-      const programs =
-        programsResponse?.data?.items ??
-        programsResponse?.data ??
-        [];
-
-      const allApplications = [];
-
-      for (const program of programs) {
-        const applicantsResponse =
-          await getApplicantsByProgram(
-            program.programId,
-            1,
-            5
-          );
-
-        const applicants =
-          applicantsResponse?.data?.items ?? [];
-
-        const mappedApplicants =
-          applicants.map((applicant: any) => ({
-            applicationId:
-              applicant.applicationId,
-
-            programId:
-              program.programId,
-
-            applicantName:
-              applicant.menteeName,
-
-            applicantAvatar:
-              applicant.menteeProfilePicture,
-
-            appliedAt:
-              applicant.appliedAt,
-
-            level:
-              applicant.level,
-
-            programName:
-              applicant.programName,
-          }));
-
-        allApplications.push(
-          ...mappedApplicants
-        );
-      }
-
-      allApplications.sort(
-        (a, b) =>
-          new Date(b.appliedAt).getTime() -
-          new Date(a.appliedAt).getTime()
-      );
-
-      setApplications(
-        allApplications.slice(0, 5)
-      );
-    } catch (error) {
-      console.error(`[${COMPONENT_NAME}] loadApplications error`, error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  console.log(
-    `[${COMPONENT_NAME}] Calling loadApplications() from effectRun #${effectRun}`
-  );
-  loadApplications();
-
-  // Cleanup: if this runs again, it means the effect re-ran (component unmounted/remounted)
-  return () => {
-    console.warn(
-      `[${COMPONENT_NAME}] useEffect CLEANUP for run #${effectRun} — ` +
-      `this means the component unmounted or the effect re-ran. ` +
-      `Total renders so far: ${renderCountRef.current}`
-    );
-  };
-}, []);
+  const applications: DashboardApplication[] = response?.data || [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">

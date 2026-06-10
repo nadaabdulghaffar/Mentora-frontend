@@ -1,71 +1,12 @@
 import Layout from "../shared/components/Layout";
 import ProgramCard from "../components/ProgramCard";
-
-interface SuggestedProgram {
-  id: string;
-  title: string;
-  description: string;
-  image?: string;
-  tag?: string;
-  phases?: string;
-  author?: {
-    avatar: string;
-    name: string;
-  };
-}
-
-const suggestedPrograms: SuggestedProgram[] = [
-  {
-    id: "program-1",
-    title: "UX Research Fundamentals",
-    description: "Master the art of user research with industry experts from top tech companies.",
-    image: "https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=900&q=80",
-    tag: "DESIGN",
-    phases: "8 PHASES",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Moraa",
-      name: "Moraa Zaki",
-    },
-  },
-  {
-    id: "program-2",
-    title: "Frontend Accelerator",
-    description: "A practical mentorship track for React, TypeScript, and production UI delivery.",
-    image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80",
-    tag: "DEVELOPMENT",
-    phases: "6 PHASES",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Omar",
-      name: "Omar Adel",
-    },
-  },
-  {
-    id: "program-3",
-    title: "Product Management Mastery",
-    description: "Learn product strategy, market research, and how to ship products that users love.",
-    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
-    tag: "PRODUCT",
-    phases: "7 PHASES",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Lina",
-      name: "Lina Chen",
-    },
-  },
-  {
-    id: "program-4",
-    title: "Advanced Data Science",
-    description: "Master machine learning, data analysis, and statistical modeling from industry leaders.",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80",
-    tag: "DATA SCIENCE",
-    phases: "8 PHASES",
-    author: {
-      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=Ahmed",
-      name: "Ahmed Karim",
-    },
-  },
-];
+import { useRecommendations } from "../hooks/useRecommendations";
+import { useNavigate } from "react-router-dom";
 
 const SuggestedProgramsPage = () => {
+  const navigate = useNavigate();
+  const { data: programs, isLoading, isError } = useRecommendations('programs', 20);
+
   return (
     <Layout>
       <section className="w-full pb-8 pt-4">
@@ -78,23 +19,38 @@ const SuggestedProgramsPage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {suggestedPrograms.map((program) => (
-            <ProgramCard
-              key={program.id}
-              variant="dual-buttons"
-              image={program.image}
-              tag={program.tag}
-              phases={program.phases}
-              title={program.title}
-              description={program.description}
-              author={program.author}
-              primaryButtonText="Apply"
-              secondaryButtonText="Details"
-              className="h-full"
-            />
-          ))}
-        </div>
+        {isLoading ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {[...Array(6)].map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-100 rounded-2xl h-96 w-full"></div>
+              ))}
+            </div>
+        ) : isError ? (
+            <div className="text-center py-12 text-gray-500">
+                <p>Failed to load recommendations. Please try again later.</p>
+            </div>
+        ) : !programs || programs.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+                <p>No program recommendations available at this time.</p>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              {programs.map((program) => (
+                <ProgramCard
+                  key={program.id}
+                  variant="dual-buttons"
+                  image={program.avatarUrl || undefined}
+                  tag={program.headline?.toUpperCase() || undefined}
+                  phases={`${program.aiMatchScore}% MATCHING`}
+                  title={program.name}
+                  description={program.description || ''}
+                  primaryButtonText="View Details"
+                  onPrimaryClick={() => navigate(`/applications/${program.id}?apply=1`)}
+                  className="h-full"
+                />
+              ))}
+            </div>
+        )}
       </section>
     </Layout>
   );

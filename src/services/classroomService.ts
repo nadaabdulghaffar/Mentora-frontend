@@ -18,6 +18,14 @@ export const classroomService = {
     return response.data;
   },
 
+  async getAllUpcomingSessions() {
+    const response = await apiClient.get(
+      `/classroom/sessions/upcoming/all`
+    );
+
+    return response.data;
+  },
+
    async getClassroom(programId: number) {
     const response = await apiClient.get(
       `/classroom/program/${programId}`
@@ -131,6 +139,14 @@ async attachRoadmapToProgram(
   async deleteClassroomRoadmapResource(programId: number) {
     const response = await apiClient.delete(
       `/classroom/program/${programId}/roadmap-resource`
+    );
+
+    return response.data;
+  },
+
+  async getClassroomCompletion(programId: number) {
+    const response = await apiClient.get(
+      `/classroom/program/${programId}/dashboard/completion`
     );
 
     return response.data;

@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import ProgramCard from "../../components/ProgramCard";
-import { joinCommunity, leaveCommunity } from "../../services/communityService";
 import type { ExploreItem } from "./exploreTypes";
+import ExploreMentorCard from "./components/ExploreMentorCard";
 
 type Props = {
   items: ExploreItem[];
@@ -15,7 +15,6 @@ type Props = {
 export default function ExploreItemGrid({
   items,
   loading = false,
-  onCommunityMembershipChange,
 }: Props) {
   const navigate = useNavigate();
 
@@ -37,69 +36,56 @@ export default function ExploreItemGrid({
 
   return (
     <>
-      {items.map((item) => (
-        <ProgramCard
-          key={`${item.tab}-${item.id}`}
-          variant={item.tab === "roadmaps" ? "simple-button" : "dual-buttons"}
-          image={item.image}
-          tag={item.tag}
-          phases={item.phases}
-          title={item.title}
-          description={item.description}
-          author={item.author}
-          primaryButtonText={
-            item.tab === "mentors"
-              ? "See Full Profile"
-              : item.tab === "programs"
+      {items.map((item) => {
+        const handlePrimaryClick = async () => {
+          if (item.tab === "communities") {
+            navigate(`/community/${item.id}`);
+          } else if (item.tab === "mentors") {
+            navigate(`/profile/${item.id}`);
+          } else if (item.tab === "programs") {
+            if (item.isApplied) navigate(`/classroom/${item.id}`);
+            else navigate(`/applications/${item.id}?apply=1`);
+          } else if (item.tab === "roadmaps") {
+            navigate(`/roadmap/${item.id}`);
+          }
+        };
+
+        if (item.tab === "mentors") {
+          return (
+            <ExploreMentorCard
+              key={`${item.tab}-${item.id}`}
+              item={item}
+              onClick={handlePrimaryClick}
+            />
+          );
+        }
+
+        return (
+          <ProgramCard
+            key={`${item.tab}-${item.id}`}
+            variant={item.tab === "roadmaps" ? "simple-button" : "dual-buttons"}
+            image={item.image}
+            tag={item.tag}
+            phases={item.phases}
+            durationBadge={item.durationBadge}
+            title={item.title}
+            description={item.description}
+            author={item.author}
+            primaryButtonText={
+              item.tab === "programs"
                 ? item.isApplied
                   ? "Join classroom"
-                  : "Apply"
+                  : "View Details"
                 : item.tab === "communities"
-                  ? item.isJoined
-                    ? "Leave Community"
-                    : "Join Community"
+                  ? "Explore"
                   : "View Roadmap"
-          }
-          secondaryButtonText={
-            item.tab === "mentors"
-              ? "Message"
-              : item.tab === "programs"
-                ? "Details"
-                : item.tab === "communities"
-                  ? "Preview"
-                  : "Details"
-          }
-          onPrimaryClick={async () => {
-            if (item.tab === "communities") {
-              try {
-                if (item.isJoined) {
-                  await leaveCommunity(item.id);
-                  onCommunityMembershipChange?.(item.id, false);
-                } else {
-                  await joinCommunity(item.id);
-                  onCommunityMembershipChange?.(item.id, true);
-                }
-              } catch (err) {
-                console.error("Failed to update community membership", err);
-              }
-            } else if (item.tab === "mentors") {
-              navigate(`/profile/${item.id}`);
-            } else if (item.tab === "programs") {
-              if (item.isApplied) navigate(`/classroom/${item.id}`);
-              else navigate(`/applications/${item.id}?apply=1`);
-            } else if (item.tab === "roadmaps") {
-              navigate(`/roadmap/${item.id}`);
             }
-          }}
-          onSecondaryClick={() => {
-            if (item.tab === "communities") navigate(`/community/${item.id}`);
-            if (item.tab === "programs") navigate(`/applications/${item.id}`);
-            if (item.tab === "roadmaps") navigate(`/roadmap/${item.id}`);
-          }}
-          hideHeaderImage={item.tab === "roadmaps"}
-          className="h-full"
-        />
-      ))}
+            onPrimaryClick={handlePrimaryClick}
+            hideHeaderImage={item.tab === "roadmaps"}
+            className="h-full"
+          />
+        );
+      })}
     </>
   );
 }

@@ -196,6 +196,8 @@ export interface RoadmapListItem {
   domainName?: string;
   subDomainName?: string;
   duration?: number;
+  targetLevelFrom?: number | null;
+  targetLevelTo?: number | null;
 }
 
 export interface LocalMaterial {

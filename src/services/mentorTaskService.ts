@@ -13,7 +13,8 @@ export const mentorTaskService = {
 
  async getProgramSubmissions(
   programId: number,
-  taskId?: number
+  taskId?: number,
+  status?: string
 ) {
 
   const response = await apiClient.get(
@@ -21,6 +22,7 @@ export const mentorTaskService = {
     {
       params: {
         taskId,
+        status,
       },
     }
   );

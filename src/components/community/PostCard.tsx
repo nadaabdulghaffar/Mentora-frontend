@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type { CommunityThread } from '../../pages/community/types';
 import { formatTimestamp, truncateText } from '../../pages/community/utils/threadUtils';
 import { buildCommunityPostShareUrl } from '../../pages/community/utils/shareUtils';
+import ConfirmationModal from '../modals/ConfirmationModal';
 import { ProfileAvatar } from '../profile/ProfileAvatar';
 import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
 
@@ -82,6 +83,7 @@ export const PostCard: React.FC<PostCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const [shareOpen, setShareOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
@@ -156,9 +158,11 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const handleDeleteClick = () => {
     closeMenu();
-    if (typeof window !== 'undefined' && !window.confirm('Delete this post? This cannot be undone.')) {
-      return;
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
     onThreadDelete?.(thread.id);
   };
 
@@ -401,6 +405,17 @@ export const PostCard: React.FC<PostCardProps> = ({
             </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Delete Post?"
+        message="Delete this post? This cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

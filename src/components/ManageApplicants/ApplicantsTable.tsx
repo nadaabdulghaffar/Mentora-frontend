@@ -2,6 +2,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { resolveProfilePictureUrl, getProfileAvatarFallback } from "../../utils/profileImageUrl";
 
 export default function ApplicantsTable({
   data,
@@ -61,6 +62,10 @@ export default function ApplicantsTable({
 
           const currentStatus =
             app.status;
+          const isLocked =
+  (currentStatus === "Accepted" ||
+    currentStatus === "Rejected") &&
+  app.isNotified;
 
           return (
             <div
@@ -82,13 +87,14 @@ export default function ApplicantsTable({
                 {/* NAME */}
                 <div className="flex items-center gap-4">
 
-                  <img
-                    src={
-                      app.menteeProfilePicture ||
-                      "https://via.placeholder.com/100"
-                    }
-                    className="w-14 h-14 rounded-full object-cover"
-                  />
+                 <img
+  src={
+    app.menteeProfilePicture
+      ? resolveProfilePictureUrl(app.menteeProfilePicture)
+      : getProfileAvatarFallback(app.menteeName)
+  }
+  className="w-14 h-14 rounded-full object-cover"
+/>
 
                   <span className="font-semibold text-[17px]">
                     {app.menteeName}
@@ -133,8 +139,7 @@ export default function ApplicantsTable({
                   <div className="relative">
 
                     <button
-                      disabled={(currentStatus === "Accepted" || currentStatus === "Rejected") && app.isNotified}
-                      onClick={() =>
+disabled={isLocked}                      onClick={() =>
                         setOpenDropdown(
                           openDropdown ===
                           app.applicationId
@@ -160,7 +165,7 @@ export default function ApplicantsTable({
 
                       {currentStatus}{(currentStatus === "Accepted" || currentStatus === "Rejected") && app.isNotified && " - Notified"}
 
-                      {!(currentStatus === "Accepted" || currentStatus === "Rejected" && app.isNotified) && <ChevronDown size={16} />}
+                     {!isLocked && <ChevronDown size={16} />}
 
                     </button>
 

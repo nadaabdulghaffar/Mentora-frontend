@@ -147,15 +147,15 @@ const Sidebar = () => {
                     />
                 </div>
 
-                <nav className="space-y-7">
+                <nav className="space-y-1.5 mt-2">
                   <SidebarItem
-                    icon={<Home size={24} />}
+                    icon={<Home size={26} />}
                     label="Homepage"
                     onClick={goHome}
                     active={location.pathname === '/dashboard' || location.pathname === '/mentor/dashboard'}
                   />
                    <SidebarItem
-                      icon={<Compass size={24} />}
+                      icon={<Compass size={26} />}
                       label="Explore"
                       onClick={goToExplore}
                       active={
@@ -164,42 +164,40 @@ const Sidebar = () => {
                       }
                     />
                     <SidebarItem
-                      icon={<Mail size={24} />}
+                      icon={<Mail size={26} />}
                       label="Messages"
                       onClick={goToMessages}
                       active={location.pathname === '/messages'}
                       badgeCount={unreadMessageCount}
                     />
-                    {userRole === "mentee" && (
-                      <SidebarItem
-                        icon={
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#A8E6CF]">
-                            <img
-                              src={mentoRobot}
-                              alt=""
-                              className="h-full w-full object-contain"
-                            />
-                          </span>
-                        }
-                        label="Mento AI"
-                        onClick={goToMentoAI}
-                        active={location.pathname === "/mento-ai"}
-                      />
-                    )}
+                    <SidebarItem
+                      icon={
+                        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-[#A8E6CF]">
+                          <img
+                            src={mentoRobot}
+                            alt=""
+                            className="h-full w-full object-contain"
+                          />
+                        </span>
+                      }
+                      label="Mento AI"
+                      onClick={goToMentoAI}
+                      active={location.pathname === "/mento-ai"}
+                    />
                     <SidebarItem 
-                      icon={<Users size={24} />} 
+                      icon={<Users size={26} />} 
                       label="Community"
                       onClick={goToCommunity}
                       active={location.pathname === '/community'}
                     />
                     <SidebarItem
-                      icon={<FileText size={24} />}
+                      icon={<FileText size={26} />}
                       label="Applications"
                       onClick={goToApplications}
                       active={location.pathname.startsWith('/applications')}
                     />
                   <SidebarItem
-                    icon={<BookOpen size={24} />}
+                    icon={<BookOpen size={26} />}
                     label="My Programs"
                     onClick={goToMyPrograms}
                     active={location.pathname === '/my-programs'}
@@ -207,7 +205,7 @@ const Sidebar = () => {
 
                   {userRole === 'mentor' && (
                     <SidebarItem
-                      icon={<Layers3 size={24} />}
+                      icon={<Layers3 size={26} />}
                       label="My Roadmaps"
                       onClick={goToMyRoadmaps}
                       active={
@@ -304,8 +302,10 @@ interface SidebarItemProps {
 const SidebarItem = ({ icon, label, onClick, active = false, badgeCount }: SidebarItemProps) => {
     return (
     <div
-      className={`flex items-center justify-between cursor-pointer transition ${
-        active ? 'text-primary' : 'text-gray-600 hover:text-primary'
+      className={`group flex w-full items-center justify-between px-4 py-3 cursor-pointer rounded-xl transition-all duration-200 ease-in-out ${
+        active 
+          ? 'bg-primary/10 text-primary font-semibold shadow-sm' 
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 font-medium'
       }`}
       onClick={onClick}
       role="button"
@@ -319,10 +319,10 @@ const SidebarItem = ({ icon, label, onClick, active = false, badgeCount }: Sideb
     >
       <div className="flex items-center gap-3">
         {icon}
-        <span className="text-base font-medium">{label}</span>
+        <span className={`text-[17px] ${active ? 'font-semibold' : 'font-medium'}`}>{label}</span>
       </div>
       {!!badgeCount && badgeCount > 0 && (
-        <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[0.65rem] font-bold text-white bg-red-500 rounded-full">
+        <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[0.65rem] font-bold text-white bg-red-500 rounded-full shadow-sm">
           {badgeCount > 99 ? '99+' : badgeCount}
         </span>
       )}

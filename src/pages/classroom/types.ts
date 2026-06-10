@@ -90,6 +90,8 @@ export type MentorWorkflowTask = {
   submissions: string;
   avgScore: number;
   avgLabel: string;
+  taskType?: 'Classroom' | 'Roadmap';
+  taskId?: number;
 };
 
 export type MentorTaskPhase = {

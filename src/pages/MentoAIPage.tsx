@@ -1,7 +1,27 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CheckCheck, Send } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Send } from "lucide-react";
 import mentoRobot from "../assets/images/Gemini_Generated_Image_oov0p2oov0p2oov0 1.png";
 import Layout from "../shared/components/Layout";
+import { authAPI } from "../services/authService";
+import {
+  sendMenteeChat,
+  sendMentorChat,
+  type ChatRequestDto,
+  type ChatResponseDto,
+  type ChatMaterialItem,
+  type ChatStatItem,
+  type ChatRecommendationItem,
+  type ChatProgramRecommendationItem
+} from "../services/chatService";
+
+import { ChatBubble } from "../components/chat/ChatBubble";
+import { ChatMaterialsWidget } from "../components/chat/ChatMaterialsWidget";
+import { ChatStatsWidget } from "../components/chat/ChatStatsWidget";
+import { ChatRecommendationsWidget } from "../components/chat/ChatRecommendationsWidget";
+import { MENTEE_CHAT_CHIPS, MENTOR_CHAT_CHIPS } from "../constants/chatbotPrompts";
+
+const MAX_HISTORY_MESSAGES = 10;
 
 type ChatRole = "user" | "assistant";
 
@@ -10,18 +30,20 @@ type ChatMessage = {
   role: ChatRole;
   text: string;
   time: string;
+  responseType?: 'text' | 'materials' | 'recommendation' | 'roadmap';
+  materials?: ChatMaterialItem[];
+  stats?: ChatStatItem[];
+  mentors?: ChatRecommendationItem[];
+  programs?: ChatProgramRecommendationItem[];
 };
-
-const QUICK_PROMPTS: { label: string; className: string }[] = [
-  { label: "How to use Mentora", className: "bg-[#FFF9DB] text-gray-800" },
-  { label: "Recommend Mentorship program", className: "bg-[#E8F5E9] text-gray-800" },
-  { label: "Recommend Mentor", className: "bg-[#FFE8D6] text-gray-800" },
-  { label: "ٌRecommend materials", className: "bg-[#FCE4EC] text-gray-800" },
-  { label: "Explain a topic", className: "bg-[#E0F7FA] text-gray-800" },
-];
 
 function formatTime(d: Date) {
   return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function detectLanguage(text: string): "ar" | "en" {
+  // Simple Arabic character detection
+  return /[\u0600-\u06FF]/.test(text) ? "ar" : "en";
 }
 
 const MentoAvatar = ({ size = "sm" }: { size?: "sm" | "lg" }) => {
@@ -52,28 +74,56 @@ const MentoAIPage = () => {
   const [pending, setPending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const currentUser = authAPI.getCurrentUser();
+  const userRole = currentUser?.role?.toLowerCase() || '';
+  const isBoth = userRole === 'both';
+  const [activeRoleMode, setActiveRoleMode] = useState<'mentee' | 'mentor'>(userRole === 'mentor' ? 'mentor' : 'mentee');
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
     });
   }, []);
 
-  const pushAssistant = useCallback(
-    (text: string) => {
-      setMessages((prev) => [
-        ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", text, time: formatTime(new Date()) },
-      ]);
-      setPending(false);
-    },
-    []
-  );
+  const pushAssistantMessage = useCallback((response: ChatResponseDto) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        text: response.answer || "",
+        time: formatTime(new Date()),
+        responseType: response.response_type,
+        materials: response.materials,
+        stats: response.stats,
+        mentors: response.recommendations,
+        programs: response.program_recommendations
+      },
+    ]);
+  }, []);
+
+  const pushErrorBubble = useCallback(() => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `err-${Date.now()}`,
+        role: "assistant",
+        text: "I'm currently experiencing high traffic or offline. Please try again in a moment.",
+        time: formatTime(new Date()),
+        responseType: "text"
+      },
+    ]);
+  }, []);
 
   const sendText = useCallback(
-    (raw: string) => {
+    async (raw: string) => {
       const text = raw.trim();
       if (!text || pending) return;
 
+      // Add user message to UI immediately
       setMessages((prev) => [
         ...prev,
         { id: `u-${Date.now()}`, role: "user", text, time: formatTime(new Date()) },
@@ -81,18 +131,54 @@ const MentoAIPage = () => {
       setInput("");
       setPending(true);
 
-      window.setTimeout(() => {
-        pushAssistant(
-          "I can walk you through Mentora, suggest programs or mentors, outline a roadmap, or explain a topic. Tell me what you want to focus on next."
-        );
-      }, 700);
+      try {
+        // Trim history for payload based on the messages state PRIOR to adding the new user message
+        // This is okay because the new message is passed in the "message" field.
+        const historyPayload = messages.slice(-MAX_HISTORY_MESSAGES).map(m => ({
+          role: m.role,
+          content: m.text
+        }));
+
+        const language = detectLanguage(text);
+
+        const dto: ChatRequestDto = {
+          message: text,
+          language,
+          history: historyPayload
+        };
+
+        let response: ChatResponseDto;
+        if (activeRoleMode === 'mentor') {
+          response = await sendMentorChat(dto);
+        } else {
+          response = await sendMenteeChat(dto);
+        }
+
+        pushAssistantMessage(response);
+      } catch (err) {
+        console.error("Chat API Error:", err);
+        pushErrorBubble();
+      } finally {
+        setPending(false);
+      }
     },
-    [pending, pushAssistant]
+    [pending, messages, activeRoleMode, pushAssistantMessage, pushErrorBubble]
   );
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  const autoSendExecuted = useRef(false);
+
+  useEffect(() => {
+    if (location.state?.autoSendPrompt && !autoSendExecuted.current) {
+      autoSendExecuted.current = true;
+      const prompt = location.state.autoSendPrompt;
+      navigate(location.pathname, { replace: true, state: {} });
+      sendText(prompt);
+    }
+  }, [location.state?.autoSendPrompt, location.pathname, navigate, sendText]);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -104,14 +190,38 @@ const MentoAIPage = () => {
   return (
     <Layout showTopBar={false}>
       <div className="flex h-[calc(100dvh-4.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm md:h-[calc(100dvh-5rem)] lg:h-[calc(100dvh-5.5rem)]">
-        <header className="shrink-0 flex items-center gap-3 border-b border-gray-200 px-5 py-4">
-          <MentoAvatar />
-          <div>
-            <h1 className="text-lg font-bold text-[#2E2A47]">Mento AI</h1>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-              Your AI assistant
-            </p>
+        <header className="shrink-0 flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <MentoAvatar />
+            <div>
+              <h1 className="text-lg font-bold text-[#2E2A47]">Mento AI</h1>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                Your AI assistant
+              </p>
+            </div>
           </div>
+          {isBoth && (
+            <div className="flex items-center gap-2 rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setActiveRoleMode('mentee')}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  activeRoleMode === 'mentee' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Mentee Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveRoleMode('mentor')}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  activeRoleMode === 'mentor' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Mentor Mode
+              </button>
+            </div>
+          )}
         </header>
 
         <div
@@ -139,7 +249,7 @@ const MentoAIPage = () => {
               </div>
 
               <div className="flex flex-wrap justify-center gap-2">
-                {QUICK_PROMPTS.map((p) => (
+                {(activeRoleMode === 'mentor' ? MENTOR_CHAT_CHIPS : MENTEE_CHAT_CHIPS).map((p) => (
                   <button
                     key={p.label}
                     type="button"
@@ -158,31 +268,30 @@ const MentoAIPage = () => {
                 Today
               </p>
               <div className="flex flex-col gap-6">
-                {messages.map((m) =>
-                  m.role === "user" ? (
-                    <div key={m.id} className="flex flex-col items-end gap-1">
-                      <div
-                        className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-3 text-sm leading-relaxed text-white shadow-sm"
-                        style={{ backgroundColor: "#5B5091" }}
-                      >
-                        {m.text}
-                      </div>
-                      <div className="flex items-center gap-1.5 pr-1 text-xs text-gray-400">
-                        <span>{m.time}</span>
-                        <CheckCheck className="h-3.5 w-3.5 text-primary" aria-hidden />
-                      </div>
+                {messages.map((m) => (
+                  <div key={m.id} className="flex flex-col w-full gap-1">
+                    <ChatBubble role={m.role} text={m.text} time={m.time} isMarkdown={m.role === 'assistant'} />
+                    {m.role === 'assistant' && m.stats && m.stats.length > 0 && (
+                      <ChatStatsWidget stats={m.stats} />
+                    )}
+                    {m.role === 'assistant' && m.materials && m.materials.length > 0 && (
+                      <ChatMaterialsWidget materials={m.materials} />
+                    )}
+                    {m.role === 'assistant' && (m.mentors || m.programs) && (
+                      <ChatRecommendationsWidget mentors={m.mentors} programs={m.programs} />
+                    )}
+                  </div>
+                ))}
+                
+                {pending && (
+                  <div className="flex gap-3">
+                    <MentoAvatar />
+                    <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-gray-200 bg-white px-4 py-4 shadow-sm h-[46px]">
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '0ms' }} />
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '150ms' }} />
+                      <div className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style={{ animationDelay: '300ms' }} />
                     </div>
-                  ) : (
-                    <div key={m.id} className="flex gap-3">
-                      <MentoAvatar />
-                      <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-800 shadow-sm">
-                          {m.text}
-                        </div>
-                        <span className="pl-1 text-xs text-gray-400">{m.time}</span>
-                      </div>
-                    </div>
-                  )
+                  </div>
                 )}
               </div>
             </>

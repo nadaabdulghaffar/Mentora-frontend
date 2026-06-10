@@ -6,6 +6,7 @@ import type {
   MentorReviewsResponse,
   SubmitFeedbackRequest,
   UpdateFeedbackRequest,
+  SentimentSummaryDto,
 } from '../pages/profile/feedback/types';
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -89,4 +90,18 @@ export async function deleteFeedback(feedbackId: string): Promise<void> {
   if (!response.data?.success) {
     throw new Error(response.data?.message || 'Failed to delete feedback.');
   }
+}
+
+export async function getMentorFeedbackSummary(
+  mentorId: string
+): Promise<SentimentSummaryDto> {
+  const response = await apiClient.get<ApiResponse<SentimentSummaryDto>>(
+    `/Analytics/mentor-feedback-summary/${mentorId}`
+  );
+
+  if (!response.data?.success || !response.data.data) {
+    throw new Error(response.data?.message || 'Failed to load feedback analytics.');
+  }
+
+  return response.data.data;
 }

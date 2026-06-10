@@ -81,7 +81,8 @@ export const TextAreaField: React.FC<{
   onChange: (v: string) => void
   rows?: number
   placeholder?: string
-}> = ({ id, value, onChange, rows = 5, placeholder }) => (
+  maxLength?: number
+}> = ({ id, value, onChange, rows = 5, placeholder, maxLength }) => (
   <textarea
     id={id}
     value={value}
@@ -89,6 +90,7 @@ export const TextAreaField: React.FC<{
     className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-base text-slateInk outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
     rows={rows}
     placeholder={placeholder}
+    maxLength={maxLength}
   />
 )
 

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Calendar, Upload, X } from 'lucide-react';
+import { useRef, useState, useEffect } from 'react';
+import { Upload, X } from 'lucide-react';
 import {
   extractErrorMessage,
   uploadTaskAttachment,
@@ -17,6 +17,7 @@ type MentorNewTaskModalProps = {
   onClose: () => void;
   onPublish: (values: CreateClassroomTaskFormValues) => void;
   isPublishing?: boolean;
+  initialData?: CreateClassroomTaskFormValues;
 };
 
 const labelClass =
@@ -29,6 +30,7 @@ export default function MentorNewTaskModal({
   onClose,
   onPublish,
   isPublishing = false,
+  initialData,
 }: MentorNewTaskModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
@@ -39,6 +41,49 @@ export default function MentorNewTaskModal({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setTitle(initialData.title || '');
+        setDescription(initialData.description || '');
+        
+        // If initialData.deadline has a time part, just take the YYYY-MM-DD
+        const formattedDeadline = initialData.deadline 
+          ? initialData.deadline.split('T')[0]
+          : '';
+        setDeadline(formattedDeadline);
+
+        setAttachmentUrl(initialData.attachmentUrl || '');
+        // Extract filename from URL or set generic name
+        if (initialData.attachmentUrl) {
+          const parts = initialData.attachmentUrl.split('/');
+          setAttachmentName(parts[parts.length - 1] || 'Attached file');
+        } else {
+          setAttachmentName('');
+        }
+      } else {
+        setTitle('');
+        setDescription('');
+        setDeadline('');
+        setAttachmentUrl('');
+        setAttachmentName('');
+      }
+      setUploadError(null);
+      setSubmitAttempted(false);
+    } else {
+      setTitle('');
+      setDescription('');
+      setDeadline('');
+      setAttachmentUrl('');
+      setAttachmentName('');
+      setUploadError(null);
+      setSubmitAttempted(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) {
     return null;
@@ -121,7 +166,7 @@ export default function MentorNewTaskModal({
       title: title.trim(),
       description: description.trim(),
       deadline,
-      attachmentUrl: attachmentUrl.trim() || undefined,
+      attachmentUrl: attachmentUrl.trim() || "", // Send empty string instead of undefined to clear it
     });
   };
 
@@ -134,7 +179,7 @@ export default function MentorNewTaskModal({
       >
         <div className="flex items-start justify-between border-b border-[#ECEFF6] px-6 py-5">
           <h2 id="mentor-new-task-title" className="text-xl font-bold text-[#1F2432]">
-            New Task
+            {initialData ? 'Edit Task' : 'New Task'}
           </h2>
           <button
             type="button"
@@ -185,20 +230,15 @@ export default function MentorNewTaskModal({
             <label htmlFor="mentor-new-task-deadline" className={labelClass}>
               Deadline
             </label>
-            <div className="relative">
-              <input
-                id="mentor-new-task-deadline"
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className={`${inputClass} pr-11 [color-scheme:light] ${deadlineError ? 'border-[#E4A4B0]' : ''}`}
-              />
-              <Calendar
-                size={18}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8A91A5]"
-                aria-hidden
-              />
-            </div>
+<input
+  id="mentor-new-task-deadline"
+  type="date"
+  value={deadline}
+  onChange={(e) => setDeadline(e.target.value)}
+  className={`${inputClass} [color-scheme:light] ${
+    deadlineError ? 'border-[#E4A4B0]' : ''
+  }`}
+/>
             {deadlineError ? (
               <p className="mt-1 text-xs text-[#AF2F4D]">{deadlineError}</p>
             ) : null}
@@ -229,9 +269,24 @@ export default function MentorNewTaskModal({
             </button>
 
             {attachmentName ? (
-              <p className="mt-2 text-xs font-medium text-[#0E7A5F]">
-                Attached: {attachmentName}
-              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-[#0E7A5F]">
+                  Attached: {attachmentName}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachmentUrl('');
+                    setAttachmentName('');
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="text-xs font-semibold text-[#AF2F4D] hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
             ) : null}
 
             {uploadError ? (
@@ -254,7 +309,7 @@ export default function MentorNewTaskModal({
             onClick={handlePublish}
             className="rounded-xl bg-[#5E4BC5] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4F3DB0] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isPublishing ? 'Publishing...' : 'Publish Task'}
+            {isPublishing ? (initialData ? 'Saving...' : 'Publishing...') : (initialData ? 'Save Changes' : 'Publish Task')}
           </button>
         </div>
       </div>

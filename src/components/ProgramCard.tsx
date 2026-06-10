@@ -10,6 +10,7 @@ export interface ProgramCardProps {
   image?: string;
   tag?: string;  
   phases?: string;
+  durationBadge?: string;
   title: string;
   description: string;
   progress?: number;
@@ -19,19 +20,18 @@ export interface ProgramCardProps {
   hideAuthorAvatar?: boolean;
   hideHeaderImage?: boolean;
   primaryButtonText?: string;
-  secondaryButtonText?: string;
   onPrimaryClick?: () => void;
-  onSecondaryClick?: () => void;
   className?: string;
 }
 
-const DEFAULT_PROGRAM_IMAGE = 'https://images.unsplash.com/photo-1558655146-d09347e92766?auto=format&fit=crop&w=900&q=80';
+
 
 export const ProgramCard: React.FC<ProgramCardProps> = ({
   variant = 'simple-button',
   image,
   tag,
   phases,
+  durationBadge,
   title,
   description,
   progress,
@@ -41,62 +41,50 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
   hideAuthorAvatar = false,
   hideHeaderImage = false,
   primaryButtonText = 'Apply',
-  secondaryButtonText = 'Details',
   onPrimaryClick,
-  onSecondaryClick,
   className = '',
 }) => {
   const progressValue = Math.max(0, Math.min(100, progress ?? 0));
   const isProgressVariant = variant === 'progress';
   const isSimpleButtonVariant = variant === 'simple-button';
   const shouldShowProgress = progress !== undefined;
-  const headerImage = image ?? DEFAULT_PROGRAM_IMAGE;
-  const hasImageHeader =
-    !hideHeaderImage && (variant === 'dual-buttons' ||
-    (isProgressVariant && Boolean(headerImage)) ||
-    (isSimpleButtonVariant && Boolean(headerImage)));
-  const headlineLarge = variant === 'dual-buttons' || (isProgressVariant && Boolean(image));
+  const headlineLarge = variant === 'dual-buttons' || isProgressVariant;
 
   return (
-    <article className={`overflow-hidden rounded-2xl border border-[#D8DBE4] bg-white shadow-[0_2px_8px_rgba(22,29,47,0.06)] ${className}`}>
-      {hasImageHeader && headerImage && (
-        <div className="h-40 w-full bg-[#CDC2F2] overflow-hidden sm:h-44">
-          <img
-            src={headerImage}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
-        </div>
-      )}
-
-      <div className={`p-3.5 ${isSimpleButtonVariant ? 'space-y-2.5 md:p-3.5' : 'space-y-2.5'}`}>
-        {(tag || phases) && (
+    <article className={`flex flex-col h-full overflow-hidden rounded-2xl border border-[#D8DBE4] bg-white shadow-[0_2px_8px_rgba(22,29,47,0.06)] ${className}`}>
+      <div className={`flex flex-col flex-1 p-5 ${isSimpleButtonVariant ? 'space-y-3' : 'space-y-3'}`}>
+        {(tag || phases || durationBadge) && (
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {tag && (
-                <span className="rounded-full bg-[#F4F0FF] px-3 py-1 text-xs font-semibold tracking-wide text-[#6B57B5]">
+                <span className="rounded-full bg-[#F4F0FF] px-3 py-1 text-xs font-semibold tracking-wide text-[#6B57B5] uppercase">
                   {tag}
                 </span>
               )}
               {phases && (
-                <span className="text-xs font-medium text-[#9AA3B6]">{phases}</span>
+                <span className="rounded-full bg-[#EAF9F7] px-3 py-1 text-xs font-semibold tracking-wide text-[#2EA594] uppercase">
+                  {phases}
+                </span>
+              )}
+              {durationBadge && (
+                <span className="rounded-full bg-[#EEF2FF] px-3 py-1 text-xs font-semibold tracking-wide text-[#4338CA] uppercase">
+                  {durationBadge}
+                </span>
               )}
             </div>
           </div>
         )}
 
         <h3
-          className={`mt-1.5 font-extrabold leading-tight text-[#1F2432] ${
-            headlineLarge ? 'min-h-0 text-[22px] sm:text-[22px]' : 'text-2xl sm:text-3xl'
-          } ${variant === 'dual-buttons' ? 'min-h-[62px]' : ''}`}
+          className={`mt-1.5 font-bold leading-tight text-[#1F2432] line-clamp-2 ${
+            headlineLarge ? 'text-lg sm:text-xl' : 'text-xl sm:text-[22px]'
+          }`}
         >
           {title}
         </h3>
 
         <p
-          className={`mt-1.5 whitespace-pre-wrap break-words text-[#5D6A85] ${isProgressVariant || isSimpleButtonVariant ? 'text-sm' : 'text-[15px]'} ${
-            variant === 'dual-buttons' ? 'min-h-[52px]' : ''
-          }`}
+          className={`mt-1.5 line-clamp-2 break-words text-[#5D6A85] ${isProgressVariant || isSimpleButtonVariant ? 'text-sm' : 'text-[15px]'}`}
         >
           {description}
         </p>
@@ -131,21 +119,10 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
           </div>
         )}
 
-        <div className="flex gap-3 items-center">
-          {variant === 'dual-buttons' && (
-            <button
-              className="min-w-[88px] h-[50px] rounded-xl border border-[#C4CAD7] px-3.5 text-sm font-semibold text-[#2E3547] transition hover:bg-[#F5F7FB]"
-              onClick={onSecondaryClick}
-              type="button"
-            >
-              {secondaryButtonText}
-            </button>
-          )}
+        <div className="flex gap-3 items-center mt-auto pt-4">
 
           <button
-            className={`${isSimpleButtonVariant ? 'h-[46px]' : 'h-[50px]'} rounded-xl bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary-dark ${
-              variant === 'dual-buttons' ? 'flex-1' : 'w-full'
-            }`}
+            className={`h-[50px] rounded-xl bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary-dark w-full`}
             onClick={onPrimaryClick}
             type="button"
           >

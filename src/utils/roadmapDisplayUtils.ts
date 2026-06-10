@@ -24,6 +24,23 @@ export function formatRoadmapDuration(duration?: number | null): string {
   return weeks === 1 ? '1 week' : `${weeks} weeks`;
 }
 
+export function formatTargetLevel(level?: number | null): string {
+  if (level == null) return '';
+  switch (level) {
+    case 1:
+      return 'Beginner';
+    case 2:
+      return 'Junior';
+    case 3:
+      return 'Mid';
+    case 4:
+      return 'Senior';
+    default:
+      return '';
+  }
+}
+
+
 export async function loadRoadmapDomainNameMaps(): Promise<DomainNameMaps> {
   if (cachedMaps) {
     return cachedMaps;
@@ -176,22 +193,12 @@ export function roadmapDetailsToListItem(
       roadmap.skillDomainId != null
         ? ((Math.max(1, roadmap.skillDomainId) - 1) % 4) + 1
         : 1,
+    targetLevelFrom: roadmap.targetLevelFrom,
+    targetLevelTo: roadmap.targetLevelTo,
     ...meta,
   };
 }
 
-export function formatRoadmapExplorePhases(meta: {
-  domainName?: string;
-  subDomainName?: string;
-  duration?: number;
-}): string {
-  const parts: string[] = [];
-  if (meta.domainName) parts.push(meta.domainName);
-  if (meta.subDomainName) parts.push(meta.subDomainName);
-  const duration = formatRoadmapDuration(meta.duration);
-  if (duration) parts.push(duration);
-  return parts.join(' · ') || 'Roadmap';
-}
 
 export function exploreRoadmapToListItem(
   item: {

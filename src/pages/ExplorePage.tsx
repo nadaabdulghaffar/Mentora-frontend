@@ -222,7 +222,7 @@ const ExplorePage: React.FC = () => {
         const roadmapItems = await mapRoadmapsToExploreItems(
           data.roadmaps.items
         );
-        const communityItems = mapExploreCommunitiesToItems(
+        const communityItems = await mapExploreCommunitiesToItems(
           data.communities.items as ExploreCommunityRow[]
         );
 
@@ -330,7 +330,7 @@ const ExplorePage: React.FC = () => {
           const res = await exploreCommunities(apiParams);
           if (!mounted) return;
           setTabItems(
-            mapExploreCommunitiesToItems(
+            await mapExploreCommunitiesToItems(
               res.items as ExploreCommunityRow[]
             )
           );

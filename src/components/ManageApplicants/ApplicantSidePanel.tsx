@@ -4,6 +4,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { resolveProfilePictureUrl, getProfileAvatarFallback } from "../../utils/profileImageUrl";
 
 export default function ApplicantSidePanel({
   applicant,
@@ -14,6 +15,8 @@ export default function ApplicantSidePanel({
 }: any) {
 
   if (!applicant) return null;
+
+  console.log(applicant.menteeProfilePicture);
 
   const levelStyles: any = {
     Senior:
@@ -108,9 +111,10 @@ export default function ApplicantSidePanel({
 
             <img
               src={
-                applicant.menteeProfilePicture ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(applicant.menteeName)}&background=random`
-              }
+  applicant.menteeProfilePicture
+    ? resolveProfilePictureUrl(applicant.menteeProfilePicture)
+    : getProfileAvatarFallback(applicant.menteeName)
+}
               className="
                 w-24 h-24 rounded-full
                 mx-auto border-4
@@ -226,27 +230,7 @@ export default function ApplicantSidePanel({
 
               </div>
 
-              {/* EDUCATION */}
-              <div className="
-                flex justify-between
-                gap-4
-              ">
 
-                <span className="text-gray-500">
-                  Education
-                </span>
-
-                <span className="
-                  font-medium text-right
-                  break-words
-                ">
-
-                  {applicant.education ||
-                    "Not provided"}
-
-                </span>
-
-              </div>
 
             </div>
 
@@ -339,94 +323,7 @@ export default function ApplicantSidePanel({
 
         </div>
 
-        {/* STICKY ACTIONS */}
-        <div
-          className="
-            border-t bg-white
-            px-6 py-4
-            space-y-3
-            sticky bottom-0
-          "
-        >
 
-          {/* ACCEPT */}
-          <button
-            disabled={
-              applicant.status ===
-              "Accepted"
-            }
-            onClick={() =>
-              onAccept(
-                applicant.applicationId
-              )
-            }
-            className={`
-              w-full flex items-center
-              justify-center gap-2
-              py-3 rounded-xl
-              font-medium transition
-              ${
-                applicant.status ===
-                "Accepted"
-                  ? `
-                    bg-gray-200
-                    text-gray-400
-                    cursor-not-allowed
-                  `
-                  : `
-                    bg-[#1FA38A]
-                    text-white
-                    hover:opacity-90
-                  `
-              }
-            `}
-          >
-
-            <CheckCircle size={18} />
-
-            Accept Application
-
-          </button>
-
-          {/* REJECT */}
-          <button
-            disabled={
-              applicant.status ===
-              "Rejected"
-            }
-            onClick={() =>
-              onReject(
-                applicant.applicationId
-              )
-            }
-            className={`
-              w-full flex items-center
-              justify-center gap-2
-              py-3 rounded-xl
-              font-medium transition border
-              ${
-                applicant.status ===
-                "Rejected"
-                  ? `
-                    bg-gray-100
-                    text-gray-400
-                    cursor-not-allowed
-                  `
-                  : `
-                    text-gray-600
-                    hover:bg-gray-50
-                  `
-              }
-            `}
-          >
-
-            <XCircle size={18} />
-
-            Reject Application
-
-          </button>
-
-        </div>
 
       </div>
     </>

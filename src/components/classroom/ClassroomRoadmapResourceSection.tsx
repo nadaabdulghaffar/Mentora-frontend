@@ -1,6 +1,8 @@
 import { Download, ExternalLink, FileText, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "react-hot-toast";
 
+import ConfirmationModal from "../modals/ConfirmationModal";
 import { classroomService } from "../../services/classroomService";
 import { toAbsoluteFileUrl } from "../../services/messagingService";
 
@@ -30,6 +32,9 @@ const ClassroomRoadmapResourceSection = ({
   onReplace,
   onResourceChanged,
 }: ClassroomRoadmapResourceSectionProps) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const resolveFileUrl = (fileUrl?: string | null) => {
     if (!fileUrl?.trim()) {
       return null;
@@ -69,13 +74,13 @@ const ClassroomRoadmapResourceSection = ({
     window.open(url.trim(), "_blank", "noopener,noreferrer");
   };
 
-  const handleDelete = async () => {
-    const confirmed = window.confirm("Remove this classroom roadmap resource?");
-    if (!confirmed) {
-      return;
-    }
+  const handleDeleteClick = () => {
+    setShowConfirmModal(true);
+  };
 
+  const handleConfirmDelete = async () => {
     try {
+      setIsDeleting(true);
       const response = await classroomService.deleteClassroomRoadmapResource(programId);
 
       if (!response?.success) {
@@ -83,6 +88,7 @@ const ClassroomRoadmapResourceSection = ({
       }
 
       toast.success("Classroom roadmap resource removed.");
+      setShowConfirmModal(false);
       await onResourceChanged();
     } catch (error: any) {
       toast.error(
@@ -90,6 +96,8 @@ const ClassroomRoadmapResourceSection = ({
           error?.message ||
           "Failed to remove resource."
       );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -118,7 +126,7 @@ const ClassroomRoadmapResourceSection = ({
             )}
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               className="inline-flex items-center gap-2 rounded-xl border border-[#F2C6C6] bg-[#FFF5F5] px-4 py-2 text-sm font-semibold text-[#C0392B] transition hover:bg-[#FFECEC]"
             >
               <Trash2 className="h-4 w-4" />
@@ -181,6 +189,18 @@ const ClassroomRoadmapResourceSection = ({
           </>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowConfirmModal(false)}
+        title="Remove Resource?"
+        message="Remove this classroom roadmap resource? This cannot be undone."
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </section>
   );
 };

@@ -9,8 +9,7 @@ export function toExploreQueryParams(
     query.SearchQuery = params.searchQuery;
   if (params.domainId != null) query.DomainId = params.domainId;
   if (params.subDomainId != null) query.SubDomainId = params.subDomainId;
-  if (params.recommendedForYou != null)
-    query.RecommendedForYou = params.recommendedForYou;
+
   if (params.pageNumber != null) query.PageNumber = params.pageNumber;
   if (params.pageSize != null) query.PageSize = params.pageSize;
   if (params.openedNow != null) query.OpenedNow = params.openedNow;

@@ -11,7 +11,7 @@ import {
   getMyPublishedPrograms,
   mapProgramResponseToFormData,
   resolveProgramImageUrl,
-  unpublishProgram,
+  deleteProgram,
   getMyApplications,
   withdrawApplication,
 } from "../services/programService";
@@ -19,6 +19,7 @@ import {
 import authAPI from "../services/authService";
 import type { AuthUser } from "../types/api";
 import { toast } from "react-hot-toast";
+import ConfirmationModal from "../components/modals/ConfirmationModal";
 
 type MyApplicationItem = {
   id: string;
@@ -101,6 +102,7 @@ const [editingInitialValues, setEditingInitialValues] =
 
 const [editLoading, setEditLoading] = useState(false);
 const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+const [programToDelete, setProgramToDelete] = useState<string | null>(null);
 
 const [withdrawTargetId, setWithdrawTargetId] = useState<string | null>(null);
 const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -347,38 +349,26 @@ const closeEditModal = () => {
     await loadMentorPrograms();
   };
 
-  const handleUnpublish = async (programId: string) => {
-    const confirmed = window.confirm(
-      "Unpublish this program? It will no longer be visible to mentees, but applications will be kept."
-    );
-
-    if (!confirmed) return;
-
+  const handleDeleteProgram = async (programId: string) => {
     setActionLoadingId(programId);
+    setProgramToDelete(null);
 
     try {
-      const res = await unpublishProgram(Number(programId));
+      const res = await deleteProgram(Number(programId));
 
       if (res?.success) {
-        setPageAlert({
-          type: "success",
-          message: res.message || "Program unpublished successfully.",
-        });
+        toast.success(res.message || "Program deleted successfully.");
         setMentorApplications((prev) =>
           prev.filter((item) => item.id !== programId)
         );
       } else {
-        setPageAlert({
-          type: "error",
-          message: res?.message || "Could not unpublish program.",
-        });
+        toast.error(res?.message || "Could not delete program.");
       }
-    } catch (err) {
-      console.error("Failed to unpublish program", err);
-      setPageAlert({
-        type: "error",
-        message: "Could not unpublish program.",
-      });
+    } catch (err: any) {
+      console.error("Failed to delete program", err);
+      toast.error(
+        err?.response?.data?.message || err?.response?.data?.errors?.[0] || err?.message || "Could not delete program."
+      );
     } finally {
       setActionLoadingId(null);
     }
@@ -449,9 +439,7 @@ deadline={formatDeadline(item.deadline)}
                   className="w-full"
 primaryButtonText={
   isMentee
-    ? item.status === "Accepted"
-      ? "Join Classroom"
-      : "View Details"
+    ? "View Details"
     : actionLoadingId === item.id
       ? "Working…"
       : "Manage Applicants"
@@ -459,27 +447,17 @@ primaryButtonText={
 
                   secondaryButtonText={
                     isMentee
-                      ? item.status === "Accepted"
-                        ? "View Details"
-                        : "Withdraw"
+                      ? ""
                       : "Details"
                   }
 
                   onPrimaryClick={() => {
                     if (isMentee) {
-                      if (item.status === "Accepted") {
-                        if (!item.programId) {
-                          toast.error("Program details are not available yet. Please refresh or restart backend.");
-                          return;
-                        }
-                        goToClassroom(String(item.programId));
-                      } else {
-                        if (!item.programId) {
-                          toast.error("Program details are not available yet. Please refresh or restart backend.");
-                          return;
-                        }
-                        goToProgramView(String(item.programId));
+                      if (!item.programId) {
+                        toast.error("Program details are not available yet. Please refresh or restart backend.");
+                        return;
                       }
+                      goToProgramView(String(item.programId));
                     } else {
                       goToManageApplicants(item.id);
                     }
@@ -508,7 +486,7 @@ primaryButtonText={
 
                   onEdit={item.status === "Closed" || isMentee ? undefined : () => openEditModal(item.id)}
 
-                  onUnpublish={item.status === "Closed" || isMentee ? undefined : () => handleUnpublish(item.id)}
+                  onDelete={item.status === "Closed" || isMentee ? undefined : () => setProgramToDelete(item.id)}
 
                   onCancelApplying={() => {
                     void handleCancelApplying(item.id);
@@ -564,6 +542,21 @@ primaryButtonText={
     </div>
   </div>
 )}
+
+<ConfirmationModal
+  isOpen={!!programToDelete}
+  onConfirm={() => {
+    if (programToDelete) {
+      handleDeleteProgram(programToDelete);
+    }
+  }}
+  onCancel={() => setProgramToDelete(null)}
+  title="Delete Program"
+  message="Are you sure you want to delete this program?"
+  confirmText="Delete Program"
+  variant="danger"
+  isLoading={!!actionLoadingId}
+/>
       </div>
     </Layout>
   );

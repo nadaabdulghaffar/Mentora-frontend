@@ -2,6 +2,7 @@
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useQueryClient } from "@tanstack/react-query";
 
 import BaseModal from "../modals/BaseModal";
 import CommunityFormFields from "./CommunityFormFields";
@@ -38,6 +39,7 @@ export default function CreateCommunityModal({
   onClose,
   onSuccess,
 }: Props) {
+  const queryClient = useQueryClient();
   const {
     register,
     watch,
@@ -196,6 +198,8 @@ export default function CreateCommunityModal({
         mapCommunityDetails(
           createdCommunity
         );
+
+      queryClient.invalidateQueries({ queryKey: ['myCommunities'] });
 
       resetFormState();
 

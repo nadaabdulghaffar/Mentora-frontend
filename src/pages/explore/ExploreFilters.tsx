@@ -130,17 +130,7 @@ export default function ExploreFilters({
       </div>
 
       <div className="space-y-5 text-sm">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            checked={filters.recommendedForYou}
-            onChange={(e) =>
-              patch({ recommendedForYou: e.target.checked })
-            }
-            className="h-4 w-4 rounded border-[#DFE3ED] text-primary focus:ring-primary/30"
-          />
-          <span className="font-medium text-[#262D3F]">Recommended for you</span>
-        </label>
+
 
         <div>
           <p className="mb-2 font-medium text-[#262D3F]">Domain</p>

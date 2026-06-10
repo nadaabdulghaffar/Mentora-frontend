@@ -44,15 +44,19 @@ export interface UpdateFeedbackRequest {
   comment?: string;
 }
 
-/** Local mock shape — replace with API DTO when analytics endpoint exists. */
-export interface AiFeedbackInsights {
-  satisfactionPercentage: number;
-  sentimentCounts: {
+/** Backend `SentimentSummaryDto`. */
+export interface SentimentSummaryDto {
+  mentor_id: string;
+  mentor_name: string;
+  satisfaction_rate: number;
+  average_rating: number;
+  breakdown: {
     positive: number;
     neutral: number;
     negative: number;
+    total: number;
   };
-  summary: string;
-  positiveSummary: string;
-  negativeSummary: string;
+  summary: string | null;
+  top_positive_themes: string[];
+  top_negative_themes: string[];
 }

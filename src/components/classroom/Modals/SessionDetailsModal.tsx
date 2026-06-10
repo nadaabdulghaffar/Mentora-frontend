@@ -90,22 +90,7 @@ return ( <div className="fixed inset-0 z-[85] flex items-center justify-center b
         </div>
       </div>
 
-      {/* DURATION */}
-      <div className="flex items-start gap-3 rounded-2xl border border-[#ECEFF6] bg-white p-4">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-[#F3F4F8]">
-          <Clock3 size={20} className="text-[#6E56CF]" />
-        </div>
-
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8A91A5]">
-            Duration
-          </p>
-
-          <p className="mt-1 text-sm font-medium text-[#1F2432]">
-            {session.duration}
-          </p>
-        </div>
-      </div>
+     
 
       {/* STATUS */}
       <div className="flex items-center justify-between rounded-2xl border border-[#ECEFF6] bg-white p-4">

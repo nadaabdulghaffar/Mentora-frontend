@@ -27,6 +27,7 @@ import CommunitiesListPage from "./pages/community/CommunitiesListPage";
 import ProfilePage from "./pages/profile/ProfilePage";
 import SuggestedProgramsPage from "./pages/SuggestedProgramsPage";
 import RecommendedMentorsPage from "./pages/RecommendedMentorsPage";
+import RecommendedCommunitiesPage from "./pages/RecommendedCommunitiesPage";
 import MyApplicationsPage from "./pages/MyApplicationsPage";
 import ManageApplicantsPage from "./pages/ManageApplicantsPage";
 import ApplicationDetailsPage from "./pages/ApplicationDetailsPage";
@@ -37,6 +38,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import OnboardingRoute from "./components/OnboardingRoute";
 import NotificationsTestPage from "./pages/dev/NotificationsTestPage";
 import { NotificationRealtimeBridge } from "./notifications";
+import UpcomingSessionsPage from "./pages/UpcomingSessionsPage";
 
 
 function App() { 
@@ -183,6 +185,14 @@ function App() {
         }
       />
       <Route
+        path="/upcoming-sessions"
+        element={
+          <ProtectedRoute roles={[ 'mentor', 'mentee' ]}>
+            <UpcomingSessionsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/applications"
         element={
           <ProtectedRoute roles={['mentor', 'mentee']}>
@@ -209,7 +219,7 @@ function App() {
       <Route
         path="/mento-ai"
         element={
-          <ProtectedRoute roles={["mentee"]}>
+          <ProtectedRoute roles={["mentee", "mentor", "both"]}>
             <MentoAIPage />
           </ProtectedRoute>
         }
@@ -277,6 +287,14 @@ function App() {
         element={
           <ProtectedRoute roles={[ 'mentee' ]}>
             <RecommendedMentorsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recommended-communities"
+        element={
+          <ProtectedRoute roles={[ 'mentee', 'mentor' ]}>
+            <RecommendedCommunitiesPage />
           </ProtectedRoute>
         }
       />
