@@ -1,13 +1,9 @@
-import {
-  getProfileAvatarFallback,
-  resolveProfilePictureUrl,
-} from '../../../utils/profileImageUrl';
+import { resolveProfilePictureUrl } from '../../../utils/profileImageUrl';
 
-/** Resolve author display avatar (API path → absolute URL, with name-based fallback). */
+/** Resolve author display avatar. Returns empty string if no valid URL is found. */
 export function resolveAuthorAvatar(
-  authorName: string,
+  _authorName: string,
   profilePictureUrl?: string | null
 ): string {
-  const resolved = resolveProfilePictureUrl(profilePictureUrl);
-  return resolved || getProfileAvatarFallback(authorName);
+  return resolveProfilePictureUrl(profilePictureUrl) || '';
 }

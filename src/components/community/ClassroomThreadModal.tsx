@@ -16,6 +16,7 @@ import {
   
 } from "../../services/classroomFeedService";
 import { ClassroomUserLink } from '../classroom/common/ClassroomUserLink';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 
 interface ClassroomThread {
   id: string;
@@ -51,7 +52,7 @@ const resolveClassroomAvatar = (url?: string | null, fullName?: string) => {
     return `${apiBase}${normalized.startsWith('/') ? normalized : `/${normalized}`}`;
   }
 
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}`;
+  return '';
 };
 
 function modalOwnerCanEdit(
@@ -459,16 +460,10 @@ const handleLocalDelete =
         <div className="mb-6">
           {/* Author Info */}
           <div className="mb-4 flex items-center gap-3">
-            <img
-              src={thread.authorAvatar}
-              alt={thread.authorName}
+            <ProfileAvatar
+              pictureUrl={thread.authorAvatar}
+              name={thread.authorName}
               className="h-12 w-12 rounded-full object-cover"
-              onError={(event) => {
-                const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.authorName || 'User')}`;
-                if (event.currentTarget.src !== fallback) {
-                  event.currentTarget.src = fallback;
-                }
-              }}
             />
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -585,16 +580,10 @@ Comments{totalCommentsCount > 0 ? ` (${totalCommentsCount})` : ''}
           {/* Comment Input */}
           <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-3">
-              <img
-                src={resolveClassroomAvatar(currentUserAvatar, 'You')}
-                alt="Your avatar"
+              <ProfileAvatar
+                pictureUrl={resolveClassroomAvatar(currentUserAvatar, 'You')}
+                name="You"
                 className="h-8 w-8 rounded-full object-cover"
-                onError={(event) => {
-                  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent('You')}`;
-                  if (event.currentTarget.src !== fallback) {
-                    event.currentTarget.src = fallback;
-                  }
-                }}
               />
               <div>
                 <p className="text-sm font-medium text-gray-900">You</p>

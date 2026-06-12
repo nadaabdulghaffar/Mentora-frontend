@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquareText, MoreHorizontal } from 'lucide-react';
 import type { MemberRequest } from '../../pages/community/types';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 
 interface MemberRequestProps {
   request: MemberRequest;
@@ -45,9 +46,9 @@ export const MemberRequestCard: React.FC<MemberRequestProps> = ({
     <div className="overflow-visible rounded-2xl border border-gray-200 bg-white transition hover:shadow-sm">
       <div className="p-4">
         <div className="flex items-center gap-3">
-          <img
-            src={request.avatar}
-            alt={request.name}
+          <ProfileAvatar
+            pictureUrl={request.avatar}
+            name={request.name}
             className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
           />
 

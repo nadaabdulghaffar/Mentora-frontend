@@ -1,4 +1,7 @@
 import React from 'react';
+import { Lightbulb } from 'lucide-react';
+import type { ExplanationMetadataDto } from '../services/chatService';
+import { ProfileAvatar } from './profile/ProfileAvatar';
 
 export interface AuthorInfo {
   avatar: string;  
@@ -12,7 +15,7 @@ export interface ProgramCardProps {
   phases?: string;
   durationBadge?: string;
   title: string;
-  description: string;
+  description?: string;
   progress?: number;
   author?: AuthorInfo;
   authorText?: string;
@@ -20,6 +23,9 @@ export interface ProgramCardProps {
   hideAuthorAvatar?: boolean;
   hideHeaderImage?: boolean;
   primaryButtonText?: string;
+  explanationMetadata?: ExplanationMetadataDto | null;
+  matchPercentage?: number;
+  matchReasons?: string[] | null;
   onPrimaryClick?: () => void;
   className?: string;
 }
@@ -41,9 +47,31 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
   hideAuthorAvatar = false,
   hideHeaderImage = false,
   primaryButtonText = 'Apply',
+  explanationMetadata,
+  matchPercentage,
+  matchReasons,
   onPrimaryClick,
   className = '',
 }) => {
+  const getCompatibilityColor = (band: string) => {
+    switch(band) {
+      case 'exact_fit': return 'bg-emerald-100 text-emerald-700';
+      case 'near_fit': return 'bg-blue-100 text-blue-700';
+      case 'stretch_fit': return 'bg-amber-100 text-amber-700';
+      case 'weak_fit': return 'bg-slate-100 text-slate-700';
+      default: return 'bg-green-50 text-green-600';
+    }
+  };
+
+  const getCompatibilityText = (band: string) => {
+    switch(band) {
+      case 'exact_fit': return 'Exact Fit';
+      case 'near_fit': return 'Strong Fit';
+      case 'stretch_fit': return 'Stretch Fit';
+      case 'weak_fit': return 'Exploratory';
+      default: return 'Good Match';
+    }
+  };
   const progressValue = Math.max(0, Math.min(100, progress ?? 0));
   const isProgressVariant = variant === 'progress';
   const isSimpleButtonVariant = variant === 'simple-button';
@@ -71,6 +99,16 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
                   {durationBadge}
                 </span>
               )}
+              {explanationMetadata?.compatibility_fit_band && (
+                <span className={`rounded-full px-3 py-1 text-[11px] font-bold tracking-wide uppercase ${getCompatibilityColor(explanationMetadata.compatibility_fit_band)}`}>
+                  {getCompatibilityText(explanationMetadata.compatibility_fit_band)}
+                </span>
+              )}
+              {matchPercentage !== undefined && (
+                <span className="rounded-full bg-green-50 px-3 py-1 text-[11px] font-bold tracking-wide text-green-600 uppercase ring-1 ring-inset ring-green-500/20">
+                  {matchPercentage}% Match
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -88,6 +126,52 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
         >
           {description}
         </p>
+
+        {/* AI Insights & Match Reasons */}
+        {((matchReasons && matchReasons.length > 0) || explanationMetadata) && (
+          <div className="mt-3 mb-1 w-full flex flex-col items-start text-left px-3 py-2.5 bg-slate-50/80 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2 mb-1.5 w-full">
+              <div className="shrink-0 rounded-full bg-[#F3E8FF] p-1 text-[#8B5CF6]">
+                <Lightbulb size={12} strokeWidth={2.5} />
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                Why this program?
+              </span>
+            </div>
+            
+            <ul className="text-[11px] font-medium text-slate-600 leading-snug space-y-1.5">
+              {matchReasons && matchReasons.length > 0 ? (
+                matchReasons.map((reason, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                    <span className="line-clamp-2">{reason.replace(/^•\s*/, '')}</span>
+                  </li>
+                ))
+              ) : explanationMetadata ? (
+                <>
+                  {explanationMetadata.matched_skills && explanationMetadata.matched_skills.length > 0 && (
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                      <span><strong>Skills:</strong> {explanationMetadata.matched_skills.slice(0, 3).join(', ')}</span>
+                    </li>
+                  )}
+                  {explanationMetadata.target_level_gap !== undefined && explanationMetadata.target_level_gap < 0 && (
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-500 shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                      <span className="text-amber-600">Stretch goal: Requires higher level</span>
+                    </li>
+                  )}
+                  {explanationMetadata.reason && (
+                    <li className="flex items-start gap-1.5 mt-1.5 pt-1.5 border-t border-slate-200/60">
+                      <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                      <span className="line-clamp-2">{explanationMetadata.reason.replace(/^•\s*/, '')}</span>
+                    </li>
+                  )}
+                </>
+              ) : null}
+            </ul>
+          </div>
+        )}
 
         {shouldShowProgress && (
           <div className="space-y-2">
@@ -113,7 +197,7 @@ export const ProgramCard: React.FC<ProgramCardProps> = ({
                 {authorIcon}
               </span>
             ) : author ? (
-              <img src={author.avatar} alt={author.name} className="h-8 w-8 rounded-full object-cover" />
+              <ProfileAvatar pictureUrl={author.avatar} name={author.name} className="h-8 w-8 rounded-full object-cover" />
             ) : null}
             <span className="text-sm font-medium text-[#7D89A3]">{authorText ?? author?.name}</span>
           </div>

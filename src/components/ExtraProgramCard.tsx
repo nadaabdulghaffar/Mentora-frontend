@@ -1,4 +1,5 @@
 import React from "react";
+import { ProfileAvatar } from "./profile/ProfileAvatar";
 
 export interface AuthorInfo {
   avatar: string;
@@ -336,9 +337,9 @@ export const ExtraProgramCard: React.FC<
             isMain && (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <img
-                    src={author.avatar}
-                    alt={author.name}
+                  <ProfileAvatar
+                    pictureUrl={author.avatar}
+                    name={author.name}
                     className="h-8 w-8 rounded-full object-cover"
                   />
 

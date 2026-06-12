@@ -39,6 +39,8 @@ import OnboardingRoute from "./components/OnboardingRoute";
 import NotificationsTestPage from "./pages/dev/NotificationsTestPage";
 import { NotificationRealtimeBridge } from "./notifications";
 import UpcomingSessionsPage from "./pages/UpcomingSessionsPage";
+import AdminRoutes from "./admin/routes/AdminRoutes";
+import AdminProtectedRoute from "./admin/components/AdminProtectedRoute";
 
 
 function App() { 
@@ -63,6 +65,14 @@ function App() {
         }}
       />
     <Routes>
+      <Route 
+        path="/admin/*" 
+        element={
+          <AdminProtectedRoute>
+            <AdminRoutes />
+          </AdminProtectedRoute>
+        } 
+      />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />

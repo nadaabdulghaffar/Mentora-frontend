@@ -5,7 +5,6 @@ import {
   MessageCircle,
   Share2,
   Bookmark,
-  Reply as ReplyIcon,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -14,6 +13,7 @@ import {
 import { validateCommentContent, validateThreadContent } from '../pages/community/utils/threadUtils';
 import { ClassroomUserLink } from './classroom/common/ClassroomUserLink';
 import ConfirmationModal from './modals/ConfirmationModal';
+import { ProfileAvatar } from './profile/ProfileAvatar';
 
 // Types
 export interface PostAttachment {
@@ -115,8 +115,8 @@ function feedCommentAllowsDelete(uid: string, c: FeedComment): boolean {
   return c.canDelete !== false;
 }
 
-function buildAvatarFallback(name: string): string {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}`;
+function buildAvatarFallback(_name: string): string {
+  return '';
 }
 
 function formatAbsoluteTimestamp(timestamp: string): string {
@@ -234,7 +234,7 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
       id: `reply-${Date.now()}`,
       authorId: currentUserId,
       authorName: 'You',
-      authorAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You',
+      authorAvatar: '',
       content: trimmedReply,
       timestamp: 'Just now',
       likes: 0,
@@ -313,9 +313,9 @@ const ClassroomCommentBlock: React.FC<ClassroomCommentBlockProps> = ({
     <div className={`space-y-2 ${indent}`}>
       {overflowMenu}
       <div className="flex gap-2">
-        <img
-          src={comment.authorAvatar}
-          alt={comment.authorName}
+        <ProfileAvatar
+          pictureUrl={comment.authorAvatar}
+          name={comment.authorName}
           className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
         />
         <div className="min-w-0 flex-1">
@@ -518,9 +518,9 @@ const Comment: React.FC<CommentProps> = ({ comment, variant }) => {
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <img
-          src={comment.authorAvatar}
-          alt={comment.authorName}
+        <ProfileAvatar
+          pictureUrl={comment.authorAvatar}
+          name={comment.authorName}
           className="h-8 w-8 rounded-full object-cover"
         />
         <div className="flex-1">
@@ -563,9 +563,9 @@ const Comment: React.FC<CommentProps> = ({ comment, variant }) => {
           {showReplies &&
             localReplies.map((reply) => (
               <div key={reply.id} className="flex gap-2">
-                <img
-                  src={reply.authorAvatar}
-                  alt={reply.authorName}
+                <ProfileAvatar
+                  pictureUrl={reply.authorAvatar}
+                  name={reply.authorName}
                   className="h-8 w-8 rounded-full object-cover"
                 />
                 <div className="flex-1">
@@ -874,7 +874,7 @@ const postOwnerMenuPortal =
       id: `comment-${Date.now()}`,
       authorId: currentUserId,
       authorName: 'You',
-      authorAvatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=You',
+      authorAvatar: '',
       content: trimmedComment,
       timestamp: 'Just now',
       likes: 0,
@@ -952,17 +952,10 @@ const postOwnerMenuPortal =
       <div className="px-4 py-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-1 items-start gap-3">
-            <img
-              src={postAvatarSrc}
-              alt={authorName}
-              onError={(event) => {
-                const target = event.currentTarget;
-                const fallback = buildAvatarFallback(authorName);
-                if (target.src !== fallback) {
-                  target.src = fallback;
-                }
-              }}
-              className="h-10 w-10 rounded-full object-cover"
+            <ProfileAvatar
+              pictureUrl={postAvatarSrc}
+              name={authorName}
+              className="h-10 w-10 rounded-full object-cover shrink-0"
             />
             <div className="min-w-0 flex-1">
               {variant === 'classroom' ? (
@@ -1146,10 +1139,10 @@ const postOwnerMenuPortal =
       {variant !== 'classroom' && (
         <div className="mt-3 border-t border-gray-100 px-4 pt-3 pb-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <img
-              src={buildAvatarFallback('You')}
-              alt="Your avatar"
-              className="h-8 w-8 rounded-full"
+            <ProfileAvatar
+              pictureUrl={null}
+              name="You"
+              className="h-8 w-8 rounded-full shrink-0"
             />
             <input
               type="text"

@@ -361,6 +361,7 @@ const closeEditModal = () => {
         setMentorApplications((prev) =>
           prev.filter((item) => item.id !== programId)
         );
+        window.dispatchEvent(new Event("mentora:programs-updated"));
       } else {
         toast.error(res?.message || "Could not delete program.");
       }

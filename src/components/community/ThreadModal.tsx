@@ -250,7 +250,7 @@ useEffect(() => {
       id: `comment-${Date.now()}`,
       authorId: currentUserId,
       authorName: 'You',
-      authorAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CurrentUser',
+      authorAvatar: '',
       authorRole: currentUserRole,
       content: trimmed,
       timestamp: new Date().toISOString(),

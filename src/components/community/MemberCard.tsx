@@ -23,6 +23,7 @@ interface MemberCardProps {
   canModerate?: boolean;
   showMessageButton?: boolean;
   isCompact?: boolean;
+  currentUserId?: string;
 }
 
 const roleBadgeStyles: Record<
@@ -44,6 +45,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
   canModerate = false,
   showMessageButton = true,
   isCompact = false,
+  currentUserId,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -66,9 +68,11 @@ export const MemberCard: React.FC<MemberCardProps> = ({
       );
   }, []);
 
+  const isSelf = currentUserId === member.id;
   const isOwner = member.role === 'Owner';
   const showModerationMenu =
     !isOwner &&
+    !isSelf &&
     (canModerate || canChangeRoles);
   const showPromoteAction =
     canChangeRoles &&
@@ -118,7 +122,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {showMessageButton && (
+            {showMessageButton && !isSelf && (
               <button
                 onClick={(event) => {
                   event.stopPropagation();

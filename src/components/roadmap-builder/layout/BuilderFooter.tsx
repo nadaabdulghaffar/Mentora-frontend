@@ -1,11 +1,15 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 import { useRoadmapBuilderStore } from "../../../store/roadmapBuilderStore";
 import { classroomService } from "../../../services/classroomService";
+import ConfirmationModal from "../../modals/ConfirmationModal";
 
 export default function BuilderFooter() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const mode = useRoadmapBuilderStore((state) => state.mode);
 
@@ -168,14 +172,10 @@ export default function BuilderFooter() {
                 id="builder-edit-cancel"
                 onClick={() => {
                   if (isDirty) {
-                    const ok = window.confirm(
-                      "You have unsaved changes. Cancel and discard them?"
-                    );
-
-                    if (!ok) return;
+                    setShowCancelConfirm(true);
+                  } else {
+                    handleCancelEdit();
                   }
-
-                  handleCancelEdit();
                 }}
                 disabled={anyBusy}
                 className="
@@ -325,6 +325,19 @@ export default function BuilderFooter() {
           </>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={showCancelConfirm}
+        onConfirm={() => {
+          setShowCancelConfirm(false);
+          handleCancelEdit();
+        }}
+        onCancel={() => setShowCancelConfirm(false)}
+        title="Discard Changes"
+        message="You have unsaved changes. Cancel and discard them?"
+        confirmText="Discard"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -185,6 +185,11 @@ export function applyRealtimeNotification(
   queryClient: QueryClient,
   notification: NotificationDto
 ): void {
+  // Ignore chat messages in the generic notification UI
+  if (notification.type === 13) { // NotificationType.NewMessage
+    return;
+  }
+
   const inserted = prependNotificationToLists(queryClient, notification);
 
   if (inserted && !notification.isRead) {

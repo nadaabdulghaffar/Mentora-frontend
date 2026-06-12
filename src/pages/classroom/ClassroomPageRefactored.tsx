@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import authAPI from '../../services/authService';
@@ -45,6 +45,8 @@ import { mentorTaskService }
 from "../../services/mentorTaskService";
 import { classroomTaskService } from "../../services/classroomTaskService";
 import { messagingService } from "../../services/messagingService";
+import { notificationSignalR } from "../../notifications/services/notificationSignalR";
+import { NotificationType } from "../../notifications/types/notification.enums";
 
 
 
@@ -147,9 +149,9 @@ const API_ROOT = (import.meta.env.VITE_API_URL ?? 'http://localhost:5069/api').r
   ''
 );
 
-const resolveAvatarUrl = (path: string | null | undefined, name: string) => {
+const resolveAvatarUrl = (path: string | null | undefined, _name: string) => {
   if (!path) {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+    return '';
   }
   if (path.startsWith('http')) {
     return path;
@@ -198,13 +200,12 @@ const resolveImageUrl = (url?: string | null) => {
   return `${backendOrigin}${normalizedUrl.startsWith('/') ? normalizedUrl : `/${normalizedUrl}`}`;
 };
 
-const resolveProfileAvatar = (profilePictureUrl?: string | null, fullName?: string) => {
+const resolveProfileAvatar = (profilePictureUrl?: string | null, _fullName?: string) => {
   const resolved = resolveImageUrl(profilePictureUrl);
   if (resolved) {
     return resolved;
   }
-
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || 'User')}`;
+  return '';
 };
 
 
@@ -242,6 +243,7 @@ type MentorRegistryRow = {
 const ClassroomPage = ({}: Record<string, never> = {}) => {
   const { programId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const classroomProgramId =
   Number(programId);
 
@@ -607,7 +609,19 @@ const fetchFeed = useCallback(
     phase.modules.map((module) => module.id)
   );
 
-  const [activeTab, setActiveTab] = useState<ClassroomTab>('classroom');
+  const [activeTab, setActiveTab] = useState<ClassroomTab>(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab') as ClassroomTab;
+    return tab || 'classroom';
+  });
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab') as ClassroomTab;
+    if (tab && ['classroom', 'tasks', 'roadmap', 'schedule', 'students'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
   const [expandedMentorPhaseIds, setExpandedMentorPhaseIds] = useState<string[]>([]);
   const [expandedMenteeSectionIds, setExpandedMenteeSectionIds] = useState<string[]>([]);
   const [expandedMentorRoadmapPhaseIds, setExpandedMentorRoadmapPhaseIds] = useState<string[]>([
@@ -1905,7 +1919,7 @@ const handleConfirmTaskSubmission =
             authorAvatar:
               resolveImageUrl(createdPost.author?.profilePictureUrl) ||
               currentUserProfile.avatarUrl ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserProfile.displayName)}`,
+              "",
             content: createdPost.content,
             timestamp: new Date(createdPost.createdAt).toLocaleString(),
             attachments: Array.isArray(createdPost.attachments)
@@ -1928,7 +1942,7 @@ const handleConfirmTaskSubmission =
             authorName: currentUserProfile.displayName,
             authorAvatar:
               currentUserProfile.avatarUrl ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUserProfile.displayName)}`,
+              "",
             content,
             timestamp: 'Just now',
             attachments: attachmentPayload,
@@ -2418,6 +2432,7 @@ const handleSubmitMentorReview = async (
     queryClient.invalidateQueries({ queryKey: ['pendingReviews', classroomProgramId] });
 
     await refreshMentorTaskData();
+    await refreshDashboard();
 
     if (mentorTasksState.selectedMentorTaskId) {
       await handleOpenMentorSubmissions(

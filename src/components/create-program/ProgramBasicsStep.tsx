@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { UploadCloud } from "lucide-react";
 import { useFormikContext, getIn } from "formik";
 
 import type { CreateProgramFormData } from "./types";
@@ -33,28 +32,12 @@ export default function ProgramBasicsStep({
   const [subDomains, setSubDomains] = useState<Option[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [previewImage, setPreviewImage] = useState("");
   const [mentor, setMentor] = useState<AuthUser | null>(null);
 
   const domainId = values.domainId;
   const subDomainId = values.subDomainId;
   const title = values.title;
   const description = values.description;
-  const existingImageUrl = values.existingImageUrl;
-
-  useEffect(() => {
-    if (!values.image) {
-      setPreviewImage("");
-      return;
-    }
-
-    const imageUrl = URL.createObjectURL(values.image);
-    setPreviewImage(imageUrl);
-
-    return () => {
-      URL.revokeObjectURL(imageUrl);
-    };
-  }, [values.image]);
 
   /* Load current mentor */
   useEffect(() => {
@@ -118,25 +101,6 @@ export default function ProgramBasicsStep({
 
     loadSubDomains();
   }, [domainId]);
-
-  useEffect(() => {
-    if (existingImageUrl && !previewImage) {
-      setPreviewImage(existingImageUrl);
-    }
-  }, [existingImageUrl, previewImage]);
-
-  /* Upload image */
-  const handleImageChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setFieldValue("image", file);
-
-    const imageUrl = URL.createObjectURL(file);
-    setPreviewImage(imageUrl);
-  };
 
   const selectedDomain =
     domains.find(
@@ -230,31 +194,6 @@ export default function ProgramBasicsStep({
             <p className="text-sm text-red-500 mt-1">{String(getIn(errors, "description"))}</p>
           )}
         </InputGroup>
-
-        <InputGroup label="Program Image (Optional)">
-          <label className="w-full border-2 border-dashed border-gray-200 rounded-2xl px-5 py-6 flex items-center gap-4 cursor-pointer hover:border-primary transition">
-            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-              <UploadCloud size={22} />
-            </div>
-
-            <div>
-              <p className="font-medium text-slateInk">
-                Click to upload image
-              </p>
-
-              <p className="text-sm text-gray-400">
-                PNG, JPG up to 5MB
-              </p>
-            </div>
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </label>
-        </InputGroup>
       </div>
 
       {/* RIGHT */}
@@ -262,11 +201,6 @@ export default function ProgramBasicsStep({
         <ExtraProgramCard
           variant="main"
           className="w-full max-w-sm"
-          image={
-            previewImage ||
-            existingImageUrl ||
-            "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1200&auto=format&fit=crop"
-          }
           tag={selectedDomain}
           subDomains={[selectedSubDomain]}
           title={title || "Program Title Preview"}
@@ -275,7 +209,7 @@ export default function ProgramBasicsStep({
             "Your program description will appear here as you type."
           }
           author={{
-            avatar: "https://i.pravatar.cc/100?img=12",
+            avatar: "",
             name: mentor
               ? `${mentor.firstName} ${mentor.lastName ?? ""}`
               : "Mentor Name",

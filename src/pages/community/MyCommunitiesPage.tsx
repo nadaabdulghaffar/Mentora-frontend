@@ -24,6 +24,8 @@ import type {
   Community,
 } from "./types";
 
+import { resolveAuthorAvatar } from "./utils/authorAvatar";
+
 const MyCommunitiesPage = () => {
   const navigate =
     useNavigate();
@@ -123,7 +125,7 @@ const MyCommunitiesPage = () => {
                   image={
                     community.cover
                   }
-                  tag="COMMUNITY"
+                  tag={community.domain ? community.domain.toUpperCase() : "COMMUNITY"}
                   phases={`${community.memberCount.toLocaleString()} MEMBERS`}
                   title={
                     community.name
@@ -132,9 +134,8 @@ const MyCommunitiesPage = () => {
                     community.description
                   }
                   author={{
-                    avatar:
-                      community.cover || community.avatar,
-                    name: `Hosted community`,
+                    avatar: community.creatorAvatar || resolveAuthorAvatar(community.creatorName ?? "Community"),
+                    name: community.creatorName ?? "Community",
                   }}
                   primaryButtonText="Open Community"
                   className="h-full"

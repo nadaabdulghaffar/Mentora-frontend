@@ -42,6 +42,8 @@ export interface Community {
   memberCount: number;
   isPublic: boolean;
   createdDate: string;
+  creatorName?: string;
+  creatorAvatar?: string;
   isJoined?: boolean;
 
 currentUserRole?: string;

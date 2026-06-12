@@ -73,6 +73,7 @@ export function normalizeNotificationDto(
     createdAt: String(
       raw.createdAt ?? raw.CreatedAt ?? new Date().toISOString()
     ),
+    metadata: (raw.metadata ?? raw.Metadata ?? undefined) as Record<string, any> | undefined,
   };
 }
 

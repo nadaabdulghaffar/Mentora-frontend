@@ -1,6 +1,7 @@
 import { ChevronRight, ChevronDown } from "lucide-react";
 import type { Applicant } from "./types";
 import { statusStyles, statusDot } from "./constants";
+import { ProfileAvatar } from "../profile/ProfileAvatar";
 
 type Props = {
   app: Applicant;
@@ -27,14 +28,11 @@ export default function ApplicantRow({
       }}
     >
       <div className="flex items-center gap-4">
-<img
-  src={
-    app.avatar
-      ? `http://localhost:5069${app.avatar}`
-      : `https://ui-avatars.com/api/?name=${encodeURIComponent(app.name)}&background=random`
-  }
-  className="w-12 h-12 rounded-full object-cover"
-/>
+        <ProfileAvatar
+          pictureUrl={app.avatar ? `http://localhost:5069${app.avatar}` : null}
+          name={app.name}
+          className="w-12 h-12 rounded-full object-cover"
+        />
         <span className="font-semibold text-[16px] text-[#1F2432]">
           {app.name}
         </span>

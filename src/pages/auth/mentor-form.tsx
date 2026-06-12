@@ -72,10 +72,10 @@ function MentorForm() {
     if (authAPI.isAuthenticated()) {
       const currentUser = authAPI.getCurrentUser()
       if (currentUser) {
-        if (currentUser.role?.toLowerCase() === 'mentor') {
-          navigate('/mentor/dashboard', { replace: true })
+        if (currentUser.role?.toLowerCase() === 'admin') {
+          navigate('/admin/dashboard', { replace: true })
         } else {
-          navigate('/dashboard', { replace: true })
+          navigate('/profile', { replace: true })
         }
       }
     }
@@ -402,10 +402,10 @@ const handleLinkedInChange = (value: string) => {
 
   if (response.success && response.data) {
         const role = response.data.role?.toLowerCase()
-        if (role === 'mentor') {
-          navigate('/mentor/dashboard', { replace: true })
+        if (role === 'admin') {
+          navigate('/admin/dashboard', { replace: true })
         } else {
-          navigate('/dashboard', { replace: true })
+          navigate('/profile', { replace: true })
         }
       }
     } finally {

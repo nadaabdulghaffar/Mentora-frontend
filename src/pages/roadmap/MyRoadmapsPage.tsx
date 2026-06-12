@@ -22,6 +22,8 @@ import {
   roadmapDetailsToListItem,
 } from "../../utils/roadmapDisplayUtils";
 
+import ConfirmationModal from "../../components/modals/ConfirmationModal";
+
 export default function MyRoadmapPage() {
   const navigate = useNavigate();
 
@@ -37,21 +39,27 @@ export default function MyRoadmapPage() {
   const [deletingId, setDeletingId] =
     useState<number | null>(null);
 
-  const handleDelete = async (roadmapId: number) => {
-    if (!window.confirm("Delete this roadmap? This action cannot be undone.")) {
-      return;
-    }
-    setDeletingId(roadmapId);
+  const [roadmapToDelete, setRoadmapToDelete] = useState<number | null>(null);
+
+  const confirmDelete = async () => {
+    if (roadmapToDelete === null) return;
+    
+    setDeletingId(roadmapToDelete);
     try {
-      await deleteRoadmap(roadmapId);
+      await deleteRoadmap(roadmapToDelete);
       setRoadmaps((prev) =>
-        prev.filter((r) => r.roadmapId !== roadmapId)
+        prev.filter((r) => r.roadmapId !== roadmapToDelete)
       );
     } catch (error) {
       console.error(extractErrorMessage(error));
     } finally {
       setDeletingId(null);
+      setRoadmapToDelete(null);
     }
+  };
+
+  const handleDeleteClick = (roadmapId: number) => {
+    setRoadmapToDelete(roadmapId);
   };
 
   useEffect(() => {
@@ -220,7 +228,7 @@ export default function MyRoadmapPage() {
                 <RoadmapCard
                 key={roadmap.roadmapId}
                 roadmap={roadmap}
-                onDelete={() => handleDelete(roadmap.roadmapId)}
+                onDelete={() => handleDeleteClick(roadmap.roadmapId)}
                 isDeleting={deletingId === roadmap.roadmapId}
               />
               )
@@ -228,6 +236,17 @@ export default function MyRoadmapPage() {
           </div>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={roadmapToDelete !== null}
+        onConfirm={confirmDelete}
+        onCancel={() => setRoadmapToDelete(null)}
+        title="Delete Roadmap"
+        message="Delete this roadmap? This action cannot be undone."
+        confirmText="Delete Roadmap"
+        variant="danger"
+        isLoading={deletingId !== null}
+      />
     </Layout>
   );
 }

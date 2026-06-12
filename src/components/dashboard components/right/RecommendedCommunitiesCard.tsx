@@ -24,6 +24,7 @@ const RecommendedCommunitiesCard = () => {
             footerLinkTo="/recommended-communities"
             footerLinkText="View All Communities"
             onRetry={() => refetch()}
+            hideImage={true}
         />
     );
 };

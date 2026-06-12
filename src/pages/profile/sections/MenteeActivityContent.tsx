@@ -126,9 +126,7 @@ export function MenteeActivityContent({ isOwner, targetUserId }: MenteeActivityC
                 description={program.description}
                 author={{
                   name: program.mentorName ?? 'Mentor',
-                  avatar:
-                    program.mentorAvatar ??
-                    'https://randomuser.me/api/portraits/lego/1.jpg',
+                  avatar: program.mentorAvatar ?? '',
                 }}
                 primaryButtonText="View Details"
                 className="h-full w-full"
@@ -163,9 +161,7 @@ export function MenteeActivityContent({ isOwner, targetUserId }: MenteeActivityC
               progress={program.progress}
               author={{
                 name: program.mentorName ?? 'Mentor',
-                avatar:
-                  program.mentorAvatar ??
-                  'https://randomuser.me/api/portraits/lego/1.jpg',
+                avatar: program.mentorAvatar ?? '',
               }}
               primaryButtonText="Join classroom"
               className="h-full w-full"

@@ -8,6 +8,7 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useRef,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -156,6 +157,7 @@ const currentUserId =
   const viewingCommunityId = params.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const sharedThreadId = searchParams.get('thread');
+  const processedSharedThreadId = useRef<string | null>(null);
   const queryClient = useQueryClient();
 
   usePageLifecycleDiagnostics(PAGE_NAME);
@@ -550,8 +552,15 @@ const handleThreadSubmit =
 
   useEffect(() => {
     if (!sharedThreadId || !viewingCommunityId) {
+      processedSharedThreadId.current = null;
       return;
     }
+
+    if (processedSharedThreadId.current === sharedThreadId) {
+      return;
+    }
+
+    processedSharedThreadId.current = sharedThreadId;
 
     const clearThreadParam = () => {
       setSearchParams(
@@ -571,14 +580,9 @@ const handleThreadSubmit =
       return;
     }
 
-    let cancelled = false;
-
     const openSharedPost = async () => {
       try {
         const post = await getCommunityPostById(sharedThreadId);
-        if (cancelled) {
-          return;
-        }
         const mapped = mapCommunityPostToThread(post, viewingCommunityId);
         handleThreadClick(mapped);
         clearThreadParam();
@@ -588,10 +592,6 @@ const handleThreadSubmit =
     };
 
     void openSharedPost();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     sharedThreadId,
     viewingCommunityId,
@@ -1441,7 +1441,7 @@ onClick={async () => {
     modalState.closeModal();
 
     navigate(
-      "/community"
+      "/my-communities"
     );
   } catch (error) {
     console.error(
@@ -1559,10 +1559,13 @@ canManageCommunity && activeCommunity ? (
           modalState.closeModal
         }
         isLoading={false}
-        onDelete={() =>
-          setShowDeleteConfirm(
-            true
-          )
+        onDelete={
+          isOwner
+            ? () =>
+                setShowDeleteConfirm(
+                  true
+                )
+            : undefined
         }
       />
     </div>

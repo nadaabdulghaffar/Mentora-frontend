@@ -17,6 +17,7 @@ export interface NotificationDto {
   referenceId?: string;
   isRead: boolean;
   createdAt: string;
+  metadata?: Record<string, any>;
 }
 
 /** Matches backend `Mentora.Application.DTOs.Common.PagedResult<T>` for notifications. */

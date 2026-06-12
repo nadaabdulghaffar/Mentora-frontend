@@ -27,6 +27,7 @@ interface CommunityMembersSectionProps {
   canModerate?: boolean;
   isLoading?: boolean;
   error?: string | null;
+  currentUserId?: string | null;
 }
 
 function filterMembers(
@@ -54,6 +55,7 @@ function MemberSection({
   onChangeMemberRole,
   canChangeRoles,
   canModerate,
+  currentUserId,
 }: {
   title: string;
   members: CommunityMember[];
@@ -67,6 +69,7 @@ function MemberSection({
   ) => void;
   canChangeRoles?: boolean;
   canModerate?: boolean;
+  currentUserId?: string | null;
 }) {
   return (
     <section>
@@ -88,6 +91,7 @@ function MemberSection({
               canModerate={canModerate}
               showMessageButton
               isCompact
+              currentUserId={currentUserId || undefined}
             />
           ))}
         </div>
@@ -119,6 +123,7 @@ export const CommunityMembersSection: React.FC<
   canModerate = false,
   isLoading = false,
   error = null,
+  currentUserId = null,
 }) => {
   const filteredOwners = useMemo(
     () => filterMembers(owners, searchQuery),
@@ -187,6 +192,7 @@ export const CommunityMembersSection: React.FC<
             members={filteredOwners}
             emptyMessage="No owners found."
             onMessageMember={onMessageMember}
+            currentUserId={currentUserId}
           />
 
           <MemberSection
@@ -199,6 +205,7 @@ export const CommunityMembersSection: React.FC<
             onChangeMemberRole={onChangeMemberRole}
             canChangeRoles={canChangeRoles}
             canModerate={canModerate}
+            currentUserId={currentUserId}
           />
 
           <MemberSection
@@ -211,6 +218,7 @@ export const CommunityMembersSection: React.FC<
             onChangeMemberRole={onChangeMemberRole}
             canChangeRoles={canChangeRoles}
             canModerate={canModerate}
+            currentUserId={currentUserId}
           />
         </div>
       )}

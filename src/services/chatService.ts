@@ -11,6 +11,18 @@ export interface ChatRequestDto {
   history: ChatHistoryItem[] | null;
 }
 
+export interface ExplanationMetadataDto {
+  matched_skills: string[];
+  matched_subdomains: string[];
+  domain_alignment: string;
+  compatibility_fit_band: string;
+  target_level_gap?: number;
+  education_level_gap?: number;
+  missing_required_skills?: number;
+  confidence_score: number;
+  reason: string;
+}
+
 export interface ChatRecommendationItem {
   mentor_id: string;
   mentor_name: string;
@@ -18,6 +30,7 @@ export interface ChatRecommendationItem {
   score: number;
   match_percentage: number;
   reason: string;
+  explanation_metadata?: ExplanationMetadataDto;
 }
 
 export interface ChatProgramRecommendationItem {
@@ -31,10 +44,12 @@ export interface ChatProgramRecommendationItem {
   score: number;
   match_percentage: number;
   reason: string;
+  explanation_metadata?: ExplanationMetadataDto;
 }
 
 export interface ChatCommunityRecommendationItem {
   id: string;
+  name?: string;
   score: number;
   match_percentage: number;
   reason: string;
@@ -57,7 +72,7 @@ export interface ChatStatItem {
 export interface ChatResponseDto {
   language: string;
   intent: string;
-  response_type: 'text' | 'materials' | 'recommendation' | 'roadmap';
+  response_type: 'text' | 'materials' | 'recommendation' | 'roadmap' | string;
   answer: string;
   recommendations?: ChatRecommendationItem[];
   program_recommendations?: ChatProgramRecommendationItem[];

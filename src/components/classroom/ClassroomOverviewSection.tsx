@@ -2,6 +2,7 @@
 import { Calendar } from 'lucide-react';
 import Feed, { type FeedPostProps } from '../Feed';
 import { ClassroomUserLink } from './common/ClassroomUserLink';
+import { ProfileAvatar } from '../profile/ProfileAvatar';
 
 type ClassroomUpcomingSessionCard = {
   title: string;
@@ -62,9 +63,7 @@ const ClassroomOverviewSection = ({
     ? Math.max(0, Math.min(100, Math.round(progressPercent)))
     : 0;
 
-  const avatarUrl =
-    currentUserAvatarUrl?.trim() ||
-    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(currentUserName)}`;
+  const avatarUrl = currentUserAvatarUrl?.trim() || '';
 
   return (
     <section className="space-y-5">
@@ -172,9 +171,9 @@ const ClassroomOverviewSection = ({
             onClick={onAddPost}
             className="flex w-full items-center gap-4 rounded-2xl bg-[#EFF1F5] px-4 py-3 text-left transition hover:bg-[#E9ECF2]"
           >
-            <img
-              src={avatarUrl}
-              alt={`${currentUserName} avatar`}
+            <ProfileAvatar
+              pictureUrl={avatarUrl}
+              name={currentUserName}
               className="h-10 w-10 rounded-full"
             />
             <span className="text-sm text-[#9AA1B1]">Share a thought or ask the atelier...</span>

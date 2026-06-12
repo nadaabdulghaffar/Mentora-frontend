@@ -28,6 +28,7 @@ import { MenteeActivityContent } from './sections/MenteeActivityContent';
 import { SettingsModal } from './modals/SettingsModal';
 import { EditProfileModal } from './modals/EditProfileModal';
 import { EditEducationModal } from './modals/EditEducationModal';
+import { ReportProfileModal } from './modals/ReportProfileModal';
 import { notifySuccess, notifyError } from '../../utils/toast';
 import { followService } from '../../services/followService';
 import {
@@ -49,6 +50,7 @@ const ProfilePage = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editEducationOpen, setEditEducationOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -351,7 +353,7 @@ const ProfilePage = () => {
           onEdit={() => setEditProfileOpen(true)}
           onFollow={() => void handleFollowToggle()}
           onMessage={() => void handleMessage()}
-          onReport={() => undefined}
+          onReport={() => setReportModalOpen(true)}
         />
 
         {/* Public-profile notice removed per request */}
@@ -427,7 +429,13 @@ const ProfilePage = () => {
             onSave={handleSaveEducation}
           />
         </>
-      ) : null}
+      ) : (
+        <ReportProfileModal
+          isOpen={reportModalOpen}
+          onClose={() => setReportModalOpen(false)}
+          targetId={profile.userId}
+        />
+      )}
     </Layout>
   );
 };

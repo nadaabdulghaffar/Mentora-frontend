@@ -1,5 +1,6 @@
 import type { ExploreItem } from '../exploreTypes';
 import { Star } from 'lucide-react';
+import { ProfileAvatar } from '../../../components/profile/ProfileAvatar';
 
 interface ExploreMentorCardProps {
   item: ExploreItem;
@@ -33,10 +34,10 @@ export default function ExploreMentorCard({ item, onClick }: ExploreMentorCardPr
       {/* Avatar Section */}
       <div className="relative flex justify-center -mt-14 px-4">
         <div className="relative inline-block shrink-0">
-          <img 
-            src={item.image || 'https://api.dicebear.com/7.x/notionists/svg?seed=' + encodeURIComponent(item.title)} 
-            alt={item.title} 
-            className="h-24 w-24 rounded-full border-4 border-white object-cover bg-white shadow-sm"
+          <ProfileAvatar 
+            pictureUrl={item.image} 
+            name={item.title}
+            className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-sm"
           />
           {/* Default Online Status dot for visual similarity to design */}
           <span className="absolute bottom-1 right-1 h-4 w-4 bg-[#22C55E] border-2 border-white rounded-full"></span>

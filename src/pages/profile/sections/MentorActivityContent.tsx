@@ -236,6 +236,7 @@ export function MentorActivityContent({
       if (res?.success) {
         notifySuccess(res.message || 'Program deleted successfully.');
         setOwnerPrograms((prev) => prev.filter((item) => item.id !== programId));
+        window.dispatchEvent(new Event("mentora:programs-updated"));
       } else {
         notifyError(res?.message || 'Could not delete program.');
       }

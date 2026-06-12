@@ -68,9 +68,7 @@ export async function mapProgramToExploreItem(
       : p.mentorName,
     isApplied,
     author: {
-      avatar:
-        mentorAvatar ??
-        `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(p.mentorName)}`,
+      avatar: mentorAvatar ?? "",
       name: p.mentorName,
     },
   };
@@ -109,9 +107,7 @@ export async function mapRoadmapToExploreItem(
     phases: listItem.subDomainName,
     durationBadge: formatRoadmapDuration(listItem.duration),
     author: {
-      avatar:
-        mentorAvatar ??
-        `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(mentorName || r.title)}`,
+      avatar: mentorAvatar ?? "",
       name: mentorName || "Unknown",
     },
   };

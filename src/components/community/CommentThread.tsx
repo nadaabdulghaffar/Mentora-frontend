@@ -219,12 +219,6 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
           name={comment.authorName}
           alt={comment.authorName}
           className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-          onError={(event) => {
-            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.authorName || 'User')}`;
-            if (event.currentTarget.src !== fallback) {
-              event.currentTarget.src = fallback;
-            }
-          }}
         />
 
         <div className="flex-1 min-w-0">

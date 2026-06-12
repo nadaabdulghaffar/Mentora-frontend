@@ -20,7 +20,17 @@ export const formatTimestamp = (timestamp: string): string => {
     return timestamp;
   }
 
-  const date = new Date(timestamp);
+  // Ensure UTC parsing for ISO strings missing timezone info
+  let parsedTimestamp = timestamp;
+  const parts = parsedTimestamp.split('T');
+  if (parts.length === 2) {
+    const timePart = parts[1];
+    if (!parsedTimestamp.endsWith('Z') && !timePart.includes('+') && !timePart.includes('-')) {
+      parsedTimestamp += 'Z';
+    }
+  }
+
+  const date = new Date(parsedTimestamp);
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 

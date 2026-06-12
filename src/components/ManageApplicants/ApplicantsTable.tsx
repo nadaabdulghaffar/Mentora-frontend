@@ -2,7 +2,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
-import { resolveProfilePictureUrl, getProfileAvatarFallback } from "../../utils/profileImageUrl";
+import { ProfileAvatar } from "../profile/ProfileAvatar";
 
 export default function ApplicantsTable({
   data,
@@ -87,14 +87,11 @@ export default function ApplicantsTable({
                 {/* NAME */}
                 <div className="flex items-center gap-4">
 
-                 <img
-  src={
-    app.menteeProfilePicture
-      ? resolveProfilePictureUrl(app.menteeProfilePicture)
-      : getProfileAvatarFallback(app.menteeName)
-  }
-  className="w-14 h-14 rounded-full object-cover"
-/>
+                 <ProfileAvatar
+                    pictureUrl={app.menteeProfilePicture}
+                    name={app.menteeName}
+                    className="w-14 h-14 rounded-full object-cover"
+                 />
 
                   <span className="font-semibold text-[17px]">
                     {app.menteeName}

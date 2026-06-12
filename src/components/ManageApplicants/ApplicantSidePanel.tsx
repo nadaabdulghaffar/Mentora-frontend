@@ -4,7 +4,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { resolveProfilePictureUrl, getProfileAvatarFallback } from "../../utils/profileImageUrl";
+import { ProfileAvatar } from "../profile/ProfileAvatar";
 
 export default function ApplicantSidePanel({
   applicant,
@@ -109,12 +109,9 @@ export default function ApplicantSidePanel({
           {/* PROFILE */}
           <div className="text-center">
 
-            <img
-              src={
-  applicant.menteeProfilePicture
-    ? resolveProfilePictureUrl(applicant.menteeProfilePicture)
-    : getProfileAvatarFallback(applicant.menteeName)
-}
+            <ProfileAvatar
+              pictureUrl={applicant.menteeProfilePicture}
+              name={applicant.menteeName}
               className="
                 w-24 h-24 rounded-full
                 mx-auto border-4

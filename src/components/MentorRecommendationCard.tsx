@@ -1,5 +1,7 @@
 import React from 'react';
 import { Lightbulb } from 'lucide-react';
+import { ProfileAvatar } from './profile/ProfileAvatar';
+import type { ExplanationMetadataDto } from '../services/chatService';
 
 export interface MentorRecommendationCardProps {
   id: string;
@@ -9,6 +11,7 @@ export interface MentorRecommendationCardProps {
   matchPercentage: number;
   matchReason?: string | null;
   matchReasons?: string[] | null;
+  explanationMetadata?: ExplanationMetadataDto | null;
   onSeeProfileClick: () => void;
   className?: string;
 }
@@ -20,9 +23,29 @@ export const MentorRecommendationCard: React.FC<MentorRecommendationCardProps> =
   matchPercentage,
   matchReason,
   matchReasons,
+  explanationMetadata,
   onSeeProfileClick,
   className = '',
 }) => {
+  const getCompatibilityColor = (band: string) => {
+    switch(band) {
+      case 'exact_fit': return 'bg-emerald-100 text-emerald-700 ring-emerald-500/20';
+      case 'near_fit': return 'bg-blue-100 text-blue-700 ring-blue-500/20';
+      case 'stretch_fit': return 'bg-amber-100 text-amber-700 ring-amber-500/20';
+      case 'weak_fit': return 'bg-slate-100 text-slate-700 ring-slate-500/20';
+      default: return 'bg-green-50 text-green-600 ring-green-500/20';
+    }
+  };
+
+  const getCompatibilityText = (band: string) => {
+    switch(band) {
+      case 'exact_fit': return 'Exact Fit';
+      case 'near_fit': return 'Strong Fit';
+      case 'stretch_fit': return 'Stretch Fit';
+      case 'weak_fit': return 'Exploratory';
+      default: return 'Good Match';
+    }
+  };
   return (
     <div className={`group relative flex flex-col h-full overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition-all hover:shadow-md hover:ring-primary/20 ${className}`}>
       {/* Top Background Pattern (Shared visual language with ExploreMentorCard) */}
@@ -44,10 +67,10 @@ export const MentorRecommendationCard: React.FC<MentorRecommendationCardProps> =
       {/* Avatar Section */}
       <div className="relative flex justify-center -mt-14 px-4">
         <div className="relative inline-block shrink-0">
-          <img 
-            src={imageUrl || 'https://api.dicebear.com/7.x/notionists/svg?seed=' + encodeURIComponent(name)} 
-            alt={name} 
-            className="h-24 w-24 rounded-full border-4 border-white object-cover bg-white shadow-sm"
+          <ProfileAvatar 
+            pictureUrl={imageUrl} 
+            name={name} 
+            className="h-24 w-24 rounded-full border-4 border-white object-cover shadow-sm"
           />
           <span className="absolute bottom-1 right-1 h-4 w-4 bg-[#22C55E] border-2 border-white rounded-full"></span>
         </div>
@@ -62,11 +85,15 @@ export const MentorRecommendationCard: React.FC<MentorRecommendationCardProps> =
               {domain}
             </span>
           )}
-          {matchPercentage !== undefined && (
+          {explanationMetadata?.compatibility_fit_band ? (
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider ring-1 ring-inset ${getCompatibilityColor(explanationMetadata.compatibility_fit_band)}`}>
+              {getCompatibilityText(explanationMetadata.compatibility_fit_band)}
+            </span>
+          ) : matchPercentage !== undefined ? (
             <span className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-[11px] font-bold text-green-600 uppercase tracking-wider ring-1 ring-inset ring-green-500/20">
               {matchPercentage}% Match
             </span>
-          )}
+          ) : null}
         </div>
         
         {/* Name */}
@@ -74,8 +101,40 @@ export const MentorRecommendationCard: React.FC<MentorRecommendationCardProps> =
           {name}
         </h3>
         
-        {/* Match Reasons (AI Insights) */}
-        {(matchReasons?.length || matchReason) && (
+        {/* AI Insights & Match Reasons */}
+        {explanationMetadata ? (
+          <div className="mt-2 mb-4 w-full flex flex-col items-start text-left px-3 py-2.5 bg-slate-50/80 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2 mb-1.5 w-full">
+              <div className="shrink-0 rounded-full bg-[#F3E8FF] p-1 text-[#8B5CF6]">
+                <Lightbulb size={12} strokeWidth={2.5} />
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                Why this mentor?
+              </span>
+            </div>
+            
+            <ul className="text-[11px] font-medium text-slate-600 leading-snug space-y-1.5">
+              {explanationMetadata.matched_skills && explanationMetadata.matched_skills.length > 0 && (
+                <li className="flex items-start gap-1.5">
+                  <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                  <span><strong>Skills:</strong> {explanationMetadata.matched_skills.slice(0, 3).join(', ')}</span>
+                </li>
+              )}
+              {explanationMetadata.target_level_gap !== undefined && explanationMetadata.target_level_gap < 0 && (
+                <li className="flex items-start gap-1.5">
+                  <span className="text-amber-500 shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                  <span className="text-amber-600">Stretch goal: Requires higher level</span>
+                </li>
+              )}
+              {explanationMetadata.reason && (
+                <li className="flex items-start gap-1.5 mt-1.5 pt-1.5 border-t border-slate-200/60">
+                  <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                  <span className="line-clamp-2">{explanationMetadata.reason.replace(/^•\s*/, '')}</span>
+                </li>
+              )}
+            </ul>
+          </div>
+        ) : (matchReasons?.length || matchReason) ? (
           <div className="mt-2 mb-4 w-full flex flex-col items-start text-left px-3 py-2.5 bg-slate-50/80 rounded-xl border border-slate-100">
             <div className="flex items-center gap-2 mb-1.5 w-full">
               <div className="shrink-0 rounded-full bg-[#F3E8FF] p-1 text-[#8B5CF6]">
@@ -86,21 +145,23 @@ export const MentorRecommendationCard: React.FC<MentorRecommendationCardProps> =
               </span>
             </div>
             
-            <ul className="text-[11px] font-medium text-slate-600 leading-snug list-none pl-[26px] space-y-1">
+            <ul className="text-[11px] font-medium text-slate-600 leading-snug space-y-1.5">
               {matchReasons && matchReasons.length > 0 ? (
                 matchReasons.map((reason, idx) => (
-                  <li key={idx} className="line-clamp-2 relative before:content-['•'] before:absolute before:-left-2.5 before:text-[#8B5CF6]">
-                    {reason}
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                    <span className="line-clamp-2">{reason.replace(/^•\s*/, '')}</span>
                   </li>
                 ))
               ) : (
-                <li className="line-clamp-3 relative before:content-['•'] before:absolute before:-left-2.5 before:text-[#8B5CF6]">
-                  {matchReason}
+                <li className="flex items-start gap-1.5">
+                  <span className="text-[#8B5CF6] shrink-0 mt-[1px] leading-tight text-[14px]">•</span>
+                  <span className="line-clamp-2">{matchReason?.replace(/^•\s*/, '')}</span>
                 </li>
               )}
             </ul>
           </div>
-        )}
+        ) : null}
 
         <div className="mt-auto pt-2 w-full">
           <button 

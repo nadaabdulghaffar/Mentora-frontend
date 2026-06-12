@@ -19,6 +19,7 @@ import Layout from "../../shared/components/Layout";
 
 import PhaseCard from "../../components/roadmap-builder/roadmap/PhaseCard";
 import EmbeddedRoadmapStructure from "../../components/roadmap-builder/EmbeddedRoadmapStructure";
+import { ProfileAvatar } from "../../components/profile/ProfileAvatar";
 
 import { useRoadmapBuilderStore } from "../../store/roadmapBuilderStore";
 
@@ -418,21 +419,9 @@ const subDomains =
                 "
               >
 
-                <img
-                  src={
-  basicInfo.profilePictureUrl
-    ? toAbsoluteFileUrl(
-        basicInfo.profilePictureUrl
-      )
-    : `https://ui-avatars.com/api/?name=${
-        basicInfo.mentorName ||
-        "Mentor"
-      }`
-}
-                  alt={
-                    basicInfo.mentorName ||
-                    "Mentor"
-                  }
+                <ProfileAvatar
+                  pictureUrl={basicInfo.profilePictureUrl}
+                  name={basicInfo.mentorName || "Mentor"}
                   className="
                     h-14 w-14
                     rounded-full

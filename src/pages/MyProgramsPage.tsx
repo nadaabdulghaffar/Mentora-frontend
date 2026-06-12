@@ -47,6 +47,15 @@ const MyProgramsPage = () => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [programs, setPrograms] = useState<MyProgramItem[]>([]);
+  const [refreshCount, setRefreshCount] = useState(0);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setRefreshCount((c) => c + 1);
+    };
+    window.addEventListener("mentora:programs-updated", handleUpdate);
+    return () => window.removeEventListener("mentora:programs-updated", handleUpdate);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -74,125 +83,133 @@ if (localUser && isMounted) {
             const role = String(response.data.role).toLowerCase();
 
 if (role === "mentor") {
-  const programsRes =
-    await getMyPublishedPrograms();
+  const programsRes = await getMyPublishedPrograms();
 
-  if (
-    programsRes.success &&
-    programsRes.data
-  ) {
-          const mapped = await Promise.all(
-            programsRes.data.items.map(async (p: any) => {
-              const programId = p.programId ?? p.ProgramId;
-              if (!programId) {
-                console.error("ProgramId is missing in API response for Mentor published programs:", p);
-              }
-
-              let progress = 0;
-              try {
-                if (programId) {
-                  const dashboardRes = await classroomService.getClassroomDashboard(programId);
-                  if (dashboardRes?.success && dashboardRes.data) {
-                    progress = dashboardRes.data.averageRoadmapCompletion || 0;
-                  }
-                }
-              } catch {
-                // Ignore if no classroom dashboard exists yet
-              }
-
-              return {
-                id: String(programId),
-                title: p.title,
-                description: p.description,
-                tag: p.domainName?.toUpperCase?.() ?? "PROGRAM",
-                phases: p.subDomainName ?? p.SubDomainName ?? p.subdomainName ?? "SUB-DOMAIN",
-                subDomainName: p.subDomainName ?? p.SubDomainName ?? p.subdomainName,
-                image: resolveImageUrl(p.programImageUrl),
-                progress,
-              };
-            })
-          );
+  if (programsRes.success && programsRes.data) {
+    const initialMapped = programsRes.data.items.map((p: any) => {
+      const programId = p.programId ?? p.ProgramId;
+      if (!programId) console.error("ProgramId is missing in API response for Mentor published programs:", p);
+      return {
+        id: String(programId),
+        title: p.title,
+        description: p.description,
+        tag: p.domainName?.toUpperCase?.() ?? "PROGRAM",
+        phases: p.subDomainName ?? p.SubDomainName ?? p.subdomainName ?? "SUB-DOMAIN",
+        subDomainName: p.subDomainName ?? p.SubDomainName ?? p.subdomainName,
+        image: resolveImageUrl(p.programImageUrl),
+        progress: 0,
+      };
+    });
 
     if (isMounted) {
-      setPrograms(mapped);
+      setPrograms(initialMapped);
+      setLoading(false); // Stop loading immediately
     }
+
+    // Lazy load progress
+    programsRes.data.items.forEach(async (p: any) => {
+      const programId = p.programId ?? p.ProgramId;
+      if (programId) {
+        try {
+          const dashboardRes = await classroomService.getClassroomDashboard(programId);
+          if (dashboardRes?.success && dashboardRes.data) {
+            const progress = dashboardRes.data.averageRoadmapCompletion || 0;
+            if (isMounted) {
+              setPrograms((prev) =>
+                prev.map((prog) => (prog.id === String(programId) ? { ...prog, progress } : prog))
+              );
+            }
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    });
   }
 } else {
-  const appsRes =
-    await getMyApplications();
+  const appsRes = await getMyApplications();
 
-  if (
-    appsRes.success &&
-    appsRes.data
-  ) {
-    const accepted =
-      appsRes.data.items.filter(
-        (a: any) =>
-          a.status === "Accepted"
-      );
+  if (appsRes.success && appsRes.data) {
+    const accepted = appsRes.data.items.filter((a: any) => a.status === "Accepted");
 
-    const mapped = await Promise.all(
-      accepted.map(async (a: any) => {
-        const programId = Number(a.programId ?? a.ProgramId ?? 0);
-        if (!programId || programId <= 0) {
-          console.error("ProgramId is missing or invalid in API response for Mentee applications:", a);
-        }
+    const initialMapped = accepted.map((a: any) => {
+      const programId = Number(a.programId ?? a.ProgramId ?? 0);
+      if (!programId || programId <= 0) console.error("ProgramId is missing in API response for Mentee applications:", a);
 
-        let subDomainName =
-          a.subDomainName ?? a.SubDomainName ?? a.subdomainName;
-        let mentorName = a.mentorName;
-        let mentorAvatar = a.mentorProfilePicture;
-        let image = resolveImageUrl(a.programImageUrl);
-        let progress = 0;
+      const compactDescription = String(a.programDescription ?? "").replace(/\s+/g, " ").trim().slice(0, 110);
+      let subDomainName = a.subDomainName ?? a.SubDomainName ?? a.subdomainName;
 
-        // Use ProgramView as source of truth for My Programs card metadata.
-        if (programId > 0) {
-          try {
-            const view = await getProgramView(programId);
-            subDomainName = view?.subDomainName || subDomainName;
-            mentorName = view?.mentorName || mentorName;
-            mentorAvatar = view?.profilePictureUrl || mentorAvatar;
-            image = resolveImageUrl(view?.programImageUrl) || image;
-          } catch {
-            // Keep fallback values from my-applications response.
-          }
-
-          try {
-            const completionRes = await classroomService.getClassroomCompletion(programId);
-            if (completionRes?.success && completionRes.data?.students) {
-              const mentee = completionRes.data.students.find((s: any) => s.studentId === response.data?.userId);
-              if (mentee) {
-                progress = mentee.overallCompletionPercent || 0;
-              }
-            }
-          } catch {
-            // Ignore if no classroom completion exists yet
-          }
-        }
-
-        const compactDescription = String(a.programDescription ?? "")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 110);
-
-        return {
-          id: String(programId),
-          title: a.programTitle,
-          description: compactDescription,
-          tag: a.mentorDomain?.toUpperCase?.() ?? "PROGRAM",
-          phases: subDomainName ?? "SUB-DOMAIN",
-          subDomainName,
-          image,
-          mentorName,
-          mentorAvatar: resolveImageUrl(mentorAvatar),
-          progress,
-        };
-      })
-    );
+      return {
+        id: String(programId),
+        title: a.programTitle,
+        description: compactDescription,
+        tag: a.mentorDomain?.toUpperCase?.() ?? "PROGRAM",
+        phases: subDomainName ?? "SUB-DOMAIN",
+        subDomainName,
+        image: resolveImageUrl(a.programImageUrl),
+        mentorName: a.mentorName,
+        mentorAvatar: resolveImageUrl(a.mentorProfilePicture),
+        progress: 0,
+      };
+    });
 
     if (isMounted) {
-      setPrograms(mapped);
+      setPrograms(initialMapped);
+      setLoading(false); // Stop loading immediately
     }
+
+    // Lazy load progress and program view
+    accepted.forEach(async (a: any) => {
+      const programId = Number(a.programId ?? a.ProgramId ?? 0);
+      if (programId > 0) {
+        let updatedSubDomainName;
+        let updatedMentorName;
+        let updatedMentorAvatar;
+        let updatedImage;
+        let updatedProgress;
+
+        try {
+          const view = await getProgramView(programId);
+          updatedSubDomainName = view?.subDomainName;
+          updatedMentorName = view?.mentorName;
+          updatedMentorAvatar = view?.profilePictureUrl;
+          updatedImage = resolveImageUrl(view?.programImageUrl);
+        } catch {
+          // Ignore
+        }
+
+        try {
+          const completionRes = await classroomService.getClassroomCompletion(programId);
+          if (completionRes?.success && completionRes.data?.students) {
+            const mentee = completionRes.data.students.find((s: any) => s.studentId === response.data?.userId);
+            if (mentee) {
+              updatedProgress = mentee.overallCompletionPercent || 0;
+            }
+          }
+        } catch {
+          // Ignore
+        }
+
+        if (isMounted && (updatedSubDomainName || updatedMentorName || updatedMentorAvatar || updatedImage || updatedProgress !== undefined)) {
+          setPrograms((prev) =>
+            prev.map((prog) => {
+              if (prog.id === String(programId)) {
+                return {
+                  ...prog,
+                  phases: updatedSubDomainName || prog.phases,
+                  subDomainName: updatedSubDomainName || prog.subDomainName,
+                  mentorName: updatedMentorName || prog.mentorName,
+                  mentorAvatar: updatedMentorAvatar ? resolveImageUrl(updatedMentorAvatar) : prog.mentorAvatar,
+                  image: updatedImage || prog.image,
+                  progress: updatedProgress !== undefined ? updatedProgress : prog.progress,
+                };
+              }
+              return prog;
+            })
+          );
+        }
+      }
+    });
   }
 }
             setLoading(false);
@@ -213,7 +230,7 @@ if (role === "mentor") {
     return () => {
       isMounted = false;
     };
-  }, [navigate]);
+  }, [navigate, refreshCount]);
 
   const role = user?.role?.toLowerCase();
   const isMentor = role === "mentor";
@@ -269,8 +286,7 @@ if (role === "mentor") {
                     ? {
                         name: program.mentorName ?? "Mentor",
                         avatar:
-                          program.mentorAvatar ??
-                          "https://randomuser.me/api/portraits/lego/1.jpg",
+                          program.mentorAvatar ?? "",
                       }
                     : undefined
                 }

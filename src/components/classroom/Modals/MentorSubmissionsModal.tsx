@@ -1,6 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { ClassroomUserLink } from '../common/ClassroomUserLink';
+import { ProfileAvatar } from '../../profile/ProfileAvatar';
 
 export type MentorSubmissionSummary = {
   id: string;
@@ -107,10 +108,10 @@ const MentorSubmissionsModal = ({
             filteredSubmissions.map((submission) => (
               <div key={submission.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E6E9F2] bg-[#FCFCFE] px-4 py-4">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={submission.studentAvatar}
-                    alt={submission.studentName}
-                    className="h-11 w-11 rounded-full object-cover"
+                  <ProfileAvatar
+                    pictureUrl={submission.studentAvatar}
+                    name={submission.studentName}
+                    className="h-11 w-11 rounded-full object-cover shrink-0"
                   />
                   <div>
                     <div className="flex items-center gap-2">

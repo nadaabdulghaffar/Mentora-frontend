@@ -34,10 +34,6 @@ export function toStorageProfilePictureUrl(url?: string | null): string | undefi
   return trimmed;
 }
 
-export function getProfileAvatarFallback(name?: string): string {
-  const label = name?.trim() || 'User';
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&backgroundColor=b6e3f4`;
-}
 
 export function mapProfilePictureFields(profilePictureUrl?: string | null): {
   profilePicturePath: string;

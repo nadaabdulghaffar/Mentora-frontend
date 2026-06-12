@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import Layout from "../shared/components/Layout";
+import { ProfileAvatar } from "../components/profile/ProfileAvatar";
 import authAPI from "../services/authService";
 import { chatHubService } from "../services/chatHubService";
 import { messageKeys } from "../hooks/useUnreadMessageCount";
@@ -37,7 +38,7 @@ type Contact = {
   otherUserId: string;
   name: string;
   role: string;
-  avatar: string;
+  avatar: string | null;
   preview: string;
   time: string;
   unread?: number;
@@ -57,9 +58,7 @@ type ChatMessage = {
   attachment?: ChatMessageAttachment;
 };
 
-const DEFAULT_AVATAR =
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80";
-
+// Removed hardcoded DEFAULT_AVATAR
 function formatListTime(value: string | null | undefined): string {
   if (!value) {
     return "";
@@ -104,7 +103,7 @@ function mapConversationToContact(
     role: "Student",
     avatar: conversation.otherUserProfilePicture
       ? toAbsoluteFileUrl(conversation.otherUserProfilePicture)
-      : DEFAULT_AVATAR,
+      : null,
     preview,
     time: formatListTime(conversation.lastMessageSentAt),
     unread: conversation.unreadCount > 0 ? conversation.unreadCount : undefined,
@@ -625,16 +624,10 @@ const MessagesPage = () => {
                       }`}
                     >
                       <div className="relative">
-                        <img
-                          src={contact.avatar}
-                          alt={contact.name}
+                        <ProfileAvatar
+                          pictureUrl={contact.avatar}
+                          name={contact.name}
                           className="h-11 w-11 rounded-full object-cover"
-                          onError={(event) => {
-                            const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}`;
-                            if (event.currentTarget.src !== fallback) {
-                              event.currentTarget.src = fallback;
-                            }
-                          }}
                         />
                       </div>
 
@@ -667,16 +660,10 @@ const MessagesPage = () => {
               <>
                 <header className="flex items-center border-b border-[#E2E5EE] bg-[#F8F9FD] px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={activeContact.avatar}
-                      alt={activeContact.name}
+                    <ProfileAvatar
+                      pictureUrl={activeContact.avatar}
+                      name={activeContact.name}
                       className="h-11 w-11 rounded-full object-cover"
-                      onError={(event) => {
-                        const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(activeContact.name)}`;
-                        if (event.currentTarget.src !== fallback) {
-                          event.currentTarget.src = fallback;
-                        }
-                      }}
                     />
                     <div>
                       <button

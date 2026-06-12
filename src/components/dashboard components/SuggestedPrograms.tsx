@@ -38,9 +38,9 @@ const SuggestedPrograms = () => {
                         <ProgramCard
                             key={program.id}
                             variant="dual-buttons"
-                            image={program.avatarUrl || undefined}
                             tag={program.headline?.toUpperCase() || undefined}
-                            phases={`${program.aiMatchScore}% MATCHING`}
+                            matchPercentage={program.aiMatchScore}
+                            matchReasons={program.aiMatchReasons}
                             title={program.name}
                             description={program.description || ''}
                             primaryButtonText="View Details"

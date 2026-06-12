@@ -12,14 +12,18 @@ import {
   type ChatMaterialItem,
   type ChatStatItem,
   type ChatRecommendationItem,
-  type ChatProgramRecommendationItem
+  type ChatProgramRecommendationItem,
+  type ChatCommunityRecommendationItem
 } from "../services/chatService";
 
 import { ChatBubble } from "../components/chat/ChatBubble";
 import { ChatMaterialsWidget } from "../components/chat/ChatMaterialsWidget";
 import { ChatStatsWidget } from "../components/chat/ChatStatsWidget";
 import { ChatRecommendationsWidget } from "../components/chat/ChatRecommendationsWidget";
+import { ChatMyProgramsWidget, type MyProgramItem } from "../components/chat/ChatMyProgramsWidget";
 import { MENTEE_CHAT_CHIPS, MENTOR_CHAT_CHIPS } from "../constants/chatbotPrompts";
+import { getMyPublishedPrograms } from "../services/programService";
+import { classroomService } from "../services/classroomService";
 
 const MAX_HISTORY_MESSAGES = 10;
 
@@ -30,11 +34,13 @@ type ChatMessage = {
   role: ChatRole;
   text: string;
   time: string;
-  responseType?: 'text' | 'materials' | 'recommendation' | 'roadmap';
+  responseType?: 'text' | 'materials' | 'recommendation' | 'roadmap' | 'my_programs';
   materials?: ChatMaterialItem[];
   stats?: ChatStatItem[];
   mentors?: ChatRecommendationItem[];
   programs?: ChatProgramRecommendationItem[];
+  communities?: ChatCommunityRecommendationItem[];
+  myPrograms?: MyProgramItem[];
 };
 
 function formatTime(d: Date) {
@@ -72,6 +78,7 @@ const MentoAIPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   const currentUser = authAPI.getCurrentUser();
@@ -96,11 +103,13 @@ const MentoAIPage = () => {
         role: "assistant",
         text: response.answer || "",
         time: formatTime(new Date()),
-        responseType: response.response_type,
+        responseType: response.response_type as "text" | "materials" | "recommendation" | "roadmap" | "my_programs" | undefined,
         materials: response.materials,
         stats: response.stats,
         mentors: response.recommendations,
-        programs: response.program_recommendations
+        programs: response.program_recommendations,
+        communities: response.community_recommendations,
+        myPrograms: (response as any).myPrograms
       },
     ]);
   }, []);
@@ -154,6 +163,49 @@ const MentoAIPage = () => {
           response = await sendMenteeChat(dto);
         }
 
+        // Intercept my_programs intent to fetch and render mentor programs natively in the chat
+        if (response.intent === "my_programs" && activeRoleMode === 'mentor') {
+          try {
+            const programsRes = await getMyPublishedPrograms();
+            if (programsRes.success && programsRes.data && programsRes.data.items.length > 0) {
+              const mappedPrograms = await Promise.all(
+                programsRes.data.items.map(async (p: any) => {
+                  const programId = String(p.programId ?? p.ProgramId);
+                  let progress = 0;
+                  try {
+                    const dashboardRes = await classroomService.getClassroomDashboard(Number(programId));
+                    if (dashboardRes?.success && dashboardRes.data) {
+                      progress = dashboardRes.data.averageRoadmapCompletion || 0;
+                    }
+                  } catch {}
+
+                  const resolveImageUrl = (url?: string) => url ? (url.startsWith("http") ? url : `${(import.meta.env.VITE_API_URL ?? "http://localhost:5069/api").replace(/\/api\/?$/, "")}${url.startsWith("/") ? url : `/${url}`}`) : undefined;
+
+                  return {
+                    id: programId,
+                    title: p.title,
+                    description: p.description,
+                    tag: p.domainName?.toUpperCase?.() ?? "PROGRAM",
+                    phases: p.subDomainName ?? p.SubDomainName ?? p.subdomainName ?? "SUB-DOMAIN",
+                    subDomainName: p.subDomainName ?? p.SubDomainName ?? p.subdomainName,
+                    image: resolveImageUrl(p.programImageUrl),
+                    progress,
+                  };
+                })
+              );
+
+              (response as any).response_type = "my_programs";
+              (response as any).myPrograms = mappedPrograms;
+              response.answer = language === "ar" ? `إليك قائمة برامجك (${mappedPrograms.length}):` : `Here are your programs (${mappedPrograms.length}):`;
+            } else {
+              response.answer = language === "ar" ? "ليس لديك برامج حتى الآن 📭" : "You don't have any programs yet 📭";
+              response.response_type = "text";
+            }
+          } catch (e) {
+            console.error("Failed to fetch native mentor programs:", e);
+          }
+        }
+
         pushAssistantMessage(response);
       } catch (err) {
         console.error("Chat API Error:", err);
@@ -168,6 +220,22 @@ const MentoAIPage = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  const handleChipClick = useCallback((promptText: string) => {
+    if (isTyping || pending) return;
+    setIsTyping(true);
+    setInput("");
+    let i = 0;
+    const interval = setInterval(() => {
+      setInput(promptText.slice(0, i + 1));
+      i++;
+      if (i >= promptText.length) {
+        clearInterval(interval);
+        setIsTyping(false);
+        sendText(promptText);
+      }
+    }, 15);
+  }, [isTyping, pending, sendText]);
 
   const autoSendExecuted = useRef(false);
 
@@ -253,8 +321,8 @@ const MentoAIPage = () => {
                   <button
                     key={p.label}
                     type="button"
-                    disabled={pending}
-                    onClick={() => sendText(p.label)}
+                    disabled={pending || isTyping}
+                    onClick={() => handleChipClick(p.label)}
                     className={`rounded-full px-4 py-2.5 text-sm font-medium shadow-sm transition hover:opacity-90 disabled:opacity-50 ${p.className}`}
                   >
                     {p.label}
@@ -267,9 +335,9 @@ const MentoAIPage = () => {
               <p className="mb-6 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                 Today
               </p>
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-6 min-w-0">
                 {messages.map((m) => (
-                  <div key={m.id} className="flex flex-col w-full gap-1">
+                  <div key={m.id} className="flex flex-col w-full min-w-0 gap-1">
                     <ChatBubble role={m.role} text={m.text} time={m.time} isMarkdown={m.role === 'assistant'} />
                     {m.role === 'assistant' && m.stats && m.stats.length > 0 && (
                       <ChatStatsWidget stats={m.stats} />
@@ -277,8 +345,18 @@ const MentoAIPage = () => {
                     {m.role === 'assistant' && m.materials && m.materials.length > 0 && (
                       <ChatMaterialsWidget materials={m.materials} />
                     )}
-                    {m.role === 'assistant' && (m.mentors || m.programs) && (
-                      <ChatRecommendationsWidget mentors={m.mentors} programs={m.programs} />
+                    {m.role === 'assistant' && (m.mentors || m.programs || m.communities) && m.responseType !== "my_programs" && (
+                      <ChatRecommendationsWidget 
+                        mentors={m.mentors} 
+                        programs={m.programs} 
+                        communities={m.communities} 
+                      />
+                    )}
+                    {m.role === 'assistant' && m.responseType === "my_programs" && m.myPrograms && (
+                      <ChatMyProgramsWidget
+                        programs={m.myPrograms}
+                        isMentor={true}
+                      />
                     )}
                   </div>
                 ))}
@@ -306,7 +384,7 @@ const MentoAIPage = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder="How can I help you today?"
               disabled={pending}
-              className="w-full rounded-full border border-gray-200 bg-white py-3.5 pl-5 pr-14 text-sm text-gray-800 shadow-inner outline-none ring-primary/30 placeholder:text-gray-400 focus:ring-2 disabled:bg-gray-50"
+              className="w-full rounded-full border border-gray-200 bg-white py-3.5 pl-5 pr-14 text-base text-gray-800 shadow-inner outline-none ring-primary/30 placeholder:text-gray-400 focus:ring-2 disabled:bg-gray-50"
             />
             <button
               type="submit"

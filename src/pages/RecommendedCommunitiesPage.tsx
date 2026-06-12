@@ -41,6 +41,9 @@ const RecommendedCommunitiesPage = () => {
                   id={community.id}
                   name={community.name}
                   domain={community.headline}
+                  matchPercentage={community.aiMatchScore}
+                  matchReasons={community.aiMatchReasons}
+                  imageUrl={community.avatarUrl}
                   onExploreClick={() => navigate(`/community/${community.id}`)}
                   className="h-full"
                 />

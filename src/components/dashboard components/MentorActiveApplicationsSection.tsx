@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getRecentApplications } from "../../services/programService";
+import { ProfileAvatar } from "../profile/ProfileAvatar";
 
 const COMPONENT_NAME = "MentorActiveApplicationsSection";
 
@@ -83,11 +84,10 @@ onClick={() =>
           >
             {/* NAME */}
             <div className="flex items-center gap-4">
-              <img
-src={
-  app.applicantAvatar ??
-  "https://i.pravatar.cc/100"
-}                className="w-12 h-12 rounded-full object-cover"
+              <ProfileAvatar
+                pictureUrl={app.applicantAvatar}
+                name={app.applicantName}
+                className="w-12 h-12 rounded-full object-cover"
               />
 
               <span className="font-semibold text-[16px] text-[#1F2432]">

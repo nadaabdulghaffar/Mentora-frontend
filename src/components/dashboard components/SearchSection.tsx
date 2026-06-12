@@ -15,11 +15,28 @@ const SearchSection = ({
     suggestionChips = MENTEE_DASHBOARD_CHIPS
 }: SearchSectionProps) => {
     const [message, setMessage] = useState("");
+    const [isTyping, setIsTyping] = useState(false);
     const navigate = useNavigate();
 
     const handleSend = (promptText: string) => {
         if (!promptText.trim()) return;
         navigate("/mento-ai", { state: { autoSendPrompt: promptText } });
+    };
+
+    const handleChipClick = (promptText: string) => {
+        if (isTyping) return;
+        setIsTyping(true);
+        setMessage("");
+        let i = 0;
+        const interval = setInterval(() => {
+            setMessage(promptText.slice(0, i + 1));
+            i++;
+            if (i >= promptText.length) {
+                clearInterval(interval);
+                setIsTyping(false);
+                handleSend(promptText);
+            }
+        }, 15); // Type very quickly
     };
 
     const onSubmit = (e: FormEvent) => {
@@ -47,8 +64,9 @@ const SearchSection = ({
                         <button
                             key={label}
                             type="button"
-                            onClick={() => handleSend(label)}
-                            className={`rounded-full px-3.5 py-2 text-left text-xs font-medium text-gray-900 transition sm:text-sm ${className}`}
+                            disabled={isTyping}
+                            onClick={() => handleChipClick(label)}
+                            className={`rounded-full px-3.5 py-2 text-left text-xs font-medium text-gray-900 transition sm:text-sm ${className} disabled:opacity-50`}
                         >
                             {label}
                         </button>

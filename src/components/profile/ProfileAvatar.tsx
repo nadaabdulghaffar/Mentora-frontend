@@ -1,48 +1,65 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  getProfileAvatarFallback,
-  resolveProfilePictureUrl,
-} from '../../utils/profileImageUrl';
+import { resolveProfilePictureUrl } from '../../utils/profileImageUrl';
 
-export interface ProfileAvatarProps
-  extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
+export interface ProfileAvatarProps {
   /** Relative or absolute profile picture URL from the API or upload response. */
   pictureUrl?: string | null;
   /** Used for the generated fallback when the image fails to load. */
   name?: string;
+  alt?: string;
+  className?: string;
+  onClick?: () => void;
+}
+
+function getInitials(name?: string): string {
+  if (!name || !name.trim()) return 'U';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return parts[0].substring(0, 2).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export function ProfileAvatar({
   pictureUrl,
   name,
   alt = '',
-  className,
-  ...imgProps
+  className = '',
+  onClick,
 }: ProfileAvatarProps) {
   const resolvedSrc = useMemo(
     () => resolveProfilePictureUrl(pictureUrl),
     [pictureUrl]
   );
-  const fallbackSrc = useMemo(() => getProfileAvatarFallback(name), [name]);
-  const [src, setSrc] = useState(() => resolvedSrc || fallbackSrc);
+  
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    setSrc(resolvedSrc || fallbackSrc);
-  }, [resolvedSrc, fallbackSrc]);
+    setImageError(false);
+  }, [resolvedSrc]);
 
-  const handleError = () => {
-    if (src !== fallbackSrc) {
-      setSrc(fallbackSrc);
-    }
-  };
+  if (resolvedSrc && !imageError) {
+    return (
+      <img
+        src={resolvedSrc}
+        alt={alt || name || 'Avatar'}
+        className={className}
+        onError={() => setImageError(true)}
+        onClick={onClick}
+      />
+    );
+  }
 
+  // Fallback to initials
+  const initials = getInitials(name);
+  
   return (
-    <img
-      {...imgProps}
-      src={src}
-      alt={alt}
-      className={className}
-      onError={handleError}
-    />
+    <div
+      onClick={onClick}
+      className={`flex items-center justify-center bg-[#6D5DD3] text-white font-semibold overflow-hidden shrink-0 ${className}`}
+      title={name}
+    >
+      {initials}
+    </div>
   );
 }

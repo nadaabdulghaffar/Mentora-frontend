@@ -100,9 +100,7 @@ export function mapPublishedProgramToExploreStyle(
     isApplied,
     author: {
       name: mentorDisplay.name,
-      avatar:
-        mentorDisplay.avatar ??
-        `https://api.dicebear.com/7.x/notionists/svg?seed=${encodeURIComponent(mentorDisplay.name)}`,
+      avatar: mentorDisplay.avatar ?? '',
     },
     deadline: (p.deadline ?? p.Deadline) as string | undefined,
   };

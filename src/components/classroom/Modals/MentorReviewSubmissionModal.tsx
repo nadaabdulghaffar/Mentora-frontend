@@ -13,6 +13,7 @@ import {
 
 import type { MentorSubmissionSummary } from './MentorSubmissionsModal';
 import { ClassroomUserLink } from '../common/ClassroomUserLink';
+import { ProfileAvatar } from '../../profile/ProfileAvatar';
 
 export type MentorSubmissionAttachment = {
   id: string;
@@ -161,10 +162,10 @@ const MentorReviewSubmissionModal = ({
 
             <div className="flex items-center gap-3">
 
-              <img
-                src={submission.studentAvatar}
-                alt={submission.studentName}
-                className="h-10 w-10 rounded-full object-cover"
+              <ProfileAvatar
+                pictureUrl={submission.studentAvatar}
+                name={submission.studentName}
+                className="h-10 w-10 rounded-full object-cover shrink-0"
               />
 
               <div>

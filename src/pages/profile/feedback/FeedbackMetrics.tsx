@@ -1,10 +1,9 @@
-import { BarChart3, MessageSquare, Star } from 'lucide-react';
+import { MessageSquare, Star } from 'lucide-react';
 import { formatRating } from './utils';
 
 interface FeedbackMetricsProps {
   averageRating: number;
   totalReviews: number;
-  bayesianRating: number;
 }
 
 const metricConfig = [
@@ -22,24 +21,15 @@ const metricConfig = [
     iconClass: 'text-primary',
     bgClass: 'bg-primary/10',
   },
-  {
-    key: 'bayesian',
-    label: 'Bayesian Rating',
-    icon: BarChart3,
-    iconClass: 'text-[#5B45BE]',
-    bgClass: 'bg-[#F0EDFF]',
-  },
 ] as const;
 
 export function FeedbackMetrics({
   averageRating,
   totalReviews,
-  bayesianRating,
 }: FeedbackMetricsProps) {
   const values = {
     average: formatRating(averageRating),
     total: totalReviews.toLocaleString(),
-    bayesian: formatRating(bayesianRating),
   };
 
   return (
@@ -47,7 +37,7 @@ export function FeedbackMetrics({
       <h2 id="feedback-metrics-heading" className="sr-only">
         Feedback metrics
       </h2>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {metricConfig.map(({ key, label, icon: Icon, iconClass, bgClass }) => (
           <div
             key={key}
@@ -71,11 +61,6 @@ export function FeedbackMetrics({
                 <Icon size={22} className={iconClass} strokeWidth={2} />
               </span>
             </div>
-            {key === 'bayesian' ? (
-              <p className="mt-3 text-xs leading-relaxed text-[#6B7289]">
-                Weighted score that balances review volume with platform-wide averages.
-              </p>
-            ) : null}
           </div>
         ))}
       </div>

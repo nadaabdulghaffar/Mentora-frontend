@@ -13,6 +13,7 @@ export const mapCommunityResponse = (
     domainId: number;
     membersCount?: number;
     createdAt: string;
+    createdByUserName?: string;
     createdByUserProfilePicture?: string;
     isMember?: boolean;
     currentUserRole?: string;
@@ -46,6 +47,12 @@ export const mapCommunityResponse = (
 
     createdDate:
       data.createdAt,
+
+    creatorName:
+      data.createdByUserName,
+
+    creatorAvatar:
+      data.createdByUserProfilePicture,
 
     isJoined:
       data.isMember,

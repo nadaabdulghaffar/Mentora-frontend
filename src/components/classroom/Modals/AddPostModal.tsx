@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Image, Paperclip, Smile } from 'lucide-react';
 import { messagingService, isImageAttachment, toAbsoluteFileUrl } from '../../../services/messagingService';
+import { ProfileAvatar } from '../../profile/ProfileAvatar';
 
 export type AddPostAttachment = {
   id: string;
@@ -64,9 +65,7 @@ const AddPostModal = ({
     return null;
   }
 
-  const resolvedAvatar =
-    authorAvatarUrl?.trim() ||
-    `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(authorName)}`;
+  const resolvedAvatar = authorAvatarUrl?.trim() || '';
 
   const resetAndClose = () => {
     setContent('');
@@ -182,9 +181,9 @@ const AddPostModal = ({
 
         <div className="space-y-5">
           <div className="flex items-start gap-4 rounded-2xl border border-[#E6E9F2] bg-[#FCFCFE] p-4">
-            <img
-              src={resolvedAvatar}
-              alt="Your avatar"
+            <ProfileAvatar
+              pictureUrl={resolvedAvatar}
+              name={authorName}
               className="h-10 w-10 rounded-full object-cover"
             />
             <div className="flex-1 space-y-3">

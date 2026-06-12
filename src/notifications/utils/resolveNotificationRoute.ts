@@ -2,7 +2,7 @@ import {
   NOTIFICATION_NAVIGATION_FALLBACK_ROUTE,
   REFERENCE_TYPE_ROUTE_TEMPLATE,
 } from "../constants";
-import { ReferenceType, type NotificationDto, type ReferenceTypeValue } from "../types";
+import { ReferenceType, NotificationType, type NotificationDto, type ReferenceTypeValue } from "../types";
 
 export type NotificationNavigationTarget = {
   pathname: string;
@@ -38,17 +38,21 @@ function substituteRouteId(template: string, referenceId: string): string {
   return template.replace(":id", encodeURIComponent(referenceId));
 }
 
-/**
- * Adapts `REFERENCE_TYPE_ROUTE_TEMPLATE` entries to routes that exist in App.tsx.
- * Templates that already match a real route are used as-is after substitution.
- */
 function resolveVerifiedRoute(
   referenceType: ReferenceTypeValue,
   referenceId: string,
   notification: NotificationDto
 ): NotificationNavigationTarget {
+  const meta = notification.metadata || {};
+
   switch (referenceType) {
     case ReferenceType.Program:
+      if (notification.type === NotificationType.ApplicationAccepted) {
+        return {
+          pathname: `/classroom/${encodeURIComponent(referenceId)}`
+        };
+      }
+      // Mentee clicks ApplicationRejected or others
       return {
         pathname: substituteRouteId(
           REFERENCE_TYPE_ROUTE_TEMPLATE[ReferenceType.Application],
@@ -57,6 +61,12 @@ function resolveVerifiedRoute(
       };
 
     case ReferenceType.Application:
+      // Mentor clicks ApplicationSubmitted
+      if (meta.programId) {
+        return {
+          pathname: `/applications/${meta.programId}/manage`,
+        };
+      }
       return {
         pathname: substituteRouteId(
           REFERENCE_TYPE_ROUTE_TEMPLATE[ReferenceType.Application],
@@ -65,12 +75,19 @@ function resolveVerifiedRoute(
       };
 
     case ReferenceType.Submission:
-      return { pathname: "/my-programs" };
-
     case ReferenceType.ClassroomPost:
+      if (meta.programId) {
+        return { pathname: `/classroom/${meta.programId}` };
+      }
       return { pathname: "/my-programs" };
 
     case ReferenceType.CommunityPost:
+      if (meta.communityId) {
+        return {
+          pathname: `/community/${meta.communityId}`,
+          search: `?thread=${referenceId}`,
+        };
+      }
       return { pathname: "/my-communities" };
 
     case ReferenceType.Conversation:
@@ -89,16 +106,6 @@ function resolveVerifiedRoute(
       };
 
     case ReferenceType.Feedback:
-      if (notification.senderId) {
-        return {
-          pathname: substituteRouteId(
-            REFERENCE_TYPE_ROUTE_TEMPLATE[ReferenceType.UserProfile],
-            notification.senderId
-          ),
-          search: "?tab=reviews",
-        };
-      }
-
       return {
         pathname: "/profile",
         search: "?tab=reviews",
@@ -113,12 +120,14 @@ function resolveVerifiedRoute(
   }
 }
 
-function isFallbackRoute(referenceType: ReferenceTypeValue): boolean {
-  return (
-    referenceType === ReferenceType.Submission ||
-    referenceType === ReferenceType.ClassroomPost ||
-    referenceType === ReferenceType.CommunityPost
-  );
+function isFallbackRoute(referenceType: ReferenceTypeValue, notification: NotificationDto): boolean {
+  if (referenceType === ReferenceType.Submission || referenceType === ReferenceType.ClassroomPost) {
+    return !notification.metadata?.programId;
+  }
+  if (referenceType === ReferenceType.CommunityPost) {
+    return !notification.metadata?.communityId;
+  }
+  return false;
 }
 
 export function resolveNotificationRoute(
@@ -159,7 +168,7 @@ export function resolveNotificationRoute(
     status: "resolved",
     target,
     referenceType,
-    isFallback: isFallbackRoute(referenceType),
+    isFallback: isFallbackRoute(referenceType, notification),
   };
 }
 

@@ -78,10 +78,13 @@ const ProtectedRoute = ({ children, roles }: ProtectedRouteProps) => {
   if (roles && roles.length > 0) {
     if (!roles.includes(userRole)) {
       if (userRole === 'mentor') {
-        return <Navigate to="/mentor/dashboard" replace />
+        return <Navigate to="/profile" replace />
       }
       if (userRole === 'mentee') {
-        return <Navigate to="/dashboard" replace />
+        return <Navigate to="/profile" replace />
+      }
+      if (userRole === 'admin') {
+        return <Navigate to="/admin/dashboard" replace />
       }
       return <Navigate to="/login" replace />
     }

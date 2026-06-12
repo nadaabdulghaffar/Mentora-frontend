@@ -12,6 +12,7 @@ import api from "../config/api";
 import Layout from "../shared/components/Layout";
 import ApplyQuestionsModal
   from "../components/application/ApplyQuestionsModal";
+import { ProfileAvatar } from "../components/profile/ProfileAvatar";
 import { formatTargetLevel } from "../utils/roadmapDisplayUtils";
 import lookupAPI from "../services/lookupService";
 
@@ -609,11 +610,10 @@ const ApplicationDetailsPage = () => {
             {/* TOP CARD */}
             <div className="bg-white border border-[#E6E9F0] rounded-3xl p-8 sm:p-10 shadow-sm flex flex-col sm:flex-row gap-6">
 
-              <img
-                src={
-                  resolveImageUrl(program.profilePictureUrl) ||
-                  "https://via.placeholder.com/150"
-                } className="w-24 h-24 rounded-2xl object-cover"
+              <ProfileAvatar
+                pictureUrl={program.profilePictureUrl}
+                name={program.title}
+                className="w-24 h-24 rounded-2xl object-cover"
               />
 
               <div className="flex-1">
@@ -952,11 +952,9 @@ const ApplicationDetailsPage = () => {
 
               <div className="flex gap-4 items-center min-w-0">
 
-                <img
-                  src={
-                    resolveImageUrl(program.profilePictureUrl) ||
-                    "https://via.placeholder.com/100"
-                  }
+                <ProfileAvatar
+                  pictureUrl={program.profilePictureUrl}
+                  name={program.mentorName}
                   className="w-14 h-14 rounded-full object-cover shrink-0"
                 />
 

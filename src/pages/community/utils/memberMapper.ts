@@ -1,9 +1,6 @@
 import type { CommunityMember } from "../types";
 import { communityRoleFromApi } from "../../../constants/communityRoles";
-import {
-  getProfileAvatarFallback,
-  resolveProfilePictureUrl,
-} from "../../../utils/profileImageUrl";
+import { resolveProfilePictureUrl } from "../../../utils/profileImageUrl";
 
 export interface ApiMemberResponse {
   userId: string;
@@ -19,19 +16,9 @@ export function mapApiMemberToCommunityMember(
   return {
     id: member.userId,
     name: member.userName,
-    avatar:
-      resolveProfilePictureUrl(
-        member.profilePictureUrl
-      ) ||
-      getProfileAvatarFallback(
-        member.userName
-      ),
-    role: communityRoleFromApi(
-      member.role
-    ),
-    joinedDate: new Date(
-      member.joinedAt
-    ).toLocaleDateString(),
+    avatar: resolveProfilePictureUrl(member.profilePictureUrl) || "",
+    role: communityRoleFromApi(member.role),
+    joinedDate: new Date(member.joinedAt).toLocaleDateString(),
     bio: "",
   };
 }
@@ -39,7 +26,5 @@ export function mapApiMemberToCommunityMember(
 export function mapApiMembersToCommunityMembers(
   members: ApiMemberResponse[]
 ): CommunityMember[] {
-  return members.map(
-    mapApiMemberToCommunityMember
-  );
+  return members.map(mapApiMemberToCommunityMember);
 }

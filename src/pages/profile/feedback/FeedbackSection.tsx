@@ -267,7 +267,6 @@ export function FeedbackSection({ mentorUserId }: FeedbackSectionProps) {
       <FeedbackMetrics
         averageRating={data.averageRating}
         totalReviews={data.totalReviews}
-        bayesianRating={data.bayesianRating}
       />
 
       <AIInsightsSection mentorUserId={mentorUserId} />
